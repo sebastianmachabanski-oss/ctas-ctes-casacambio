@@ -12,7 +12,12 @@ export default async function CuentaCorrientePage({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const { data: profile } = await supabase.from('profiles').select('rol, cuenta_cte, nombre').eq('id', user.id).single()
+  const { data: profile } = await supabase
+  .from('profiles')
+  .select('rol, cuenta_cte, nombre')
+  .eq('id', user.id)
+  .returns<{ rol: string; cuenta_cte: string | null; nombre: string }>()
+  .single()
   if (!profile) redirect('/login')
   const cuentaCte = profile.rol === 'cliente' ? profile.cuenta_cte : null
   if (profile.rol === 'cliente' && !cuentaCte) {
