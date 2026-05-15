@@ -4,7 +4,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile } from '@/lib/supabase/types'
 const navItems = {
-  superusuario: [{ href: '/dashboard/cuenta-corriente', label: 'Cuentas Corrientes', icon: '📋' }],
+ superusuario: [
+  { href: '/dashboard/cuenta-corriente', label: 'Cuentas Corrientes', icon: '📋' },
+  { href: '/dashboard/admin/usuarios',   label: 'Usuarios',           icon: '👥' },
+],
   operador: [{ href: '/dashboard/cuenta-corriente', label: 'Cuentas Corrientes', icon: '📋' }],
   cliente: [{ href: '/dashboard/cuenta-corriente', label: 'Mi cuenta', icon: '📋' }],
 }
