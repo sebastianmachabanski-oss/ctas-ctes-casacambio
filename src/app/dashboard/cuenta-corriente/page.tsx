@@ -4,22 +4,6 @@ import FiltrosMovimientos from '@/components/cuenta-corriente/FiltrosMovimientos
 import TablaMovimientos from '@/components/cuenta-corriente/TablaMovimientos'
 import TarjetasSaldos from '@/components/cuenta-corriente/TarjetasSaldos'
 
-type ProfileRow = { rol: string; cuenta_cte: string | null; nombre: string }
-type DiarioRow = {
-  id: string; fecha: string; tipo: string; cuenta_cte: string
-  operacion: string; concepto: string | null; evento: string | null
-  detalle: string | null; recibo: string | null; moneda: string; monto: number
-  cc_pesos: number | null; cc_dolares: number | null; cc_euros: number | null; cc_reales: number | null
-  anulado: boolean; anulado_por: string | null; anulado_at: string | null
-  motivo_anulacion: string | null; notas: string | null; creado_por: string | null
-  created_at: string; updated_at: string
-}
-type TipoOp = { codigo: string; descripcion: string }
-type Saldo = {
-  cuenta_cte: string; saldo_pesos: number | null; saldo_dolares: number | null
-  saldo_euros: number | null; saldo_reales: number | null; ultimo_movimiento: string | null
-}
-
 export default async function CuentaCorrientePage({
   searchParams,
 }: {
@@ -30,19 +14,15 @@ export default async function CuentaCorrientePage({
   if (!user) redirect('/login')
 
   const { data: profileData } = await supabase
-    .from('profiles')
-    .select('rol, cuenta_cte, nombre')
-    .eq('id', user.id)
-    .single()
-
-  const profile = profileData as ProfileRow | null
+    .from('profiles').select('rol, cuenta_cte, nombre').eq('id', user.id).single()
+  const profile = profileData as { rol: string; cuenta_cte: string | null; nombre: string } | null
   if (!profile) redirect('/login')
 
   const cuentaCte = profile.rol === 'cliente' ? profile.cuenta_cte : null
 
   if (profile.rol === 'cliente' && !cuentaCte) {
     return (
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <div className="card p-6 text-center text-gray-500">
           Tu cuenta no está configurada. Contactá al administrador.
         </div>
@@ -53,10 +33,10 @@ export default async function CuentaCorrientePage({
   let saldosQuery = supabase.from('saldos_cuenta_corriente').select('*')
   if (cuentaCte) saldosQuery = saldosQuery.eq('cuenta_cte', cuentaCte)
   const { data: saldosData } = await saldosQuery
-  const saldos = (saldosData ?? []) as Saldo[]
+  const saldos = (saldosData ?? []) as any[]
 
   const { desde, hasta, concepto, operacion } = searchParams
-  let movimientos: DiarioRow[] = []
+  let movimientos: any[] = []
   let totalMovimientos = 0
 
   if (desde && hasta) {
@@ -68,22 +48,22 @@ export default async function CuentaCorrientePage({
     if (concepto) query = query.ilike('concepto', `%${concepto}%`)
     if (operacion) query = query.eq('operacion', operacion)
     const { data, count } = await query
-    movimientos = (data ?? []) as DiarioRow[]
+    movimientos = (data ?? []) as any[]
     totalMovimientos = count ?? 0
   }
 
   const { data: tiposData } = await supabase
     .from('tipos_operacion').select('codigo, descripcion').eq('activo', true)
-  const tiposOp = (tiposData ?? []) as TipoOp[]
+  const tiposOp = (tiposData ?? []) as any[]
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Cuenta Corriente</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Cuenta Corriente</h1>
         {cuentaCte && <p className="text-gray-500 text-sm mt-1">{cuentaCte}</p>}
       </div>
       <TarjetasSaldos saldos={saldos} cuentaCte={cuentaCte} />
-      <div className="card p-5">
+      <div className="card p-4 md:p-5">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Filtrar movimientos</h2>
         <FiltrosMovimientos
           tiposOperacion={tiposOp}
@@ -95,7 +75,7 @@ export default async function CuentaCorrientePage({
       </div>
       {desde && hasta ? (
         <div className="card">
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-base font-semibold text-gray-900">Movimientos</h2>
             <span className="text-sm text-gray-500">{totalMovimientos} registro{totalMovimientos !== 1 ? 's' : ''}</span>
           </div>
