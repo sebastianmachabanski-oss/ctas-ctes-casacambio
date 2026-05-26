@@ -33,3 +33,19 @@ declare module './types' {
     telefono?: string | null
   }
 }
+
+// Funciones adicionales
+export interface FuncionesExtra {
+  marcar_clave_cambiada: {
+    Args: { p_user_id: string }
+    Returns: void
+  }
+}
+
+// Funciones adicionales
+export interface FuncionesExtra {
+  marcar_clave_cambiada: {
+    Args: { p_user_id: string }
+    Returns: void
+  }
+}

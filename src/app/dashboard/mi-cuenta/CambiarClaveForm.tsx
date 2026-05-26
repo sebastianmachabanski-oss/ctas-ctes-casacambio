@@ -46,7 +46,7 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
       const { error: e2 } = await supabase.auth.updateUser({ password: nueva })
       if (e2) throw new Error('Error al actualizar: ' + e2.message)
 
-      const { error: e3 } = await supabase.rpc('marcar_clave_cambiada', { p_user_id: userId })
+      const { error: e3 } = await (supabase as any).rpc('marcar_clave_cambiada', { p_user_id: userId })
       if (e3) console.error('Error marcando clave:', e3.message)
 
       setSuccess(true)
