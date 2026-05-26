@@ -31,6 +31,7 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
 
     try {
       const supabase = createClient()
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Sesion expirada')
 
@@ -40,18 +41,13 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
       })
       if (e1) throw new Error('La contrasena actual es incorrecta')
 
+      const userId = user.id
+
       const { error: e2 } = await supabase.auth.updateUser({ password: nueva })
       if (e2) throw new Error('Error al actualizar: ' + e2.message)
 
-      const userId = user.id
-      const userEmail = user.email!
-
-      const res = await fetch('/api/mi-cuenta/marcar-clave-cambiada', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
-      })
-      if (!res.ok) console.error('No se pudo marcar clave cambiada')
+      const { error: e3 } = await supabase.rpc('marcar_clave_cambiada', { p_user_id: userId })
+      if (e3) console.error('Error marcando clave:', e3.message)
 
       setSuccess(true)
 
@@ -59,7 +55,7 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
         await supabase.auth.signOut()
         router.push('/login')
         router.refresh()
-      }, 1500)
+      }, 2000)
 
     } catch (err: any) {
       setError(err.message || 'Error inesperado')
