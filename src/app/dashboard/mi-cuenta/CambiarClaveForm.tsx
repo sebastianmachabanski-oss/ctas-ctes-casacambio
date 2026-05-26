@@ -43,7 +43,7 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
       const { error: e2 } = await supabase.auth.updateUser({ password: nueva })
       if (e2) throw new Error('Error al actualizar: ' + e2.message)
 
-      await supabase.from('profiles').update({ debe_cambiar_clave: false } as any).eq('id', user.id)
+      const db = supabase as any; await db.from('profiles').update({ debe_cambiar_clave: false }).eq('id', user.id)
       await supabase.auth.signInWithPassword({ email: user.email!, password: nueva })
 
       setSuccess(true)
