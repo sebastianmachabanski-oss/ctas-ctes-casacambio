@@ -43,11 +43,24 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
       const { error: e2 } = await supabase.auth.updateUser({ password: nueva })
       if (e2) throw new Error('Error al actualizar: ' + e2.message)
 
-      const db = supabase as any; await db.from('profiles').update({ debe_cambiar_clave: false }).eq('id', user.id)
-      await supabase.auth.signInWithPassword({ email: user.email!, password: nueva })
+      const userId = user.id
+      const userEmail = user.email!
+
+      const res = await fetch('/api/mi-cuenta/marcar-clave-cambiada', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      })
+      if (!res.ok) console.error('No se pudo marcar clave cambiada')
 
       setSuccess(true)
-      setTimeout(async () => { const supabase = createClient(); await supabase.auth.signOut(); router.push('/login'); router.refresh() }, 1500)
+
+      setTimeout(async () => {
+        await supabase.auth.signOut()
+        router.push('/login')
+        router.refresh()
+      }, 1500)
+
     } catch (err: any) {
       setError(err.message || 'Error inesperado')
     } finally {
@@ -116,11 +129,31 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
         </div>
 
         {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
-        {success && <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">✓ Contrasena actualizada. Redirigiendo...</div>}
 
-        <button type="submit" className="btn-primary w-full" disabled={loading || !requisitosOk || !coinciden}>
-          {loading ? 'Actualizando...' : forzado ? 'Crear mi contrasena' : 'Actualizar contrasena'}
-        </button>
+        {success ? (
+          <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm text-center space-y-2">
+            <div className="flex items-center justify-center gap-2 font-medium">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+              </svg>
+              Cerrando sesion...
+            </div>
+            <p className="text-xs">Seras redirigido al login para ingresar con tu nueva contrasena</p>
+          </div>
+        ) : (
+          <button type="submit" className="btn-primary w-full" disabled={loading || !requisitosOk || !coinciden}>
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                </svg>
+                Actualizando...
+              </span>
+            ) : forzado ? 'Crear mi contrasena' : 'Actualizar contrasena'}
+          </button>
+        )}
       </form>
     </div>
   )
