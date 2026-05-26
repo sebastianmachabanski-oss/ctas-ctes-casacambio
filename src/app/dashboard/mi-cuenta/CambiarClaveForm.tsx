@@ -50,6 +50,7 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
       if (e3) console.error('Error marcando clave:', e3.message)
 
       setSuccess(true)
+      setLoading(false)
 
       setTimeout(async () => {
         await supabase.auth.signOut()
@@ -127,15 +128,28 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
         {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
 
         {success ? (
-          <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm text-center space-y-2">
-            <div className="flex items-center justify-center gap-2 font-medium">
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-              </svg>
-              Cerrando sesion...
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 text-center space-y-4">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+                <svg className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">Contrasena actualizada</h3>
+                <p className="text-sm text-gray-600">Tu contrasena fue cambiada con exito. Por favor vuelve a ingresar utilizando tu nueva contrasena.</p>
+              </div>
+              <button
+                onClick={async () => {
+                  const supabase = createClient()
+                  await supabase.auth.signOut()
+                  router.push('/login')
+                  router.refresh()
+                }}
+                className="btn-primary w-full">
+                Ir al login
+              </button>
             </div>
-            <p className="text-xs">Seras redirigido al login para ingresar con tu nueva contrasena</p>
           </div>
         ) : (
           <button type="submit" className="btn-primary w-full" disabled={loading || !requisitosOk || !coinciden}>
