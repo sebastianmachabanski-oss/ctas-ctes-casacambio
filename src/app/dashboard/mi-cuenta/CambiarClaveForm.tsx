@@ -47,7 +47,7 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
       await supabase.auth.signInWithPassword({ email: user.email!, password: nueva })
 
       setSuccess(true)
-      setTimeout(() => { router.push('/dashboard'); router.refresh() }, 1500)
+      setTimeout(async () => { const supabase = createClient(); await supabase.auth.signOut(); router.push('/login'); router.refresh() }, 1500)
     } catch (err: any) {
       setError(err.message || 'Error inesperado')
     } finally {
