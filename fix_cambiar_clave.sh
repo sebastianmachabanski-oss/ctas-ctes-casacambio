@@ -1,0 +1,203 @@
+#!/bin/bash
+set -e
+
+echo "🔧 Arreglando flujo post-cambio de contraseña..."
+
+cat > src/app/dashboard/mi-cuenta/CambiarClaveForm.tsx << 'EOF'
+'use client'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+
+const REQUISITOS = [
+  { regex: /.{8,}/,       texto: 'Mínimo 8 caracteres' },
+  { regex: /[A-Z]/,       texto: 'Al menos una mayúscula' },
+  { regex: /[a-z]/,       texto: 'Al menos una minúscula' },
+  { regex: /[0-9]/,       texto: 'Al menos un número' },
+  { regex: /[!@#$%&*]/,  texto: 'Al menos un carácter especial (!@#$%&*)' },
+]
+
+export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
+  const router = useRouter()
+  const [actual, setActual] = useState('')
+  const [nueva, setNueva] = useState('')
+  const [confirmar, setConfirmar] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [showActual, setShowActual] = useState(false)
+  const [showNueva, setShowNueva] = useState(false)
+  const [showConf, setShowConf] = useState(false)
+
+  const requisitosOk = REQUISITOS.every(r => r.regex.test(nueva))
+  const coinciden = nueva === confirmar && nueva.length > 0
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!requisitosOk || !coinciden) return
+    setLoading(true); setError(null)
+
+    const supabase = createClient()
+
+    // 1. Verificar clave actual
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setError('Sesión expirada. Ingresá nuevamente.'); setLoading(false); return }
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email!, password: actual
+    })
+    if (signInError) {
+      setError('La contraseña actual es incorrecta')
+      setLoading(false)
+      return
+    }
+
+    // 2. Actualizar contraseña
+    const { error: updateError } = await supabase.auth.updateUser({ password: nueva })
+    if (updateError) {
+      setError(updateError.message)
+      setLoading(false)
+      return
+    }
+
+    // 3. Marcar debe_cambiar_clave = false
+    await supabase.from('profiles').update({ debe_cambiar_clave: false }).eq('id', user.id)
+
+    // 4. Re-login con nueva clave para mantener sesión activa
+    await supabase.auth.signInWithPassword({ email: user.email!, password: nueva })
+
+    setSuccess(true)
+    setLoading(false)
+    setActual(''); setNueva(''); setConfirmar('')
+
+    // 5. Redirigir
+    setTimeout(() => {
+      router.push('/dashboard')
+      router.refresh()
+    }, 1500)
+  }
+
+  return (
+    <div className="card p-5 md:p-6">
+      <h2 className="text-base font-semibold text-gray-900 mb-5">
+        {forzado ? 'Crear tu contraseña personal' : 'Cambiar contraseña'}
+      </h2>
+
+      {/* Requisitos */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-5">
+        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
+          La contraseña debe tener:
+        </p>
+        <ul className="space-y-1.5">
+          {REQUISITOS.map(r => {
+            const ok = r.regex.test(nueva)
+            return (
+              <li key={r.texto} className={`flex items-center gap-2 text-sm transition-colors ${ok ? 'text-green-600' : 'text-gray-500'}`}>
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 transition-colors ${ok ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-400'}`}>
+                  {ok ? '✓' : '·'}
+                </span>
+                {r.texto}
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="label">
+            {forzado ? 'Contraseña inicial (Cliente1234!)' : 'Contraseña actual'}
+          </label>
+          <div className="relative">
+            <input type={showActual ? 'text' : 'password'} className="input pr-10"
+              value={actual} onChange={e => setActual(e.target.value)} required
+              placeholder={forzado ? 'Cliente1234!' : ''} />
+            <button type="button" onClick={() => setShowActual(!showActual)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg">
+              {showActual ? '🙈' : '👁️'}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Nueva contraseña</label>
+          <div className="relative">
+            <input type={showNueva ? 'text' : 'password'} className="input pr-10"
+              value={nueva} onChange={e => setNueva(e.target.value)} required />
+            <button type="button" onClick={() => setShowNueva(!showNueva)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg">
+              {showNueva ? '🙈' : '👁️'}
+            </button>
+          </div>
+          {nueva && (
+            <div className="mt-2">
+              <div className="flex gap-1">
+                {REQUISITOS.map((r, i) => (
+                  <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${r.regex.test(nueva) ? 'bg-green-400' : 'bg-gray-200'}`} />
+                ))}
+              </div>
+              <p className="text-xs mt-1" style={{
+                color: REQUISITOS.filter(r => r.regex.test(nueva)).length < 3 ? '#ef4444'
+                     : REQUISITOS.filter(r => r.regex.test(nueva)).length < 5 ? '#f59e0b' : '#16a34a'
+              }}>
+                {REQUISITOS.filter(r => r.regex.test(nueva)).length < 3 ? 'Contraseña débil'
+                : REQUISITOS.filter(r => r.regex.test(nueva)).length < 5 ? 'Contraseña media'
+                : '✓ Contraseña fuerte'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="label">Confirmá la nueva contraseña</label>
+          <div className="relative">
+            <input type={showConf ? 'text' : 'password'} className="input pr-10"
+              value={confirmar} onChange={e => setConfirmar(e.target.value)} required />
+            <button type="button" onClick={() => setShowConf(!showConf)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg">
+              {showConf ? '🙈' : '👁️'}
+            </button>
+          </div>
+          {confirmar && (
+            <p className={`text-xs mt-1 ${coinciden ? 'text-green-600' : 'text-red-500'}`}>
+              {coinciden ? '✓ Las contraseñas coinciden' : 'Las contraseñas no coinciden'}
+            </p>
+          )}
+        </div>
+
+        {error && (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
+            ✓ Contraseña actualizada. Redirigiendo...
+          </div>
+        )}
+
+        <button type="submit" className="btn-primary w-full"
+          disabled={loading || !requisitosOk || !coinciden}>
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+              </svg>
+              Actualizando...
+            </span>
+          ) : forzado ? 'Crear mi contraseña' : 'Actualizar contraseña'}
+        </button>
+      </form>
+    </div>
+  )
+}
+EOF
+
+echo "✅ CambiarClaveForm corregido"
+echo ""
+echo "Ejecutá:"
+echo "  git add ."
+echo "  git commit -m 'fix: re-login automatico post cambio de clave'"
+echo "  git push"
