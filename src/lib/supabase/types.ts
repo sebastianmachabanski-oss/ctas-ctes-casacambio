@@ -26,3 +26,10 @@ export type Database = {
     Functions: { get_my_role: { Returns: UserRole }; get_my_cuenta_cte: { Returns: string | null } }
   }
 }
+
+// Extender Profile con campo telefono
+declare module './types' {
+  interface Profile {
+    telefono?: string | null
+  }
+}

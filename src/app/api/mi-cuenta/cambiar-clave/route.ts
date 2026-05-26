@@ -2,11 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 function validarClave(clave: string): string | null {
-  if (clave.length < 8)          return 'Mínimo 8 caracteres'
-  if (!/[A-Z]/.test(clave))      return 'Debe incluir al menos una mayúscula'
-  if (!/[a-z]/.test(clave))      return 'Debe incluir al menos una minúscula'
-  if (!/[0-9]/.test(clave))      return 'Debe incluir al menos un número'
-  if (!/[!@#$%&*]/.test(clave))  return 'Debe incluir al menos un carácter especial (!@#$%&*)'
+  if (clave.length < 8)         return 'Mínimo 8 caracteres'
+  if (!/[A-Z]/.test(clave))     return 'Debe incluir al menos una mayúscula'
+  if (!/[a-z]/.test(clave))     return 'Debe incluir al menos una minúscula'
+  if (!/[0-9]/.test(clave))     return 'Debe incluir al menos un número'
+  if (!/[!@#$%&*]/.test(clave)) return 'Debe incluir al menos un carácter especial (!@#$%&*)'
   return null
 }
 
@@ -23,20 +23,21 @@ export async function POST(request: Request) {
   if (clave_nueva !== clave_confirmacion)
     return NextResponse.json({ error: 'Las claves nuevas no coinciden' }, { status: 400 })
 
-  const error_validacion = validarClave(clave_nueva)
-  if (error_validacion)
-    return NextResponse.json({ error: error_validacion }, { status: 400 })
+  const err = validarClave(clave_nueva)
+  if (err) return NextResponse.json({ error: err }, { status: 400 })
 
-  // Verificar clave actual reautenticando
+  // Verificar clave actual
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: user.email!, password: clave_actual
   })
-  if (signInError)
-    return NextResponse.json({ error: 'La clave actual es incorrecta' }, { status: 400 })
+  if (signInError) return NextResponse.json({ error: 'La clave actual es incorrecta' }, { status: 400 })
 
   // Actualizar clave
   const { error } = await supabase.auth.updateUser({ password: clave_nueva })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Marcar que ya cambió la clave
+  await supabase.from('profiles').update({ debe_cambiar_clave: false }).eq('id', user.id)
 
   return NextResponse.json({ success: true })
 }
