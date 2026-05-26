@@ -52,11 +52,7 @@ export default function CambiarClaveForm({ forzado }: { forzado?: boolean }) {
       setSuccess(true)
       setLoading(false)
 
-      setTimeout(async () => {
-        await supabase.auth.signOut()
-        router.push('/login')
-        router.refresh()
-      }, 2000)
+
 
     } catch (err: any) {
       setError(err.message || 'Error inesperado')
