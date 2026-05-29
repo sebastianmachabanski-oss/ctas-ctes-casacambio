@@ -7,13 +7,13 @@ function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError('Email o contraseña incorrectos.'); setLoading(false); return }
@@ -22,7 +22,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-start justify-center pt-16 bg-gradient-to-br from-brand-900 to-brand-700 px-4 py-8">
+    <div className="min-h-screen flex items-start justify-center bg-gradient-to-br from-brand-900 to-brand-700 px-4 pt-16">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/10 mb-4">
@@ -43,14 +43,29 @@ function LoginForm() {
             </div>
             <div>
               <label className="label" htmlFor="password">Contraseña</label>
-              <input id="password" type="password" className="input" placeholder="••••••••"
-                value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" />
+              <div className="relative">
+                <input id="password" type={showPass ? 'text' : 'password'} className="input pr-10"
+                  placeholder="••••••••" value={password}
+                  onChange={e => setPassword(e.target.value)} required autoComplete="current-password" />
+                <button type="button" onClick={() => setShowPass(!showPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg">
+                  {showPass ? '🙈' : '👁️'}
+                </button>
+              </div>
             </div>
             {error && (
               <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
             )}
             <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading ? 'Ingresando...' : 'Ingresar'}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                  </svg>
+                  Ingresando...
+                </span>
+              ) : 'Ingresar'}
             </button>
           </form>
         </div>

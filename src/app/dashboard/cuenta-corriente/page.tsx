@@ -7,7 +7,7 @@ import TarjetasSaldos from '@/components/cuenta-corriente/TarjetasSaldos'
 export default async function CuentaCorrientePage({
   searchParams,
 }: {
-  searchParams: { desde?: string; hasta?: string; concepto?: string; operacion?: string }
+  searchParams: { desde?: string; hasta?: string; operacion?: string; cuenta?: string }
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -18,9 +18,15 @@ export default async function CuentaCorrientePage({
   const profile = profileData as { rol: string; cuenta_cte: string | null; nombre: string } | null
   if (!profile) redirect('/login')
 
-  const cuentaCte = profile.rol === 'cliente' ? profile.cuenta_cte : null
+  const esStaff = profile.rol === 'superusuario' || profile.rol === 'operador'
+  const esCliente = profile.rol === 'cliente'
 
-  if (profile.rol === 'cliente' && !cuentaCte) {
+  // Para cliente: su cuenta fija. Para staff: la que eligió en el filtro (o null = todas)
+  const cuentaFiltro = esCliente
+    ? profile.cuenta_cte
+    : searchParams.cuenta || null
+
+  if (esCliente && !profile.cuenta_cte) {
     return (
       <div className="p-4 md:p-8">
         <div className="card p-6 text-center text-gray-500">
@@ -30,12 +36,21 @@ export default async function CuentaCorrientePage({
     )
   }
 
+  // Saldos: filtrado por cuenta si se eligió una, o todos si no
   let saldosQuery = supabase.from('saldos_cuenta_corriente').select('*')
-  if (cuentaCte) saldosQuery = saldosQuery.eq('cuenta_cte', cuentaCte)
+  if (cuentaFiltro) saldosQuery = saldosQuery.eq('cuenta_cte', cuentaFiltro)
   const { data: saldosData } = await saldosQuery
   const saldos = (saldosData ?? []) as any[]
 
-  const { desde, hasta, concepto, operacion } = searchParams
+  // Lista de cuentas para el selector (solo staff)
+  let cuentasList: string[] = []
+  if (esStaff) {
+    const { data: cuentasData } = await supabase
+      .from('cuentas_corrientes').select('nombre').eq('activo', true).order('nombre')
+    cuentasList = (cuentasData ?? []).map((c: any) => c.nombre)
+  }
+
+  const { desde, hasta, operacion } = searchParams
   let movimientos: any[] = []
   let totalMovimientos = 0
 
@@ -44,8 +59,7 @@ export default async function CuentaCorrientePage({
       .eq('tipo', 'CTA CTE').eq('anulado', false)
       .gte('fecha', desde).lte('fecha', hasta)
       .order('fecha', { ascending: false })
-    if (cuentaCte) query = query.eq('cuenta_cte', cuentaCte)
-    if (concepto) query = query.ilike('concepto', `%${concepto}%`)
+    if (cuentaFiltro) query = query.eq('cuenta_cte', cuentaFiltro)
     if (operacion) query = query.eq('operacion', operacion)
     const { data, count } = await query
     movimientos = (data ?? []) as any[]
@@ -60,19 +74,34 @@ export default async function CuentaCorrientePage({
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Cuenta Corriente</h1>
-        {cuentaCte && <p className="text-gray-500 text-sm mt-1">{cuentaCte}</p>}
+        {esCliente && profile.cuenta_cte && (
+          <p className="text-gray-500 text-sm mt-1">{profile.cuenta_cte}</p>
+        )}
+        {esStaff && cuentaFiltro && (
+          <p className="text-gray-500 text-sm mt-1">{cuentaFiltro}</p>
+        )}
+        {esStaff && !cuentaFiltro && (
+          <p className="text-gray-500 text-sm mt-1">Todas las cuentas</p>
+        )}
       </div>
-      <TarjetasSaldos saldos={saldos} cuentaCte={cuentaCte} />
+
+      <TarjetasSaldos saldos={saldos} cuentaCte={cuentaFiltro} />
+
       <div className="card p-4 md:p-5">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Filtrar movimientos</h2>
         <FiltrosMovimientos
           tiposOperacion={tiposOp}
           valoresIniciales={{
-            desde: desde ?? '', hasta: hasta ?? '',
-            concepto: concepto ?? '', operacion: operacion ?? ''
+            desde: desde ?? '',
+            hasta: hasta ?? '',
+            operacion: operacion ?? '',
+            cuenta: searchParams.cuenta ?? '',
           }}
+          cuentas={cuentasList}
+          esSuperusuarioOOperador={esStaff}
         />
       </div>
+
       {desde && hasta ? (
         <div className="card">
           <div className="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between">
