@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
+import BlockBack from '@/components/BlockBack'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -11,6 +12,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar profile={profile as any} />
+      <BlockBack />
       {/* pt-14 en mobile para compensar el top bar fijo */}
       <main className="flex-1 overflow-y-auto bg-gray-50 pt-14 md:pt-0">
         {children}
