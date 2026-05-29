@@ -21,7 +21,6 @@ export default async function CuentaCorrientePage({
   const esStaff = profile.rol === 'superusuario' || profile.rol === 'operador'
   const esCliente = profile.rol === 'cliente'
 
-  // Para cliente: su cuenta fija. Para staff: la que eligió en el filtro (o null = todas)
   const cuentaFiltro = esCliente
     ? profile.cuenta_cte
     : searchParams.cuenta || null
@@ -36,7 +35,7 @@ export default async function CuentaCorrientePage({
     )
   }
 
-  // Saldos: filtrado por cuenta si se eligió una, o todos si no
+  // Saldos
   let saldosQuery = supabase.from('saldos_cuenta_corriente').select('*')
   if (cuentaFiltro) saldosQuery = saldosQuery.eq('cuenta_cte', cuentaFiltro)
   const { data: saldosData } = await saldosQuery
@@ -50,21 +49,36 @@ export default async function CuentaCorrientePage({
     cuentasList = (cuentasData ?? []).map((c: any) => c.nombre)
   }
 
-  const { desde, hasta, operacion } = searchParams
-  let movimientos: any[] = []
-  let totalMovimientos = 0
+  const { operacion } = searchParams
 
-  if (desde && hasta) {
-    let query = supabase.from('diario').select('*', { count: 'exact' })
-      .eq('tipo', 'CTA CTE').eq('anulado', false)
-      .gte('fecha', desde).lte('fecha', hasta)
-      .order('fecha', { ascending: false })
-    if (cuentaFiltro) query = query.eq('cuenta_cte', cuentaFiltro)
-    if (operacion) query = query.eq('operacion', operacion)
-    const { data, count } = await query
-    movimientos = (data ?? []) as any[]
-    totalMovimientos = count ?? 0
+  // Fechas: si no se proveen, usar la más antigua y hoy
+  let desde = searchParams.desde || ''
+  let hasta = searchParams.hasta || ''
+
+  // Siempre mostrar movimientos (con o sin fechas)
+  let desdeQuery = desde || undefined
+  let hastaQuery = hasta || new Date().toISOString().slice(0, 10)
+
+  // Si no hay fecha desde, buscar la más antigua
+  if (!desdeQuery) {
+    let minQuery = supabase.from('diario').select('fecha').eq('tipo', 'CTA CTE').eq('anulado', false).order('fecha', { ascending: true }).limit(1)
+    if (cuentaFiltro) minQuery = minQuery.eq('cuenta_cte', cuentaFiltro)
+    const { data: minData } = await minQuery
+    desdeQuery = minData?.[0]?.fecha || '2000-01-01'
   }
+
+  let query = supabase.from('diario').select('*', { count: 'exact' })
+    .eq('tipo', 'CTA CTE').eq('anulado', false)
+    .gte('fecha', desdeQuery)
+    .lte('fecha', hastaQuery)
+    .order('fecha', { ascending: false })
+
+  if (cuentaFiltro) query = query.eq('cuenta_cte', cuentaFiltro)
+  if (operacion) query = query.eq('operacion', operacion)
+
+  const { data, count } = await query
+  const movimientos = (data ?? []) as any[]
+  const totalMovimientos = count ?? 0
 
   const { data: tiposData } = await supabase
     .from('tipos_operacion').select('codigo, descripcion').eq('activo', true)
@@ -92,8 +106,8 @@ export default async function CuentaCorrientePage({
         <FiltrosMovimientos
           tiposOperacion={tiposOp}
           valoresIniciales={{
-            desde: desde ?? '',
-            hasta: hasta ?? '',
+            desde: desde,
+            hasta: hasta,
             operacion: operacion ?? '',
             cuenta: searchParams.cuenta ?? '',
           }}
@@ -102,19 +116,13 @@ export default async function CuentaCorrientePage({
         />
       </div>
 
-      {desde && hasta ? (
-        <div className="card">
-          <div className="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Movimientos</h2>
-            <span className="text-sm text-gray-500">{totalMovimientos} registro{totalMovimientos !== 1 ? 's' : ''}</span>
-          </div>
-          <TablaMovimientos movimientos={movimientos} />
+      <div className="card">
+        <div className="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900">Movimientos</h2>
+          <span className="text-sm text-gray-500">{totalMovimientos} registro{totalMovimientos !== 1 ? 's' : ''}</span>
         </div>
-      ) : (
-        <div className="card p-8 text-center">
-          <div className="text-gray-400 text-sm">Seleccioná un rango de fechas para ver los movimientos</div>
-        </div>
-      )}
+        <TablaMovimientos movimientos={movimientos} />
+      </div>
     </div>
   )
 }

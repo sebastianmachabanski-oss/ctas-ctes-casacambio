@@ -20,18 +20,18 @@ export default function FiltrosMovimientos({ tiposOperacion, valoresIniciales, c
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!desde || !hasta) return
     const params = new URLSearchParams()
-    params.set('desde', desde)
-    params.set('hasta', hasta)
+    if (desde) params.set('desde', desde)
+    if (hasta) params.set('hasta', hasta)
     if (operacion) params.set('operacion', operacion)
     if (cuenta) params.set('cuenta', cuenta)
-    startTransition(() => { router.push(`${pathname}?${params.toString()}`) })
+    // replace en lugar de push para que el back no funcione
+    startTransition(() => { router.replace(`${pathname}?${params.toString()}`) })
   }
 
   function handleLimpiar() {
     setDesde(''); setHasta(''); setOperacion(''); setCuenta('')
-    startTransition(() => { router.push(pathname) })
+    startTransition(() => { router.replace(pathname) })
   }
 
   return (
@@ -61,14 +61,14 @@ export default function FiltrosMovimientos({ tiposOperacion, valoresIniciales, c
         )}
 
         <div>
-          <label className="label" htmlFor="desde">Fecha desde *</label>
+          <label className="label" htmlFor="desde">Fecha desde</label>
           <input id="desde" type="date" className="input" value={desde}
-            onChange={e => setDesde(e.target.value)} required />
+            onChange={e => setDesde(e.target.value)} />
         </div>
         <div>
-          <label className="label" htmlFor="hasta">Fecha hasta *</label>
+          <label className="label" htmlFor="hasta">Fecha hasta</label>
           <input id="hasta" type="date" className="input" value={hasta}
-            onChange={e => setHasta(e.target.value)} required />
+            onChange={e => setHasta(e.target.value)} />
         </div>
         <div>
           <label className="label" htmlFor="operacion">Tipo de movimiento</label>
