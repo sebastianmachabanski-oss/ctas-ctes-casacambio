@@ -153,7 +153,7 @@ export async function GET(request: Request) {
 
     // 7. También sincronizar cuentas corrientes
     const cuentasSet = new Set(movimientos.map(m => m.cuenta_cte))
-    for (const nombre of cuentasSet) {
+    for (const nombre of Array.from(cuentasSet)) {
       await supabase.from('cuentas_corrientes')
         .upsert({ nombre, activo: true }, { onConflict: 'nombre', ignoreDuplicates: true })
     }
