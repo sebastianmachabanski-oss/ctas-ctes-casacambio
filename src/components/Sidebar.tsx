@@ -9,6 +9,7 @@ const navItems = {
   superusuario: [
     { href: '/dashboard/cuenta-corriente', label: 'Cuentas Corrientes', icon: '📋' },
     { href: '/dashboard/admin/usuarios',   label: 'Usuarios',           icon: '👥' },
+    { href: '/dashboard/admin/sync',       label: 'Sincronizar Excel',  icon: '🔄' },
     { href: '/dashboard/mi-cuenta',        label: 'Mi cuenta',          icon: '🔑' },
   ],
   operador: [
