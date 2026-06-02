@@ -1,107 +1,130 @@
 import type { Config } from "@netlify/functions"
 import { createClient } from "@supabase/supabase-js"
-import * as XLSX from "xlsx"
 
-const ONEDRIVE_URL = process.env.ONEDRIVE_EXCEL_URL!
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+const SHEET_ID = '1qhaR7iXXg8FSGlKfpVWNdhjNxcVtZJ9a'
+const SHEET_NAME = 'DIARIO'
 
-function mapMoneda(moneda: string | null): string {
-  if (!moneda) return "DOLARES"
-  const m = String(moneda).trim().toUpperCase()
-  if (m.includes("DOLAR") || m === "USD") return "DOLARES"
-  if (m.includes("PESO") || m === "ARS") return "PESOS"
-  if (m.includes("EURO") || m === "EUR") return "EUROS"
-  if (m.includes("REAL") || m === "BRL") return "REALES"
-  return m
+function toNum(val: any): number {
+  if (!val) return 0
+  const n = parseFloat(String(val).replace(/[^0-9.-]/g, ''))
+  return isNaN(n) ? 0 : n
 }
 
 function parseFecha(val: any): string | null {
   if (!val) return null
-  if (typeof val === "number") {
-    const date = XLSX.SSF.parse_date_code(val)
-    if (!date) return null
-    return `${date.y}-${String(date.m).padStart(2,"0")}-${String(date.d).padStart(2,"0")}`
-  }
-  if (val instanceof Date) return val.toISOString().slice(0, 10)
   const s = String(val).trim()
-  if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0, 10)
-  if (s.match(/^\d{1,2}\/\d{1,2}\/\d{4}/)) {
-    const [d, m, y] = s.split("/")
-    return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`
+  if (s.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+    const [d, m, y] = s.split('/')
+    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
   }
+  if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0, 10)
   return null
 }
 
-function toNum(val: any): number {
-  if (!val) return 0
-  const n = parseFloat(String(val).replace(/[^0-9.-]/g, ""))
-  return isNaN(n) ? 0 : n
+function mapMoneda(val: any): string {
+  if (!val) return 'DOLARES'
+  const m = String(val).trim().toUpperCase()
+  if (m.includes('DOLAR')) return 'DOLARES'
+  if (m.includes('PESO')) return 'PESOS'
+  if (m.includes('EURO')) return 'EUROS'
+  if (m.includes('REAL')) return 'REALES'
+  return m
+}
+
+async function getGoogleToken(): Promise<string> {
+  const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON!)
+  const now = Math.floor(Date.now() / 1000)
+  const payload = {
+    iss: creds.client_email,
+    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now,
+  }
+  const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const body = btoa(JSON.stringify(payload))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const signingInput = `${header}.${body}`
+  const pemContents = creds.private_key
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\n/g, '')
+  const binaryDer = Uint8Array.from(atob(pemContents), (c: string) => c.charCodeAt(0))
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8', binaryDer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false, ['sign']
+  )
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5', cryptoKey,
+    new TextEncoder().encode(signingInput)
+  )
+  const sig = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const jwt = `${signingInput}.${sig}`
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+  })
+  const tokenData = await tokenRes.json()
+  if (!tokenData.access_token) throw new Error('No se pudo obtener token')
+  return tokenData.access_token
 }
 
 export default async function handler() {
-  console.log("🔄 Iniciando sync automático...")
-
+  console.log('🔄 Sync automático iniciado...')
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
-    const res = await fetch(ONEDRIVE_URL, {
-      headers: { "User-Agent": "Mozilla/5.0" },
-      redirect: "follow",
-    })
-    if (!res.ok) throw new Error(`Error descargando Excel: ${res.status}`)
+    const token = await getGoogleToken()
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME)}`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) throw new Error(`Error leyendo sheet: ${res.status}`)
+    const data = await res.json()
+    const rows: any[][] = data.values ?? []
 
-    const buffer = await res.arrayBuffer()
-    const wb = XLSX.read(buffer, { type: "array", cellDates: false })
-
-    const sheetName = wb.SheetNames.find(n => n.toUpperCase() === "DIARIO")
-    if (!sheetName) throw new Error("No se encontró la solapa DIARIO")
-
-    const ws = wb.Sheets[sheetName]
-    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null })
-
-    let headerRow = -1
+    let headerIdx = -1
     let headers: string[] = []
     for (let i = 0; i < Math.min(10, rows.length); i++) {
-      const row = rows[i]
-      if (row && row.some((c: any) => String(c || "").toUpperCase().includes("FECHA"))) {
-        headerRow = i
-        headers = row.map((c: any) => String(c || "").trim().toUpperCase())
+      if (rows[i]?.some((c: any) => String(c || '').toUpperCase().includes('FECHA'))) {
+        headerIdx = i
+        headers = rows[i].map((c: any) => String(c || '').trim().toUpperCase())
         break
       }
     }
-    if (headerRow < 0) throw new Error("No se encontró fila de encabezados")
+    if (headerIdx < 0) throw new Error('Sin encabezados')
 
     const col = (name: string) => headers.findIndex(h => h.includes(name))
-    const iDate   = col("FECHA")
-    const iTipo   = col("TIPO")
-    const iCtaCte = col("CTA CTE")
-    const iOp     = col("OPERACI")
-    const iConc   = col("CONCEPTO")
-    const iEvento = col("EVENTO")
-    const iMoneda = col("PROPIO")
-    const iMonto  = col("MONTO")
-    const iCCPesos  = headers.findIndex(h => h === "CC PESOS")
-    const iCCDolar  = headers.findIndex(h => h === "CC DOLARES")
-    const iCCEuro   = headers.findIndex(h => h === "CC EUROS")
-    const iCCReal   = headers.findIndex(h => h === "CC REALES")
+    const iDate   = col('FECHA')
+    const iTipo   = col('TIPO')
+    const iCtaCte = col('CTA CTE')
+    const iOp     = col('OPERACI')
+    const iConc   = col('CONCEPTO')
+    const iEvento = col('EVENTO')
+    const iMoneda = col('PROPIO')
+    const iMonto  = col('MONTO')
+    const iCCPesos  = headers.findIndex(h => h === 'CC PESOS')
+    const iCCDolar  = headers.findIndex(h => h === 'CC DOLARES')
+    const iCCEuro   = headers.findIndex(h => h === 'CC EUROS')
+    const iCCReal   = headers.findIndex(h => h === 'CC REALES')
 
     const movimientos = []
-    for (let i = headerRow + 1; i < rows.length; i++) {
+    for (let i = headerIdx + 1; i < rows.length; i++) {
       const row = rows[i]
-      if (!row || !row[iTipo]) continue
-      const tipo = String(row[iTipo] || "").trim().toUpperCase()
-      if (tipo !== "CTA CTE") continue
+      if (!row?.[iTipo]) continue
+      if (String(row[iTipo]).trim().toUpperCase() !== 'CTA CTE') continue
       const fecha = parseFecha(row[iDate])
       if (!fecha) continue
-      const ctaCte = String(row[iCtaCte] || "").trim()
+      const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
-
       movimientos.push({
-        fecha,
-        tipo: "CTA CTE",
-        cuenta_cte: ctaCte,
-        operacion: String(row[iOp] || "").trim().toUpperCase(),
+        fecha, tipo: 'CTA CTE', cuenta_cte: ctaCte,
+        operacion: String(row[iOp] || '').trim().toUpperCase(),
         concepto: row[iConc] ? String(row[iConc]).trim() : null,
         evento: row[iEvento] ? String(row[iEvento]).trim() : null,
         moneda: mapMoneda(row[iMoneda]),
@@ -114,25 +137,23 @@ export default async function handler() {
       })
     }
 
-    if (movimientos.length === 0) throw new Error("Sin movimientos CTA CTE")
+    if (!movimientos.length) throw new Error('Sin movimientos')
 
-    await supabase.from("diario").delete().eq("tipo", "CTA CTE").eq("anulado", false)
-
+    await supabase.from('diario').delete().eq('tipo', 'CTA CTE').eq('anulado', false)
     for (let i = 0; i < movimientos.length; i += 500) {
-      const lote = movimientos.slice(i, i + 500)
-      const { error } = await supabase.from("diario").insert(lote)
-      if (error) throw new Error("Error insertando: " + error.message)
+      const { error } = await supabase.from('diario').insert(movimientos.slice(i, i + 500))
+      if (error) throw new Error(error.message)
     }
 
-    const cuentasSet = new Set(movimientos.map(m => m.cuenta_cte))
-    for (const nombre of Array.from(cuentasSet)) {
-      await supabase.from("cuentas_corrientes")
-        .upsert({ nombre, activo: true }, { onConflict: "nombre", ignoreDuplicates: true })
+    const cuentas = Array.from(new Set(movimientos.map(m => m.cuenta_cte)))
+    for (const nombre of cuentas) {
+      await supabase.from('cuentas_corrientes')
+        .upsert({ nombre, activo: true }, { onConflict: 'nombre', ignoreDuplicates: true })
     }
 
-    console.log(`✅ Sync OK: ${movimientos.length} movimientos, ${cuentasSet.size} cuentas`)
+    console.log(`✅ Sync OK: ${movimientos.length} movimientos`)
   } catch (err: any) {
-    console.error("❌ Sync error:", err.message)
+    console.error('❌ Sync error:', err.message)
   }
 }
 
