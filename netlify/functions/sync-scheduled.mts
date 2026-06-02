@@ -1,7 +1,7 @@
 import type { Config } from "@netlify/functions"
 import { createClient } from "@supabase/supabase-js"
 
-const SHEET_ID = '1qhaR7iXXg8FSGlKfpVWNdhjNxcVtZJ9a'
+const SHEET_ID = '1ChGYD4BBAathaGY26MAGKARub_lklQ7J5l7uXVtmgr4'
 const SHEET_NAME = 'DIARIO'
 
 function toNum(val: any): number {
