@@ -89,7 +89,8 @@ async function getGoogleToken(): Promise<string> {
   })
   
   const tokenData = await tokenRes.json()
-  if (!tokenData.access_token) throw new Error('No se pudo obtener token: ' + JSON.stringify(tokenData))
+  if (!tokenData.access_token) throw new Error('Token error: ' + JSON.stringify(tokenData))
+  console.log('Token OK, scope:', tokenData.scope)
   return tokenData.access_token
 }
 
