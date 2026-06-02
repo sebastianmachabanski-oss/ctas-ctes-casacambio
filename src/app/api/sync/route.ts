@@ -76,7 +76,7 @@ async function getGoogleToken(): Promise<string> {
     new TextEncoder().encode(signingInput)
   )
   
-  const sig = btoa(String.fromCharCode(...new Uint8Array(signature)))
+  const sig = Buffer.from(signature).toString('base64')
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   
   const jwt = `${signingInput}.${sig}`
