@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const SHEET_ID = '1ChGYD4BBAathaGY26MAGKARub_lklQ7J5l7uXVtmgr4'
+const SHEET_ID = '1Sm4Y5zSu29_wtIz9MsBQxPlnTBebuyAgQP3rg9nfvG4'
 const SHEET_NAME = 'DIARIO'
 
 function toNum(val: any): number {
