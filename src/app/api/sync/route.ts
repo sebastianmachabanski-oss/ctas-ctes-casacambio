@@ -98,7 +98,7 @@ async function readSheet(token: string): Promise<any[][]> {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` }
   })
-  if (!res.ok) throw new Error(`Error leyendo sheet: ${res.status} ${res.statusText}`)
+  if (!res.ok) { const errBody = await res.text(); throw new Error(`Error leyendo sheet: ${res.status} ${res.statusText} - ${errBody}`) }
   const data = await res.json()
   return data.values ?? []
 }
