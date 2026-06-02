@@ -5,7 +5,7 @@ type Saldo = {
 interface Props { saldos: Saldo[]; cuentaCte: string | null }
 
 const MONEDAS = [
-  { key: 'saldo_dolares' as const, label: 'Dólares', sym: 'U$S', color: 'bg-green-50 border-green-200 text-green-900' },
+  { key: 'saldo_dolares' as const, label: 'Dólares', sym: 'U$S', color: 'bg-red-50 border-red-200 text-red-900' },
   { key: 'saldo_pesos'   as const, label: 'Pesos',   sym: '$',   color: 'bg-blue-50 border-blue-200 text-blue-900'    },
   { key: 'saldo_euros'   as const, label: 'Euros',   sym: '€',   color: 'bg-purple-50 border-purple-200 text-purple-900' },
   { key: 'saldo_reales'  as const, label: 'Reales',  sym: 'R$',  color: 'bg-orange-50 border-orange-200 text-orange-900' },
@@ -28,7 +28,7 @@ export default function TarjetasSaldos({ saldos }: Props) {
         const v = t[m.key] ?? 0
         const n = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(Math.abs(v))
         return (
-          <div key={m.key} className={`card border p-3 md:p-4 ${m.color}`}>
+          <div key={m.key} className={`card border p-3 md:p-4 ${v > 0 ? 'bg-red-50 border-red-200 text-red-900' : v < 0 ? 'bg-green-50 border-green-200 text-green-900' : m.color}`}>
             <p className="text-xs font-medium opacity-70 uppercase tracking-wide mb-1">{m.label}</p>
             <div className="flex items-baseline gap-1">
               <span className="text-xs font-medium opacity-60">{m.sym}</span>
