@@ -8,6 +8,7 @@ interface Props {
 
 export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
   const [loading, setLoading] = useState(false)
+  const [showInfo, setShowInfo] = useState(false)
   const [resultado, setResultado] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,15 +27,14 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-2xl">
+    <div className="p-4 md:p-6 space-y-5 max-w-2xl">
       <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Sincronización con Excel</h1>
-        <p className="text-gray-500 text-sm mt-1">Lee el Excel de OneDrive y actualiza los datos de la app</p>
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Sincronización</h1>
+        <p className="text-gray-500 text-sm mt-1">Actualiza los datos desde Google Sheets</p>
       </div>
 
       {/* Estado actual */}
-      <div className="card p-5 space-y-3">
-        <h2 className="text-base font-semibold text-gray-900">Estado actual</h2>
+      <div className="card p-5">
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="text-xs text-gray-500 mb-1">Movimientos en base</p>
@@ -49,50 +49,56 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
             </p>
           </div>
         </div>
+
+        {/* Resultados */}
+        {resultado && (
+          <div className="mt-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
+            <p className="font-semibold">✓ Sincronización exitosa</p>
+            <p>{resultado.movimientos.toLocaleString('es-AR')} movimientos · {resultado.cuentas} cuentas actualizadas</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            <p className="font-semibold">Error en la sincronización</p>
+            <p>{error}</p>
+          </div>
+        )}
+
+        {/* Botones */}
+        <div className="mt-4 flex items-center gap-3">
+          <button onClick={handleSync} className="btn-primary" disabled={loading}>
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                </svg>
+                Sincronizando...
+              </span>
+            ) : '🔄 Sincronizar ahora'}
+          </button>
+
+          {/* Botón de información */}
+          <button onClick={() => setShowInfo(!showInfo)}
+            className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-gray-400 transition-colors text-sm font-bold"
+            title="Cómo funciona">
+            i
+          </button>
+        </div>
+
+        {/* Panel de información colapsable */}
+        {showInfo && (
+          <div className="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-600 space-y-2">
+            <ol className="space-y-1.5">
+              <li className="flex gap-2"><span className="font-bold text-brand-600">1.</span> Lee los movimientos de la solapa DIARIO donde TIPO = CTA CTE</li>
+              <li className="flex gap-2"><span className="font-bold text-brand-600">2.</span> Reemplaza los datos existentes con los nuevos</li>
+              <li className="flex gap-2"><span className="font-bold text-brand-600">3.</span> Los clientes ven la información actualizada inmediatamente</li>
+            </ol>
+            <p className="text-xs text-amber-600 mt-2">⚠️ Los movimientos anulados manualmente se conservan.</p>
+          </div>
+        )}
       </div>
-
-      {/* Cómo funciona */}
-      <div className="card p-5">
-        <h2 className="text-base font-semibold text-gray-900 mb-3">Cómo funciona</h2>
-        <ol className="space-y-2 text-sm text-gray-600">
-          <li className="flex gap-2"><span className="font-bold text-brand-600">1.</span> La app descarga el Excel desde OneDrive</li>
-          <li className="flex gap-2"><span className="font-bold text-brand-600">2.</span> Lee todos los movimientos de la solapa DIARIO donde TIPO = CTA CTE</li>
-          <li className="flex gap-2"><span className="font-bold text-brand-600">3.</span> Reemplaza los datos existentes con los nuevos</li>
-          <li className="flex gap-2"><span className="font-bold text-brand-600">4.</span> Los clientes ven la información actualizada inmediatamente</li>
-        </ol>
-        <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs">
-          ⚠️ La sincronización reemplaza todos los movimientos no anulados. Los movimientos anulados manualmente se conservan.
-        </div>
-      </div>
-
-      {/* Resultado */}
-      {resultado && (
-        <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-green-700">
-          <p className="font-semibold mb-1">✓ Sincronización exitosa</p>
-          <p className="text-sm">{resultado.movimientos.toLocaleString('es-AR')} movimientos importados</p>
-          <p className="text-sm">{resultado.cuentas} cuentas corrientes actualizadas</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700">
-          <p className="font-semibold mb-1">Error en la sincronización</p>
-          <p className="text-sm">{error}</p>
-        </div>
-      )}
-
-      {/* Botón */}
-      <button onClick={handleSync} className="btn-primary w-full md:w-auto" disabled={loading}>
-        {loading ? (
-          <span className="flex items-center gap-2">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-            </svg>
-            Sincronizando... puede demorar unos segundos
-          </span>
-        ) : '🔄 Sincronizar ahora'}
-      </button>
     </div>
   )
 }
