@@ -7,19 +7,23 @@ const SHEET_NAME = 'DIARIO'
 function toNum(val: any): number {
   if (!val) return 0
   let s = String(val).trim()
-  // Detectar formato con punto como separador de miles (ej: 2.000 o 1.234.567)
-  // Si hay punto pero no coma, y el punto no está seguido de exactamente 1-2 dígitos al final
-  if (s.includes('.') && !s.includes(',')) {
-    const parts = s.split('.')
-    // Si todas las partes después del primero tienen 3 dígitos, es separador de miles
-    const allThreeDigits = parts.slice(1).every(p => p.length === 3)
-    if (allThreeDigits) s = s.replace(/\./g, '')
-  }
-  // Formato europeo con coma decimal (ej: 1.234,56)
-  if (s.includes(',')) {
+  if (!s || s === '-' || s === '  -   ') return 0
+  // Quitar espacios internos
+  s = s.replace(/\s/g, '')
+  // Formato: punto como separador de miles, coma como decimal (ej: 1.234,56 o 2.000)
+  if (s.includes('.') && s.includes(',')) {
+    // 1.234,56 -> 1234.56
     s = s.replace(/\./g, '').replace(',', '.')
+  } else if (s.includes('.') && !s.includes(',')) {
+    // Verificar si el punto es separador de miles (todas las partes tienen 3 dígitos)
+    const parts = s.replace(/^-/, '').split('.')
+    const allThreeDigits = parts.length > 1 && parts.slice(1).every((p: string) => p.length === 3)
+    if (allThreeDigits) s = s.replace(/\./g, '')
+  } else if (s.includes(',') && !s.includes('.')) {
+    // Coma como decimal (ej: 2,5)
+    s = s.replace(',', '.')
   }
-  const n = parseFloat(s.replace(/[^0-9.-]/g, ''))
+  const n = parseFloat(s)
   return isNaN(n) ? 0 : n
 }
 
