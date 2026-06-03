@@ -7,24 +7,25 @@ const SHEET_NAME = 'DIARIO'
 function toNum(val: any): number {
   if (!val) return 0
   let s = String(val).trim()
-  if (!s || s === '-' || s === '  -   ') return 0
-  // Quitar espacios internos
+  if (!s || s === '-' || s.replace(/\s/g,'') === '-' || s.replace(/\s/g,'') === '') return 0
+  // Quitar espacios
   s = s.replace(/\s/g, '')
-  // Formato: punto como separador de miles, coma como decimal (ej: 1.234,56 o 2.000)
+  // Formato contable: (1.000) = -1000
+  const isNegative = s.startsWith('(') && s.endsWith(')')
+  if (isNegative) s = s.slice(1, -1)
+  // Punto como separador de miles + coma decimal: 1.234,56
   if (s.includes('.') && s.includes(',')) {
-    // 1.234,56 -> 1234.56
     s = s.replace(/\./g, '').replace(',', '.')
   } else if (s.includes('.') && !s.includes(',')) {
-    // Verificar si el punto es separador de miles (todas las partes tienen 3 dígitos)
     const parts = s.replace(/^-/, '').split('.')
     const allThreeDigits = parts.length > 1 && parts.slice(1).every((p: string) => p.length === 3)
     if (allThreeDigits) s = s.replace(/\./g, '')
   } else if (s.includes(',') && !s.includes('.')) {
-    // Coma como decimal (ej: 2,5)
     s = s.replace(',', '.')
   }
   const n = parseFloat(s)
-  return isNaN(n) ? 0 : n
+  if (isNaN(n)) return 0
+  return isNegative ? -n : n
 }
 
 function parseFecha(val: any): string | null {
