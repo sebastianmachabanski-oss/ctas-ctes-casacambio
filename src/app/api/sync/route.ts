@@ -145,6 +145,7 @@ export async function GET() {
       }
     }
     if (headerIdx < 0) throw new Error('No se encontraron encabezados')
+    console.log('DEBUG headers:', JSON.stringify(headers))
 
     // 4. Mapear columnas
     const col = (name: string) => headers.findIndex(h => h.includes(name))
