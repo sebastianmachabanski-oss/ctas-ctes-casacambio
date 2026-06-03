@@ -173,6 +173,7 @@ export async function GET() {
       const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
 
+      if (ctaCte === 'Costa Rica') console.log('DEBUG Costa Rica row:', JSON.stringify(row))
       movimientos.push({
         fecha,
         tipo: 'CTA CTE',
