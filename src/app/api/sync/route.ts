@@ -6,7 +6,20 @@ const SHEET_NAME = 'DIARIO'
 
 function toNum(val: any): number {
   if (!val) return 0
-  const n = parseFloat(String(val).replace(/[^0-9.-]/g, ''))
+  let s = String(val).trim()
+  // Detectar formato con punto como separador de miles (ej: 2.000 o 1.234.567)
+  // Si hay punto pero no coma, y el punto no está seguido de exactamente 1-2 dígitos al final
+  if (s.includes('.') && !s.includes(',')) {
+    const parts = s.split('.')
+    // Si todas las partes después del primero tienen 3 dígitos, es separador de miles
+    const allThreeDigits = parts.slice(1).every(p => p.length === 3)
+    if (allThreeDigits) s = s.replace(/\./g, '')
+  }
+  // Formato europeo con coma decimal (ej: 1.234,56)
+  if (s.includes(',')) {
+    s = s.replace(/\./g, '').replace(',', '.')
+  }
+  const n = parseFloat(s.replace(/[^0-9.-]/g, ''))
   return isNaN(n) ? 0 : n
 }
 
