@@ -178,7 +178,7 @@ export async function GET() {
       const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
 
-      if (ctaCte === 'Costa Rica') console.log('DEBUG Costa Rica row:', JSON.stringify(row))
+      if (ctaCte === 'Sebastian Machabanski') console.log('DEBUG Seba row:', JSON.stringify(row.slice(38, 48)))
       movimientos.push({
         fecha,
         tipo: 'CTA CTE',
