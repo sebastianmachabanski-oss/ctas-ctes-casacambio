@@ -8,7 +8,7 @@ export default async function DeudoresPage() {
 
   const { data: profile } = await supabase
     .from('profiles').select('rol').eq('id', user.id).single()
-  if (!profile || (profile as any).rol !== 'superusuario') redirect('/dashboard')
+  if (!profile || !['superusuario', 'operador'].includes((profile as any).rol)) redirect('/dashboard')
 
   const { data: saldos } = await supabase
     .from('saldos_cuenta_corriente')

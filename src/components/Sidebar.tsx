@@ -15,6 +15,7 @@ const navItems = {
   ],
   operador: [
     { href: '/dashboard/cuenta-corriente', label: 'Cuentas Corrientes', icon: '📋' },
+    { href: '/dashboard/deudores',          label: 'Deudores',           icon: '📊' },
     { href: '/dashboard/mi-cuenta',        label: 'Mi cuenta',          icon: '🔑' },
   ],
   cliente: [
