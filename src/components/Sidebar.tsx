@@ -7,14 +7,14 @@ import type { Profile } from '@/lib/supabase/types'
 
 const navItems = {
   superusuario: [
-    { href: '/dashboard/cuenta-corriente', label: 'Cuentas Corrientes', icon: '📋' },
+    { href: '/dashboard/cuenta-corriente', label: 'Casa de Cambio', icon: '📋' },
     { href: '/dashboard/admin/usuarios',   label: 'Usuarios',           icon: '👥' },
     { href: '/dashboard/deudores',          label: 'Deudores',           icon: '📊' },
     { href: '/dashboard/admin/sync',       label: 'Sincronizar Excel',  icon: '🔄' },
     { href: '/dashboard/mi-cuenta',        label: 'Mi cuenta',          icon: '🔑' },
   ],
   operador: [
-    { href: '/dashboard/cuenta-corriente', label: 'Cuentas Corrientes', icon: '📋' },
+    { href: '/dashboard/cuenta-corriente', label: 'Casa de Cambio', icon: '📋' },
     { href: '/dashboard/deudores',          label: 'Deudores',           icon: '📊' },
     { href: '/dashboard/mi-cuenta',        label: 'Mi cuenta',          icon: '🔑' },
   ],
@@ -43,7 +43,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white text-sm font-bold shrink-0">CC</div>
           <div className="overflow-hidden">
-            <p className="text-white text-sm font-semibold truncate">Cuentas Corrientes</p>
+            <p className="text-white text-sm font-semibold truncate">Casa de Cambio</p>
             <p className="text-brand-300 text-xs capitalize">{profile.rol}</p>
           </div>
         </div>
@@ -85,7 +85,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         </button>
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-brand-600 flex items-center justify-center text-white text-xs font-bold">CC</div>
-          <span className="text-white text-sm font-semibold">Cuentas Corrientes</span>
+          <span className="text-white text-sm font-semibold">Casa de Cambio</span>
         </div>
       </div>
 

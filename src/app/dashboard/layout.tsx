@@ -14,7 +14,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <Sidebar profile={profile as any} />
       <BlockBack />
       {/* pt-14 en mobile para compensar el top bar fijo */}
-      <main className="flex-1 overflow-y-auto bg-gray-50 pt-14 md:pt-0">
+      <main className="flex-1 overflow-y-auto bg-amber-50 pt-14 md:pt-0">
         {children}
       </main>
     </div>
