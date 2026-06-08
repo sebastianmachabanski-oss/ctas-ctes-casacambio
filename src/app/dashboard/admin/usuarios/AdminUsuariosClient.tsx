@@ -132,12 +132,22 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
               {u.cuenta_cte && <p className="text-xs text-gray-500 mb-1">Cuenta: {u.cuenta_cte}</p>}
               {u.notas && <p className="text-xs text-gray-400 italic mb-2">{u.notas}</p>}
               <div className="flex gap-2 flex-wrap mt-2">
-                <button onClick={() => abrirEditar(u)} className="text-xs px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 text-gray-600">Editar</button>
-                <button onClick={() => restablecerClave(u)} className="text-xs px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 text-blue-600">Restablecer contraseña</button>
-                <button onClick={() => toggleActivo(u)} className={`text-xs px-2 py-1 rounded border ${u.activo ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
-                  {u.activo ? 'Suspender' : 'Activar'}
+                <button onClick={() => abrirEditar(u)} className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  Editar
                 </button>
-                <button onClick={() => eliminarUsuario(u)} className="text-xs px-2 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 font-medium">
+                <button onClick={() => restablecerClave(u)} className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                  Clave
+                </button>
+                <button onClick={() => toggleActivo(u)} className={`inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md font-medium transition-colors ${u.activo ? 'bg-red-50 hover:bg-red-100 text-red-700' : 'bg-green-50 hover:bg-green-100 text-green-700'}`}>
+                  {u.activo
+                    ? <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>Suspender</>
+                    : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>Activar</>
+                  }
+                </button>
+                <button onClick={() => eliminarUsuario(u)} className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-red-50 hover:bg-red-100 text-red-700 font-medium transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   Eliminar
                 </button>
               </div>
@@ -177,14 +187,21 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-1.5 flex-wrap">
-                      <button onClick={() => abrirEditar(u)} className="text-xs px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 text-gray-600">Editar</button>
-                      <button onClick={() => restablecerClave(u)} className="text-xs px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 text-blue-600">Restablecer contraseña</button>
-                      <button onClick={() => toggleActivo(u)} className={`text-xs px-2 py-1 rounded border ${u.activo ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
-                        {u.activo ? 'Suspender' : 'Activar'}
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => abrirEditar(u)} title="Editar usuario" className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
-                      <button onClick={() => eliminarUsuario(u)} className="text-xs px-2 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 font-medium">
-                        Eliminar
+                      <button onClick={() => restablecerClave(u)} title="Restablecer contraseña" className="p-1.5 rounded-md text-blue-500 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                      </button>
+                      <button onClick={() => toggleActivo(u)} title={u.activo ? 'Suspender usuario' : 'Activar usuario'} className={`p-1.5 rounded-md transition-colors ${u.activo ? 'text-orange-500 hover:bg-orange-50 hover:text-orange-700' : 'text-green-500 hover:bg-green-50 hover:text-green-700'}`}>
+                        {u.activo
+                          ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                          : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        }
+                      </button>
+                      <button onClick={() => eliminarUsuario(u)} title="Eliminar usuario" className="p-1.5 rounded-md text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   </td>
