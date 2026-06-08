@@ -246,9 +246,9 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Invitacion para WhatsApp</p>
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-line leading-relaxed">
-                    {`Bienvenido al sistema de cuentas corrientes
+                    {`Bienvenido al sistema de casa de cambio
 
-Para ingresar visita: https://ctas-ctes.netlify.app/
+Para ingresar visita: https://ctas-ctes-casacambio.netlify.app/
 
 Accede con las siguientes credenciales:
 Usuario: ${form.email}
@@ -258,7 +258,7 @@ Al ingresar por primera vez deberas cambiar tu contrasena.`}
                   </div>
                   <button
                     onClick={() => {
-                      const msg = "Bienvenido al sistema de cuentas corrientes\n\nPara ingresar visita: https://ctas-ctes.netlify.app/\n\nAccede con las siguientes credenciales:\nUsuario: " + form.email + "\nContrasena: " + claveMsg + "\n\nAl ingresar por primera vez deberas cambiar tu contrasena."
+                      const msg = "Bienvenido al sistema de casa de cambio\n\nPara ingresar visita: https://ctas-ctes-casacambio.netlify.app/\n\nAccede con las siguientes credenciales:\nUsuario: " + form.email + "\nContrasena: " + claveMsg + "\n\nAl ingresar por primera vez deberas cambiar tu contrasena."
                       navigator.clipboard.writeText(msg).then(() => alert("Copiado al portapapeles")).catch(() => alert("No se pudo copiar"))
                     }}
                     className="btn-secondary w-full flex items-center justify-center gap-2">
