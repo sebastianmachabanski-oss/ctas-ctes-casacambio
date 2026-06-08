@@ -125,9 +125,12 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                   <p className="text-gray-500 text-xs">{u.email}</p>
                   {u.telefono && <p className="text-gray-400 text-xs">{u.telefono}</p>}
                 </div>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ml-2 ${ROL_COLORS[u.rol] ?? 'bg-gray-100'}`}>
-                  {ROL_LABELS[u.rol] ?? u.rol}
-                </span>
+                <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                  <span title={u.activo ? 'Activo' : 'Suspendido'} className={`inline-block w-2.5 h-2.5 rounded-full ${u.activo ? 'bg-green-500' : 'bg-red-400'}`} />
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROL_COLORS[u.rol] ?? 'bg-gray-100'}`}>
+                    {ROL_LABELS[u.rol] ?? u.rol}
+                  </span>
+                </div>
               </div>
               {u.cuenta_cte && <p className="text-xs text-gray-500 mb-1">Cuenta: {u.cuenta_cte}</p>}
               {u.notas && <p className="text-xs text-gray-400 italic mb-2">{u.notas}</p>}
@@ -156,38 +159,40 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
         </div>
 
         {/* Desktop */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="hidden md:block">
+          <table className="w-full text-sm table-fixed">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Nombre</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Teléfono</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Rol</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Cuenta corriente</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Estado</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Acciones</th>
+                <th className="text-left px-3 py-3 font-medium text-gray-600 w-[28%]">Nombre</th>
+                <th className="text-left px-3 py-3 font-medium text-gray-600 w-[12%]">Teléfono</th>
+                <th className="text-left px-3 py-3 font-medium text-gray-600 w-[12%]">Rol</th>
+                <th className="text-left px-3 py-3 font-medium text-gray-600 w-[16%]">Cuenta cte.</th>
+                <th className="text-center px-3 py-3 font-medium text-gray-600 w-[8%]">Estado</th>
+                <th className="text-center px-3 py-3 font-medium text-gray-600 w-[24%]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {usuarios.map(u => (
                 <tr key={u.id} className={`hover:bg-gray-50 ${!u.activo ? 'opacity-50' : ''}`}>
-                  <td className="px-4 py-3 font-medium text-gray-900">{u.nombre}</td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">{u.email}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{u.telefono ?? '—'}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
+                    <p className="font-medium text-gray-900 truncate">{u.nombre}</p>
+                    <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                  </td>
+                  <td className="px-3 py-3 text-gray-500 text-xs">{u.telefono ?? '—'}</td>
+                  <td className="px-3 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROL_COLORS[u.rol] ?? 'bg-gray-100'}`}>
                       {ROL_LABELS[u.rol] ?? u.rol}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">{u.cuenta_cte ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${u.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {u.activo ? 'Activo' : 'Suspendido'}
-                    </span>
+                  <td className="px-3 py-3 text-gray-600 text-xs">{u.cuenta_cte ?? '—'}</td>
+                  <td className="px-3 py-3 text-center">
+                    <span
+                      title={u.activo ? 'Activo' : 'Suspendido'}
+                      className={`inline-block w-3 h-3 rounded-full ${u.activo ? 'bg-green-500' : 'bg-red-400'}`}
+                    />
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
+                  <td className="px-3 py-3">
+                    <div className="flex items-center justify-center gap-0.5">
                       <button onClick={() => abrirEditar(u)} title="Editar usuario" className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
