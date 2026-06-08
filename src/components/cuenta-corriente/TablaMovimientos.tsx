@@ -15,8 +15,10 @@ function fmt(v: number | null, sym: string) {
 
 // COMPROMISO → Egreso, DONACION → Ingreso
 function opLabel(op: string) {
-  if (op === 'DONACION')   return { label: 'Ingreso', cls: 'bg-green-100 text-green-700' }
-  if (op === 'COMPROMISO') return { label: 'Egreso',  cls: 'bg-orange-100 text-orange-700' }
+  const labelIngreso = process.env.NEXT_PUBLIC_LABEL_INGRESO ?? 'Ingreso'
+  const labelEgreso  = process.env.NEXT_PUBLIC_LABEL_EGRESO  ?? 'Egreso'
+  if (op === 'DONACION')   return { label: labelIngreso, cls: 'bg-green-100 text-green-700' }
+  if (op === 'COMPROMISO') return { label: labelEgreso,  cls: 'bg-orange-100 text-orange-700' }
   return { label: op, cls: 'bg-gray-100 text-gray-700' }
 }
 
