@@ -87,6 +87,14 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
     if (res.ok) alert(`✓ Contraseña restablecida. La nueva contraseña es: Cliente1234!`)
   }
 
+  async function eliminarUsuario(u: Usuario) {
+    if (!confirm(`Eliminar DEFINITIVAMENTE la cuenta de ${u.nombre}? Esta accion no se puede deshacer.`)) return
+    if (!confirm(`Confirma: Eliminar a ${u.nombre}?`)) return
+    const res = await fetch(`/api/admin/usuarios/${u.id}`, { method: "DELETE" })
+    if (res.ok) { setUsuarios(prev => prev.filter(x => x.id !== u.id)) }
+    else { const data = await res.json(); alert("Error: " + data.error) }
+  }
+
   async function toggleActivo(u: Usuario) {
     if (!confirm(`¿${u.activo ? 'Suspender' : 'Activar'} la cuenta de ${u.nombre}?`)) return
     const res = await fetch(`/api/admin/usuarios/${u.id}`, {
@@ -128,6 +136,9 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                 <button onClick={() => restablecerClave(u)} className="text-xs px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 text-blue-600">Restablecer contraseña</button>
                 <button onClick={() => toggleActivo(u)} className={`text-xs px-2 py-1 rounded border ${u.activo ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
                   {u.activo ? 'Suspender' : 'Activar'}
+                </button>
+                <button onClick={() => eliminarUsuario(u)} className="text-xs px-2 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 font-medium">
+                  Eliminar
                 </button>
               </div>
             </div>
@@ -171,6 +182,9 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                       <button onClick={() => restablecerClave(u)} className="text-xs px-2 py-1 rounded border border-blue-200 hover:bg-blue-50 text-blue-600">Restablecer contraseña</button>
                       <button onClick={() => toggleActivo(u)} className={`text-xs px-2 py-1 rounded border ${u.activo ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
                         {u.activo ? 'Suspender' : 'Activar'}
+                      </button>
+                      <button onClick={() => eliminarUsuario(u)} className="text-xs px-2 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 font-medium">
+                        Eliminar
                       </button>
                     </div>
                   </td>
