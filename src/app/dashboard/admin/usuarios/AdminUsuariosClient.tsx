@@ -228,44 +228,17 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
             {claveMsg ? (
               <div className="p-6 space-y-4">
                 <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                  <p className="text-sm font-semibold text-green-800 mb-2">✓ Usuario creado correctamente</p>
-                  <p className="text-sm text-green-700 mb-3">Compartí estas credenciales con el cliente:</p>
-                  <div className="bg-white rounded border border-green-200 p-3 space-y-2">
-                    <div>
-                      <p className="text-xs text-gray-500">Email de acceso:</p>
-                      <p className="font-mono text-sm font-bold text-gray-900">{form.email}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">Contraseña inicial:</p>
-                      <p className="font-mono text-lg font-bold text-gray-900">{claveMsg}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-green-600 mt-3">⚠️ El cliente deberá cambiarla en su primer acceso.</p>
+                  <p className="text-sm font-semibold text-green-800 mb-1">✓ Usuario creado correctamente</p>
+                  <p className="text-xs text-green-600 mt-2">⚠️ El cliente deberá cambiar su contraseña en el primer acceso.</p>
                 </div>
-
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Invitacion para WhatsApp</p>
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-700 whitespace-pre-line leading-relaxed">
-                    {`Bienvenido al sistema de casa de cambio
-
-Para ingresar visita: https://ctas-ctes-casacambio.netlify.app/
-
-Accede con las siguientes credenciales:
-Usuario: ${form.email}
-Contrasena: ${claveMsg}
-
-Al ingresar por primera vez deberas cambiar tu contrasena.`}
-                  </div>
-                  <button
-                    onClick={() => {
-                      const msg = "Bienvenido al sistema de casa de cambio\n\nPara ingresar visita: https://ctas-ctes-casacambio.netlify.app/\n\nAccede con las siguientes credenciales:\nUsuario: " + form.email + "\nContrasena: " + claveMsg + "\n\nAl ingresar por primera vez deberas cambiar tu contrasena."
-                      navigator.clipboard.writeText(msg).then(() => alert("Copiado al portapapeles")).catch(() => alert("No se pudo copiar"))
-                    }}
-                    className="btn-secondary w-full flex items-center justify-center gap-2">
-                    Copiar invitacion
-                  </button>
-                </div>
-
+                <button
+                  onClick={() => {
+                    const msg = "Bienvenido al sistema de casa de cambio\n\nPara ingresar visita: https://mictacte.netlify.app/\n\nAccede con las siguientes credenciales:\nUsuario: " + form.email + "\nContrasena: " + claveMsg + "\n\nAl ingresar por primera vez deberas cambiar tu contrasena."
+                    navigator.clipboard.writeText(msg).then(() => alert("Copiado al portapapeles")).catch(() => alert("No se pudo copiar"))
+                  }}
+                  className="btn-secondary w-full flex items-center justify-center gap-2">
+                  Copiar invitación
+                </button>
                 <button onClick={() => { setModal(null); setClaveMsg(null); window.location.reload() }} className="btn-primary w-full">Cerrar</button>
               </div>
             ) : (
@@ -274,7 +247,7 @@ Al ingresar por primera vez deberas cambiar tu contrasena.`}
                   <label className="label">Nombre completo *</label>
                   <input type="text" className="input" required
                     value={form.nombre} onChange={e => handleNombreChange(e.target.value)}
-                    placeholder="ej: Leo Holcman" />
+                    placeholder="ej: Juan Perez" />
                 </div>
                 <div>
                   <label className="label">Email de acceso</label>
