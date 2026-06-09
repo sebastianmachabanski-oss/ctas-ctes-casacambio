@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import * as XLSX from 'xlsx'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const XLSX = require('xlsx')
 
 const FILE_ID    = '12F-FTw8ueaKdRgb6wr_r3y6PqJjjA_06'
 const SHEET_NAME = 'CAJA'
