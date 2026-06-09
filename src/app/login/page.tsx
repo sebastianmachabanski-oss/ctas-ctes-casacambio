@@ -32,7 +32,7 @@ function LoginForm() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-white">Casa de Cambio</h1>
-          <p className="text-brand-200 text-sm mt-1">Portal de casa de cambio</p>
+          <p className="text-brand-200 text-sm mt-1">Casa de cambio</p>
         </div>
         <div className="card p-6">
           <form onSubmit={handleLogin} className="space-y-4">
