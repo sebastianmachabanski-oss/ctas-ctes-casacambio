@@ -139,17 +139,22 @@ export async function GET() {
     const rows = await readSheet(token)
     if (rows.length < 2) throw new Error('El sheet está vacío')
 
-    // 3. Encontrar encabezados
+    // 3. Encontrar encabezados — buscar la fila que tenga FECHA + CLIENTE + CAJA
     let headerIdx = -1
     let headers: string[] = []
-    for (let i = 0; i < Math.min(10, rows.length); i++) {
-      if (rows[i] && rows[i].some((c: any) => String(c || '').toUpperCase().includes('FECHA'))) {
+    for (let i = 0; i < Math.min(20, rows.length); i++) {
+      if (!rows[i]) continue
+      const cells = rows[i].map((c: any) => String(c || '').trim().toUpperCase())
+      const tieneFecha   = cells.some(c => c === 'FECHA')
+      const tieneCliente = cells.some(c => c === 'CLIENTE')
+      const tieneCaja    = cells.some(c => c === 'CAJA')
+      if (tieneFecha && tieneCliente && tieneCaja) {
         headerIdx = i
-        headers = rows[i].map((c: any) => String(c || '').trim().toUpperCase())
+        headers = cells
         break
       }
     }
-    if (headerIdx < 0) throw new Error('No se encontraron encabezados')
+    if (headerIdx < 0) throw new Error('No se encontraron encabezados. Primeras 5 filas: ' + JSON.stringify(rows.slice(0,5)))
     console.log('DEBUG headers:', JSON.stringify(headers))
 
     // 4. Mapear columnas
