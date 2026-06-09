@@ -163,39 +163,38 @@ export async function GET() {
     // 4. Mapear columnas
     const col = (name: string) => headers.findIndex(h => h.includes(name))
     const iDate    = col('FECHA')
-    const iTipo    = col('TIPO')
-    const iCtaCte  = col('CTA CTE')
-    const iOp      = col('OPERACI')
-    const iConc    = col('CONCEPTO')
-    const iEvento  = col('EVENTO')
-    const iMoneda  = col('PROPIO')
+    const iCliente = col('CLIENTE')   // filtro: valor 'CTA CTE'
+    const iOp      = col('OP')        // nombre del cliente/cuenta
+    const iCaja    = col('CAJA')      // EGRESAN / INGRESAN
+    const iOpTipo  = col('OPERACI')   // tipo de operación
+    const iPropio  = col('PROPIO')    // moneda
     const iMonto   = col('MONTO')
-    const iCCPesos  = headers.findIndex(h => h === 'CC PESOS')
-    const iCCDolar  = headers.findIndex(h => h === 'CC DOLARES')
-    const iCCEuro   = headers.findIndex(h => h === 'CC EUROS')
-    const iCCReal   = headers.findIndex(h => h === 'CC REALES')
+    const iNotas   = col('NOTAS')
+    const iCCPesos  = headers.findIndex(h => h === 'PESOS')
+    const iCCDolar  = headers.findIndex(h => h === 'DOLARES')
+    const iCCEuro   = headers.findIndex(h => h === 'EUROS')
+    const iCCReal   = headers.findIndex(h => h === 'REALES')
 
-    // 5. Filtrar CTA CTE
+    // 5. Filtrar filas CTA CTE (CLIENTE = "CTA CTE")
     const movimientos = []
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const row = rows[i]
-      if (!row || !row[iTipo]) continue
-      const tipo = String(row[iTipo] || '').trim().toUpperCase()
-      if (tipo !== 'CTA CTE') continue
+      if (!row || !row[iCliente]) continue
+      const cliente = String(row[iCliente] || '').trim().toUpperCase()
+      if (cliente !== 'CTA CTE') continue
       const fecha = parseFecha(row[iDate])
       if (!fecha) continue
-      const ctaCte = String(row[iCtaCte] || '').trim()
+      const ctaCte = String(row[iOp] || '').trim()
       if (!ctaCte) continue
 
-      if (ctaCte === 'Sebastian Machabanski') console.log('DEBUG Seba row:', JSON.stringify(row.slice(38, 48)))
       movimientos.push({
         fecha,
         tipo: 'CTA CTE',
         cuenta_cte: ctaCte,
-        operacion: String(row[iOp] || '').trim().toUpperCase(),
-        concepto: row[iConc] ? String(row[iConc]).trim() : null,
-        evento: row[iEvento] ? String(row[iEvento]).trim() : null,
-        moneda: mapMoneda(row[iMoneda]),
+        operacion: String(row[iCaja] || '').trim().toUpperCase(),
+        concepto: row[iOpTipo] ? String(row[iOpTipo]).trim() : null,
+        evento: row[iNotas] ? String(row[iNotas]).trim() : null,
+        moneda: mapMoneda(row[iPropio]),
         monto: toNum(row[iMonto]),
         cc_pesos:   iCCPesos  >= 0 ? toNum(row[iCCPesos])  : 0,
         cc_dolares: iCCDolar  >= 0 ? toNum(row[iCCDolar])  : 0,
@@ -206,12 +205,11 @@ export async function GET() {
     }
 
     if (movimientos.length === 0) {
-      // Devolver info de debug para entender la estructura
-      const tiposEncontrados = Array.from(new Set(
+      const clientesEncontrados = Array.from(new Set(
         rows.slice(headerIdx + 1, headerIdx + 50)
-          .map(r => r[iTipo] ? String(r[iTipo]).trim() : '(vacío)')
+          .map(r => r[iCliente] ? String(r[iCliente]).trim() : '(vacío)')
       ))
-      throw new Error(`Sin movimientos CTA CTE. Headers: ${headers.slice(0,15).join(' | ')}. Valores en col TIPO: ${tiposEncontrados.join(', ')}`)
+      throw new Error(`Sin movimientos CTA CTE. Valores en col CLIENTE: ${clientesEncontrados.join(', ')}`)
     }
 
     // 6. Sincronizar Supabase
