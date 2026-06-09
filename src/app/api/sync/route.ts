@@ -164,10 +164,10 @@ export async function GET() {
     const col = (name: string) => headers.findIndex(h => h.includes(name))
     const iDate    = col('FECHA')
     const iCliente = col('CLIENTE')   // filtro: valor 'CTA CTE'
-    const iOp      = col('OP')        // nombre del cliente/cuenta
-    const iCaja    = col('CAJA')      // EGRESAN / INGRESAN
-    const iOpTipo  = col('OPERACI')   // tipo de operación
-    const iPropio  = col('PROPIO')    // moneda
+    const iCtaCte  = col('CAJA')      // nombre de la cuenta corriente
+    const iOpTipo  = col('OPERACI')   // EGRESAN / INGRESAN
+    const iPropio  = col('PROPIO')    // moneda casa de cambio
+    const iExterno = col('EXTERNO')   // moneda cliente
     const iMonto   = col('MONTO')
     const iNotas   = col('NOTAS')
     const iCCPesos  = headers.findIndex(h => h === 'PESOS')
@@ -184,15 +184,15 @@ export async function GET() {
       if (cliente !== 'CTA CTE') continue
       const fecha = parseFecha(row[iDate])
       if (!fecha) continue
-      const ctaCte = String(row[iOp] || '').trim()
+      const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
 
       movimientos.push({
         fecha,
         tipo: 'CTA CTE',
         cuenta_cte: ctaCte,
-        operacion: String(row[iCaja] || '').trim().toUpperCase(),
-        concepto: row[iOpTipo] ? String(row[iOpTipo]).trim() : null,
+        operacion: String(row[iOpTipo] || '').trim().toUpperCase(),
+        concepto: row[iPropio] ? `${String(row[iPropio]).trim()} → ${String(row[iExterno] || '').trim()}` : null,
         evento: row[iNotas] ? String(row[iNotas]).trim() : null,
         moneda: mapMoneda(row[iPropio]),
         monto: toNum(row[iMonto]),
