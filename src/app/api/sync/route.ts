@@ -207,10 +207,10 @@ export async function GET() {
 
     if (movimientos.length === 0) {
       // Devolver info de debug para entender la estructura
-      const tiposEncontrados = [...new Set(
+      const tiposEncontrados = Array.from(new Set(
         rows.slice(headerIdx + 1, headerIdx + 50)
           .map(r => r[iTipo] ? String(r[iTipo]).trim() : '(vacío)')
-      )]
+      ))
       throw new Error(`Sin movimientos CTA CTE. Headers: ${headers.slice(0,15).join(' | ')}. Valores en col TIPO: ${tiposEncontrados.join(', ')}`)
     }
 
