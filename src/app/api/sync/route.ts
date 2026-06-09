@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import * as XLSX from 'xlsx'
 
-const SHEET_ID = '1Sm4Y5zSu29_wtIz9MsBQxPlnTBebuyAgQP3rg9nfvG4'
-const SHEET_NAME = 'DIARIO'
+const FILE_ID    = '12F-FTw8ueaKdRgb6wr_r3y6PqJjjA_06'
+const SHEET_NAME = 'CAJA'
 
 function toNum(val: any): number {
   if (!val) return 0
@@ -57,7 +58,7 @@ async function getGoogleToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
   const payload = {
     iss: creds.client_email,
-    scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+    scope: 'https://www.googleapis.com/auth/drive.readonly',
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
     iat: now,
@@ -113,13 +114,19 @@ async function getGoogleToken(): Promise<string> {
 }
 
 async function readSheet(token: string): Promise<any[][]> {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME)}`
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  if (!res.ok) { const errBody = await res.text(); throw new Error(`Error leyendo sheet: ${res.status} ${res.statusText} - ${errBody}`) }
-  const data = await res.json()
-  return data.values ?? []
+  // Descargar el Excel desde Google Drive
+  const url = `https://www.googleapis.com/drive/v3/files/${FILE_ID}?alt=media`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) {
+    const errBody = await res.text()
+    throw new Error(`Error descargando archivo: ${res.status} ${res.statusText} - ${errBody}`)
+  }
+  const buffer = await res.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+  const sheet = workbook.Sheets[SHEET_NAME]
+  if (!sheet) throw new Error(`Pestaña "${SHEET_NAME}" no encontrada. Pestañas disponibles: ${workbook.SheetNames.join(', ')}`)
+  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, dateNF: 'DD/MM/YYYY' })
+  return rows
 }
 
 export async function GET() {
