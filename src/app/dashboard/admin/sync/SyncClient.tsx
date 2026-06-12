@@ -37,7 +37,6 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
         <p className="text-gray-500 text-sm mt-1">Actualiza los datos desde Google Sheets</p>
       </div>
 
-      {/* Estado actual */}
       <div className="card p-5">
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-gray-50 rounded-lg p-3">
@@ -54,7 +53,6 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
           </div>
         </div>
 
-        {/* Resultados */}
         {resultado && (
           <div className="mt-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
             <p className="font-semibold">✓ Sincronización exitosa</p>
@@ -69,7 +67,6 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
           </div>
         )}
 
-        {/* Botones */}
         <div className="mt-4 flex items-center gap-3">
           <button onClick={handleSync} className="btn-primary" disabled={loading}>
             {loading ? (
@@ -90,23 +87,25 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
           </button>
         </div>
 
-        {/* Debug sample */}
-        {resultado?.debug_sample && (
-          <div className="mt-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-xs font-mono overflow-auto max-h-64">
-            <p className="font-bold text-yellow-800 mb-2">Debug MONTO (primeras 20 filas CTA CTE):</p>
+        {/* Debug: EDY rows showing monto vs cc_dolares */}
+        {resultado?.debug_sample && resultado.debug_sample.length > 0 && (
+          <div className="mt-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-xs font-mono overflow-auto max-h-80">
+            <p className="font-bold text-yellow-800 mb-1">Debug EDY — índices: monto={resultado.debug_indices?.iMonto} dolares={resultado.debug_indices?.iCCDolar}</p>
+            <div className="grid grid-cols-5 gap-1 font-bold text-yellow-700 border-b border-yellow-300 pb-1 mb-1">
+              <span>fecha</span><span>monto_raw</span><span>monto→</span><span>dolar_raw</span><span>dolar→</span>
+            </div>
             {resultado.debug_sample.map((row: any, i: number) => (
-              <div key={i} className="border-b border-yellow-100 py-1">
-                <span className="text-gray-500">{row.fecha} {row.ctaCte}</span>{' '}
-                raw=<strong>{JSON.stringify(row.rawMonto)}</strong>{' '}
-                type={row.typeofMonto}{' '}
-                str=&quot;{row.strMonto}&quot;{' '}
-                →{' '}<strong className={row.parsed !== Math.round(row.parsed) ? 'text-red-600' : 'text-green-700'}>{row.parsed}</strong>
+              <div key={i} className="grid grid-cols-5 gap-1 border-b border-yellow-100 py-0.5">
+                <span>{row.fecha}</span>
+                <span>{row.monto_raw}</span>
+                <strong className={!Number.isInteger(row.monto_parsed) ? 'text-red-600' : 'text-green-700'}>{row.monto_parsed}</strong>
+                <span>{row.dolar_raw}</span>
+                <strong className={!Number.isInteger(row.dolar_parsed) ? 'text-red-600' : 'text-green-700'}>{row.dolar_parsed}</strong>
               </div>
             ))}
           </div>
         )}
 
-        {/* Panel de información colapsable */}
         {showInfo && (
           <div className="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-600 space-y-2">
             <ol className="space-y-1.5">
