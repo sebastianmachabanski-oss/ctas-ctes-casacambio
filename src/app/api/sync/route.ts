@@ -174,7 +174,7 @@ export async function GET() {
     const iCCEuro   = headers.findIndex(h => h === 'EUROS')
     const iCCReal   = headers.findIndex(h => h === 'REALES')
 
-    // Debug: capture EDY rows to inspect both monto and cc_dolares
+    // Debug: capture EDY rows from 2023-12-14 specifically
     const debugSample: any[] = []
 
     const movimientos = []
@@ -189,7 +189,7 @@ export async function GET() {
       const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
 
-      if (debugSample.length < 30 && ctaCte.toUpperCase() === 'EDY') {
+      if (debugSample.length < 30 && ctaCte.toUpperCase() === 'EDY' && fecha === '2023-12-14') {
         const rawMonto  = row[iMonto]
         const rawDolar  = iCCDolar >= 0 ? row[iCCDolar] : undefined
         debugSample.push({
