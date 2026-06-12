@@ -9,44 +9,33 @@ const SHEET_NAME = 'CAJA'
 function toNum(val: any): number {
   if (val === null || val === undefined || val === '') return 0
   if (typeof val === 'number') {
-    // Con raw:false no deberia llegar aqui, pero por seguridad:
-    // Redondear a 2 decimales para evitar floats de celdas con formato
     const rounded = Math.round(val * 100) / 100
     return isFinite(rounded) ? rounded : 0
   }
   let s = String(val).trim()
   if (!s || s === '-' || s.replace(/\s/g, '') === '') return 0
   s = s.replace(/\s/g, '')
-  // Quitar simbolos de moneda y porcentaje
   s = s.replace(/[%$€£]/g, '')
   const isNegative = s.startsWith('(') && s.endsWith(')')
   if (isNegative) s = s.slice(1, -1)
 
   if (s.includes('.') && s.includes(',')) {
-    // Ambos: el ultimo es el separador decimal
     const lastDot   = s.lastIndexOf('.')
     const lastComma = s.lastIndexOf(',')
     if (lastComma > lastDot) {
-      // 1.000,50 -> punto=miles, coma=decimal
       s = s.replace(/\./g, '').replace(',', '.')
     } else {
-      // 1,000.50 -> coma=miles, punto=decimal
       s = s.replace(/,/g, '')
     }
   } else if (s.includes('.') && !s.includes(',')) {
-    // Solo puntos: miles o decimal?
     const parts = s.replace(/^-/, '').split('.')
     const allThreeDigits = parts.length > 1 && parts.slice(1).every((p: string) => p.length === 3)
-    if (allThreeDigits) s = s.replace(/\./g, '')  // 9.265 -> 9265, 60.000 -> 60000
-    // si no, se deja como decimal: 9.27 queda 9.27
+    if (allThreeDigits) s = s.replace(/\./g, '')
   } else if (s.includes(',') && !s.includes('.')) {
-    // Solo comas: miles o decimal?
     const parts = s.replace(/^-/, '').split(',')
     if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
-      // 1,000 o 1,000,000 -> miles
       s = s.replace(/,/g, '')
     } else {
-      // 1,30 -> decimal
       s = s.replace(',', '.')
     }
   }
@@ -142,7 +131,6 @@ async function readSheet(token: string): Promise<any[][]> {
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheet = workbook.Sheets[SHEET_NAME]
   if (!sheet) throw new Error(`Pestaña "${SHEET_NAME}" no encontrada. Pestañas disponibles: ${workbook.SheetNames.join(', ')}`)
-  // raw:false -> XLSX devuelve strings formateados que toNum puede parsear correctamente
   const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, cellDates: true, dateNF: 'DD/MM/YYYY' })
   return rows
 }
@@ -186,6 +174,9 @@ export async function GET() {
     const iCCEuro   = headers.findIndex(h => h === 'EUROS')
     const iCCReal   = headers.findIndex(h => h === 'REALES')
 
+    // Debug: capture raw MONTO values for first 20 CTA CTE rows
+    const debugSample: any[] = []
+
     const movimientos = []
 
     for (let i = headerIdx + 1; i < rows.length; i++) {
@@ -197,6 +188,18 @@ export async function GET() {
       if (!fecha) continue
       const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
+
+      if (debugSample.length < 20) {
+        const rawMonto = row[iMonto]
+        debugSample.push({
+          fecha,
+          ctaCte,
+          rawMonto,
+          typeofMonto: typeof rawMonto,
+          strMonto: String(rawMonto),
+          parsed: toNum(rawMonto),
+        })
+      }
 
       movimientos.push({
         fecha,
@@ -241,6 +244,7 @@ export async function GET() {
       movimientos: movimientos.length,
       cuentas: cuentasSet.size,
       ultimaSync: new Date().toISOString(),
+      debug_sample: debugSample,
     })
 
   } catch (err: any) {
