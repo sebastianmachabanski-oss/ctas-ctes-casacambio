@@ -198,7 +198,12 @@ export async function GET() {
       throw new Error(`Sin movimientos CTA CTE. Valores en col CLIENTE: ${clientes.join(', ')}`)
     }
 
-    await supabase.from('diario').delete().eq('tipo', 'CTA CTE').eq('anulado', false)
+    // Borrar TODO lo no anulado (incluye anulado=null, que .eq(false) no matchea)
+    const { error: delError } = await supabase.from('diario')
+      .delete()
+      .eq('tipo', 'CTA CTE')
+      .or('anulado.is.null,anulado.eq.false')
+    if (delError) throw new Error('Error borrando datos previos: ' + delError.message)
 
     for (let i = 0; i < movimientos.length; i += 500) {
       const { error } = await supabase.from('diario').insert(movimientos.slice(i, i + 500))
