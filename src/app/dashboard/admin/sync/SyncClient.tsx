@@ -83,13 +83,28 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
             ) : '🔄 Sincronizar ahora'}
           </button>
 
-          {/* Botón de información */}
           <button onClick={() => setShowInfo(!showInfo)}
             className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-gray-400 transition-colors text-sm font-bold"
             title="Cómo funciona">
             i
           </button>
         </div>
+
+        {/* Debug sample */}
+        {resultado?.debug_sample && (
+          <div className="mt-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-xs font-mono overflow-auto max-h-64">
+            <p className="font-bold text-yellow-800 mb-2">Debug MONTO (primeras 20 filas CTA CTE):</p>
+            {resultado.debug_sample.map((row: any, i: number) => (
+              <div key={i} className="border-b border-yellow-100 py-1">
+                <span className="text-gray-500">{row.fecha} {row.ctaCte}</span>{' '}
+                raw=<strong>{JSON.stringify(row.rawMonto)}</strong>{' '}
+                type={row.typeofMonto}{' '}
+                str=&quot;{row.strMonto}&quot;{' '}
+                →{' '}<strong className={row.parsed !== Math.round(row.parsed) ? 'text-red-600' : 'text-green-700'}>{row.parsed}</strong>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Panel de información colapsable */}
         {showInfo && (
