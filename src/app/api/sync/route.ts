@@ -8,20 +8,42 @@ const SHEET_NAME = 'CAJA'
 
 function toNum(val: any): number {
   if (!val) return 0
+  if (typeof val === 'number') return val
   let s = String(val).trim()
   if (!s || s === '-' || s.replace(/\s/g,'') === '-' || s.replace(/\s/g,'') === '') return 0
   s = s.replace(/\s/g, '')
   const isNegative = s.startsWith('(') && s.endsWith(')')
   if (isNegative) s = s.slice(1, -1)
+
   if (s.includes('.') && s.includes(',')) {
-    s = s.replace(/\./g, '').replace(',', '.')
+    // Ambos separadores: el último es el decimal
+    const lastDot   = s.lastIndexOf('.')
+    const lastComma = s.lastIndexOf(',')
+    if (lastComma > lastDot) {
+      // 1.000,50  →  punto=miles, coma=decimal
+      s = s.replace(/\./g, '').replace(',', '.')
+    } else {
+      // 1,000.50  →  coma=miles, punto=decimal
+      s = s.replace(/,/g, '')
+    }
   } else if (s.includes('.') && !s.includes(',')) {
+    // Solo puntos: ¿miles o decimal?
     const parts = s.replace(/^-/, '').split('.')
     const allThreeDigits = parts.length > 1 && parts.slice(1).every((p: string) => p.length === 3)
-    if (allThreeDigits) s = s.replace(/\./g, '')
+    if (allThreeDigits) s = s.replace(/\./g, '')  // miles: 4.300.000 → 4300000
+    // si no, es decimal: 4.3 se queda igual
   } else if (s.includes(',') && !s.includes('.')) {
-    s = s.replace(',', '.')
+    // Solo comas: ¿miles o decimal?
+    const parts = s.replace(/^-/, '').split(',')
+    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) {
+      // Miles: 1,000 o 1,000,000
+      s = s.replace(/,/g, '')
+    } else {
+      // Decimal: 1,5 o 1,30
+      s = s.replace(',', '.')
+    }
   }
+
   const n = parseFloat(s)
   if (isNaN(n)) return 0
   return isNegative ? -n : n
@@ -29,6 +51,9 @@ function toNum(val: any): number {
 
 function parseFecha(val: any): string | null {
   if (!val) return null
+  if (val instanceof Date) {
+    return val.toISOString().slice(0, 10)
+  }
   const s = String(val).trim()
 
   // DD/MM/YYYY
