@@ -30,11 +30,23 @@ function toNum(val: any): number {
 function parseFecha(val: any): string | null {
   if (!val) return null
   const s = String(val).trim()
+
+  // DD/MM/YYYY
   if (s.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
     const [d, m, y] = s.split('/')
     return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
   }
+
+  // M/D/YY o MM/DD/YY (formato Excel corto, ej: 8/1/23)
+  if (s.match(/^\d{1,2}\/\d{1,2}\/\d{2}$/)) {
+    const [m, d, y] = s.split('/')
+    const year = parseInt(y) + 2000
+    return `${year}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
+  }
+
+  // YYYY-MM-DD
   if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0, 10)
+
   return null
 }
 
@@ -144,7 +156,6 @@ export async function GET() {
       }
     }
     if (headerIdx < 0) throw new Error('No se encontraron encabezados')
-    console.log('DEBUG headers:', JSON.stringify(headers))
 
     const col = (name: string) => headers.findIndex(h => h.includes(name))
     const iDate    = col('FECHA')
@@ -160,25 +171,13 @@ export async function GET() {
     const iCCEuro   = headers.findIndex(h => h === 'EUROS')
     const iCCReal   = headers.findIndex(h => h === 'REALES')
 
-    console.log('DEBUG col indices:', { iDate, iCliente, iCtaCte, iOpTipo, iPropio, iExterno, iMonto, iNotas })
-
     const movimientos = []
-    const debugCtaCte: string[] = []
 
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const row = rows[i]
       if (!row || !row[iCliente]) continue
       const cliente = String(row[iCliente] || '').trim().toUpperCase()
       if (cliente !== 'CTA CTE') continue
-
-      // Debug: mostrar las primeras 10 filas CTA CTE
-      if (debugCtaCte.length < 10) {
-        const fechaRaw = row[iDate]
-        const cajaRaw = row[iCtaCte]
-        const fechaParsed = parseFecha(fechaRaw)
-        debugCtaCte.push(`fila${i}: fecha="${fechaRaw}"(parsed=${fechaParsed}) caja="${cajaRaw}"`)
-      }
-
       const fecha = parseFecha(row[iDate])
       if (!fecha) continue
       const ctaCte = String(row[iCtaCte] || '').trim()
@@ -202,11 +201,11 @@ export async function GET() {
     }
 
     if (movimientos.length === 0) {
-      throw new Error(
-        `Sin movimientos CTA CTE.\n` +
-        `Índices de columnas: iDate=${iDate} iCliente=${iCliente} iCtaCte(CAJA)=${iCtaCte}\n` +
-        `Debug primeras filas CTA CTE:\n${debugCtaCte.join('\n') || '(ninguna fila con CLIENTE=CTA CTE encontrada)'}`
-      )
+      const clientesEncontrados = Array.from(new Set(
+        rows.slice(headerIdx + 1, headerIdx + 50)
+          .map(r => r[iCliente] ? String(r[iCliente]).trim() : '(vacío)')
+      ))
+      throw new Error(`Sin movimientos CTA CTE. Valores en col CLIENTE: ${clientesEncontrados.join(', ')}`)
     }
 
     await supabase.from('diario').delete().eq('tipo', 'CTA CTE').eq('anulado', false)
