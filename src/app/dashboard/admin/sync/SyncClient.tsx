@@ -11,6 +11,8 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
   const [showInfo, setShowInfo] = useState(false)
   const [resultado, setResultado] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [currentTotal, setCurrentTotal] = useState(totalMovimientos)
+  const [currentSync, setCurrentSync] = useState(ultimaSync)
 
   async function handleSync() {
     if (!confirm('Esto reemplazará todos los movimientos CTA CTE con los datos actuales del Excel. ¿Continuar?')) return
@@ -24,6 +26,8 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
 
     if (!res.ok) { setError(data.error); return }
     setResultado(data)
+    setCurrentTotal(data.movimientos)
+    setCurrentSync(data.ultimaSync)
   }
 
   return (
@@ -38,13 +42,13 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="text-xs text-gray-500 mb-1">Movimientos en base</p>
-            <p className="text-2xl font-bold text-gray-900">{totalMovimientos.toLocaleString('es-AR')}</p>
+            <p className="text-2xl font-bold text-gray-900">{currentTotal.toLocaleString('es-AR')}</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="text-xs text-gray-500 mb-1">Última sincronización</p>
             <p className="text-sm font-medium text-gray-900">
-              {ultimaSync
-                ? new Date(ultimaSync).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+              {currentSync
+                ? new Date(currentSync).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                 : 'Nunca'}
             </p>
           </div>
