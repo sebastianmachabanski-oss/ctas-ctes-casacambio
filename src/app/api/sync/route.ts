@@ -174,7 +174,7 @@ export async function GET() {
     const iCCEuro   = headers.findIndex(h => h === 'EUROS')
     const iCCReal   = headers.findIndex(h => h === 'REALES')
 
-    // Debug: capture raw MONTO values for first 20 CTA CTE rows
+    // Debug: capture EDY rows to inspect both monto and cc_dolares
     const debugSample: any[] = []
 
     const movimientos = []
@@ -189,15 +189,15 @@ export async function GET() {
       const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
 
-      if (debugSample.length < 20) {
-        const rawMonto = row[iMonto]
+      if (debugSample.length < 30 && ctaCte.toUpperCase() === 'EDY') {
+        const rawMonto  = row[iMonto]
+        const rawDolar  = iCCDolar >= 0 ? row[iCCDolar] : undefined
         debugSample.push({
           fecha,
-          ctaCte,
-          rawMonto,
-          typeofMonto: typeof rawMonto,
-          strMonto: String(rawMonto),
-          parsed: toNum(rawMonto),
+          monto_raw: JSON.stringify(rawMonto),
+          monto_parsed: toNum(rawMonto),
+          dolar_raw: JSON.stringify(rawDolar),
+          dolar_parsed: toNum(rawDolar),
         })
       }
 
@@ -245,6 +245,7 @@ export async function GET() {
       cuentas: cuentasSet.size,
       ultimaSync: new Date().toISOString(),
       debug_sample: debugSample,
+      debug_indices: { iMonto, iCCDolar, iCCPesos, iCCEuro, iCCReal },
     })
 
   } catch (err: any) {
