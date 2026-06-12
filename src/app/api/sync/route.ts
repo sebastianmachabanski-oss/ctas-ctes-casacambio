@@ -10,12 +10,9 @@ function toNum(val: any): number {
   if (!val) return 0
   let s = String(val).trim()
   if (!s || s === '-' || s.replace(/\s/g,'') === '-' || s.replace(/\s/g,'') === '') return 0
-  // Quitar espacios
   s = s.replace(/\s/g, '')
-  // Formato contable: (1.000) = -1000
   const isNegative = s.startsWith('(') && s.endsWith(')')
   if (isNegative) s = s.slice(1, -1)
-  // Punto como separador de miles + coma decimal: 1.234,56
   if (s.includes('.') && s.includes(',')) {
     s = s.replace(/\./g, '').replace(',', '.')
   } else if (s.includes('.') && !s.includes(',')) {
@@ -33,12 +30,10 @@ function toNum(val: any): number {
 function parseFecha(val: any): string | null {
   if (!val) return null
   const s = String(val).trim()
-  // DD/MM/YYYY
   if (s.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
     const [d, m, y] = s.split('/')
     return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
   }
-  // YYYY-MM-DD
   if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0, 10)
   return null
 }
@@ -65,7 +60,6 @@ async function getGoogleToken(): Promise<string> {
     iat: now,
   }
 
-  // Crear JWT manualmente
   const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   const body = btoa(JSON.stringify(payload))
@@ -73,7 +67,6 @@ async function getGoogleToken(): Promise<string> {
   
   const signingInput = `${header}.${body}`
   
-  // Importar clave privada
   const privateKeyPem = creds.private_key
   const pemContents = privateKeyPem
     .replace('-----BEGIN PRIVATE KEY-----', '')
@@ -101,7 +94,6 @@ async function getGoogleToken(): Promise<string> {
   
   const jwt = `${signingInput}.${sig}`
   
-  // Obtener access token
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -110,12 +102,10 @@ async function getGoogleToken(): Promise<string> {
   
   const tokenData = await tokenRes.json()
   if (!tokenData.access_token) throw new Error('Token error: ' + JSON.stringify(tokenData))
-  console.log('Token OK, scope:', tokenData.scope)
   return tokenData.access_token
 }
 
 async function readSheet(token: string): Promise<any[][]> {
-  // Descargar el Excel desde Google Drive
   const url = `https://www.googleapis.com/drive/v3/files/${FILE_ID}?alt=media`
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
   if (!res.ok) {
@@ -140,14 +130,10 @@ export async function GET() {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   try {
-    // 1. Obtener token de Google
     const token = await getGoogleToken()
-
-    // 2. Leer el sheet
     const rows = await readSheet(token)
     if (rows.length < 2) throw new Error('El sheet está vacío')
 
-    // 3. Encontrar encabezados
     let headerIdx = -1
     let headers: string[] = []
     for (let i = 0; i < Math.min(10, rows.length); i++) {
@@ -160,14 +146,13 @@ export async function GET() {
     if (headerIdx < 0) throw new Error('No se encontraron encabezados')
     console.log('DEBUG headers:', JSON.stringify(headers))
 
-    // 4. Mapear columnas
     const col = (name: string) => headers.findIndex(h => h.includes(name))
     const iDate    = col('FECHA')
-    const iCliente = col('CLIENTE')   // filtro: valor 'CTA CTE'
-    const iCtaCte  = col('CAJA')      // nombre de la cuenta corriente
-    const iOpTipo  = col('OPERACI')   // EGRESAN / INGRESAN
-    const iPropio  = col('PROPIO')    // moneda casa de cambio
-    const iExterno = col('EXTERNO')   // moneda cliente
+    const iCliente = col('CLIENTE')
+    const iCtaCte  = col('CAJA')
+    const iOpTipo  = col('OPERACI')
+    const iPropio  = col('PROPIO')
+    const iExterno = col('EXTERNO')
     const iMonto   = col('MONTO')
     const iNotas   = col('NOTAS')
     const iCCPesos  = headers.findIndex(h => h === 'PESOS')
@@ -175,13 +160,25 @@ export async function GET() {
     const iCCEuro   = headers.findIndex(h => h === 'EUROS')
     const iCCReal   = headers.findIndex(h => h === 'REALES')
 
-    // 5. Filtrar filas CTA CTE (CLIENTE = "CTA CTE")
+    console.log('DEBUG col indices:', { iDate, iCliente, iCtaCte, iOpTipo, iPropio, iExterno, iMonto, iNotas })
+
     const movimientos = []
+    const debugCtaCte: string[] = []
+
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const row = rows[i]
       if (!row || !row[iCliente]) continue
       const cliente = String(row[iCliente] || '').trim().toUpperCase()
       if (cliente !== 'CTA CTE') continue
+
+      // Debug: mostrar las primeras 10 filas CTA CTE
+      if (debugCtaCte.length < 10) {
+        const fechaRaw = row[iDate]
+        const cajaRaw = row[iCtaCte]
+        const fechaParsed = parseFecha(fechaRaw)
+        debugCtaCte.push(`fila${i}: fecha="${fechaRaw}"(parsed=${fechaParsed}) caja="${cajaRaw}"`)
+      }
+
       const fecha = parseFecha(row[iDate])
       if (!fecha) continue
       const ctaCte = String(row[iCtaCte] || '').trim()
@@ -205,14 +202,13 @@ export async function GET() {
     }
 
     if (movimientos.length === 0) {
-      const clientesEncontrados = Array.from(new Set(
-        rows.slice(headerIdx + 1, headerIdx + 50)
-          .map(r => r[iCliente] ? String(r[iCliente]).trim() : '(vacío)')
-      ))
-      throw new Error(`Sin movimientos CTA CTE. Valores en col CLIENTE: ${clientesEncontrados.join(', ')}`)
+      throw new Error(
+        `Sin movimientos CTA CTE.\n` +
+        `Índices de columnas: iDate=${iDate} iCliente=${iCliente} iCtaCte(CAJA)=${iCtaCte}\n` +
+        `Debug primeras filas CTA CTE:\n${debugCtaCte.join('\n') || '(ninguna fila con CLIENTE=CTA CTE encontrada)'}`
+      )
     }
 
-    // 6. Sincronizar Supabase
     await supabase.from('diario').delete().eq('tipo', 'CTA CTE').eq('anulado', false)
 
     for (let i = 0; i < movimientos.length; i += 500) {
