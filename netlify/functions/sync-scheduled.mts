@@ -7,29 +7,40 @@ import * as XLSX from "xlsx"
 const FILE_ID    = '12F-FTw8ueaKdRgb6wr_r3y6PqJjjA_06'
 const SHEET_NAME = 'CAJA'
 
-function toNum(val: any): number {
-  if (!val) return 0
+function parseMonto(val: any): number {
+  if (val === null || val === undefined || val === '') return 0
+  if (typeof val === 'number' && isFinite(val)) {
+    return Math.round(val * 100) / 100
+  }
   let s = String(val).trim()
-  if (!s || s === '-' || s.replace(/\s/g, '') === '-' || s.replace(/\s/g, '') === '') return 0
-  s = s.replace(/\s/g, '')
-  const isNegative = s.startsWith('(') && s.endsWith(')')
-  if (isNegative) s = s.slice(1, -1)
+  if (!s || s === '-') return 0
+  s = s.replace(/\s/g, '').replace(/[%$€£]/g, '')
+  const neg = s.startsWith('(') && s.endsWith(')')
+  if (neg) s = s.slice(1, -1)
   if (s.includes('.') && s.includes(',')) {
-    s = s.replace(/\./g, '').replace(',', '.')
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.')
+    else s = s.replace(/,/g, '')
   } else if (s.includes('.') && !s.includes(',')) {
     const parts = s.replace(/^-/, '').split('.')
-    const allThreeDigits = parts.length > 1 && parts.slice(1).every((p: string) => p.length === 3)
-    if (allThreeDigits) s = s.replace(/\./g, '')
+    if (parts.length > 1 && parts.slice(1).every((p: string) => p.length === 3)) s = s.replace(/\./g, '')
   } else if (s.includes(',') && !s.includes('.')) {
-    s = s.replace(',', '.')
+    const parts = s.replace(/^-/, '').split(',')
+    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) s = s.replace(/,/g, '')
+    else s = s.replace(',', '.')
   }
   const n = parseFloat(s)
   if (isNaN(n)) return 0
-  return isNegative ? -n : n
+  return neg ? -n : n
 }
 
 function parseFecha(val: any): string | null {
   if (!val) return null
+  if (val instanceof Date) {
+    const y = val.getFullYear()
+    const m = String(val.getMonth() + 1).padStart(2, '0')
+    const d = String(val.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
   const s = String(val).trim()
   // DD/MM/YYYY
   if (s.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
@@ -39,8 +50,7 @@ function parseFecha(val: any): string | null {
   // M/D/YY (formato Excel corto, ej: 8/1/23)
   if (s.match(/^\d{1,2}\/\d{1,2}\/\d{2}$/)) {
     const [m, d, y] = s.split('/')
-    const year = parseInt(y) + 2000
-    return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+    return `${parseInt(y) + 2000}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
   }
   // YYYY-MM-DD
   if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0, 10)
@@ -111,7 +121,7 @@ async function readSheet(token: string): Promise<any[][]> {
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheet = workbook.Sheets[SHEET_NAME]
   if (!sheet) throw new Error(`Pestaña "${SHEET_NAME}" no encontrada`)
-  return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, dateNF: 'DD/MM/YYYY' })
+  return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, cellDates: true })
 }
 
 export default async function handler() {
@@ -170,18 +180,19 @@ export default async function handler() {
         concepto: row[iPropio] ? `${String(row[iPropio]).trim()} → ${String(row[iExterno] || '').trim()}` : null,
         evento: row[iNotas] ? String(row[iNotas]).trim() : null,
         moneda: mapMoneda(row[iPropio]),
-        monto: toNum(row[iMonto]),
-        cc_pesos:   iCCPesos >= 0 ? toNum(row[iCCPesos]) : 0,
-        cc_dolares: iCCDolar >= 0 ? toNum(row[iCCDolar]) : 0,
-        cc_euros:   iCCEuro  >= 0 ? toNum(row[iCCEuro])  : 0,
-        cc_reales:  iCCReal  >= 0 ? toNum(row[iCCReal])  : 0,
+        monto: parseMonto(row[iMonto]),
+        cc_pesos:   iCCPesos >= 0 ? parseMonto(row[iCCPesos]) : 0,
+        cc_dolares: iCCDolar >= 0 ? parseMonto(row[iCCDolar]) : 0,
+        cc_euros:   iCCEuro  >= 0 ? parseMonto(row[iCCEuro])  : 0,
+        cc_reales:  iCCReal  >= 0 ? parseMonto(row[iCCReal])  : 0,
         anulado: false,
       })
     }
 
     if (!movimientos.length) throw new Error('Sin movimientos CTA CTE')
 
-    await supabase.from('diario').delete().eq('tipo', 'CTA CTE').eq('anulado', false)
+    const { error: delError } = await supabase.from('diario').delete().eq('tipo', 'CTA CTE')
+    if (delError) throw new Error('Error borrando datos previos: ' + delError.message)
     for (let i = 0; i < movimientos.length; i += 500) {
       const { error } = await supabase.from('diario').insert(movimientos.slice(i, i + 500))
       if (error) throw new Error(error.message)

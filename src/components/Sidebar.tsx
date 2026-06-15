@@ -7,14 +7,14 @@ import type { Profile } from '@/lib/supabase/types'
 
 const navItems = {
   superusuario: [
-    { href: '/dashboard/cuenta-corriente', label: 'Casa de Cambio', icon: '📋' },
+    { href: '/dashboard/cuenta-corriente', label: 'Cuentas Corrientes', icon: '📋' },
     { href: '/dashboard/admin/usuarios',   label: 'Usuarios',           icon: '👥' },
     { href: '/dashboard/deudores',          label: 'Saldos Pendientes',  icon: '📊' },
     { href: '/dashboard/admin/sync',       label: 'Sincronizar Excel',  icon: '🔄' },
     { href: '/dashboard/mi-cuenta',        label: 'Mi cuenta',          icon: '🔑' },
   ],
   operador: [
-    { href: '/dashboard/cuenta-corriente', label: 'Casa de Cambio', icon: '📋' },
+    { href: '/dashboard/cuenta-corriente', label: 'Cuentas Corrientes', icon: '📋' },
     { href: '/dashboard/deudores',          label: 'Saldos Pendientes',  icon: '📊' },
     { href: '/dashboard/mi-cuenta',        label: 'Mi cuenta',          icon: '🔑' },
   ],

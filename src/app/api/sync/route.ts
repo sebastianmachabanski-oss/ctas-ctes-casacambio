@@ -6,47 +6,50 @@ const XLSX = require('xlsx')
 const FILE_ID    = '12F-FTw8ueaKdRgb6wr_r3y6PqJjjA_06'
 const SHEET_NAME = 'CAJA'
 
-function toNum(val: any): number {
-  if (!val) return 0
+function parseMonto(val: any): number {
+  if (val === null || val === undefined || val === '') return 0
+  if (typeof val === 'number' && isFinite(val)) {
+    return Math.round(val * 100) / 100
+  }
   let s = String(val).trim()
-  if (!s || s === '-' || s.replace(/\s/g,'') === '-' || s.replace(/\s/g,'') === '') return 0
-  s = s.replace(/\s/g, '')
-  const isNegative = s.startsWith('(') && s.endsWith(')')
-  if (isNegative) s = s.slice(1, -1)
+  if (!s || s === '-') return 0
+  s = s.replace(/\s/g, '').replace(/[%$€£]/g, '')
+  const neg = s.startsWith('(') && s.endsWith(')')
+  if (neg) s = s.slice(1, -1)
   if (s.includes('.') && s.includes(',')) {
-    s = s.replace(/\./g, '').replace(',', '.')
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.')
+    else s = s.replace(/,/g, '')
   } else if (s.includes('.') && !s.includes(',')) {
     const parts = s.replace(/^-/, '').split('.')
-    const allThreeDigits = parts.length > 1 && parts.slice(1).every((p: string) => p.length === 3)
-    if (allThreeDigits) s = s.replace(/\./g, '')
+    if (parts.length > 1 && parts.slice(1).every((p: string) => p.length === 3)) s = s.replace(/\./g, '')
   } else if (s.includes(',') && !s.includes('.')) {
-    s = s.replace(',', '.')
+    const parts = s.replace(/^-/, '').split(',')
+    if (parts.length > 2 || (parts.length === 2 && parts[1].length === 3)) s = s.replace(/,/g, '')
+    else s = s.replace(',', '.')
   }
   const n = parseFloat(s)
   if (isNaN(n)) return 0
-  return isNegative ? -n : n
+  return neg ? -n : n
 }
 
 function parseFecha(val: any): string | null {
   if (!val) return null
+  if (val instanceof Date) {
+    const y = val.getFullYear()
+    const m = String(val.getMonth() + 1).padStart(2, '0')
+    const d = String(val.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
   const s = String(val).trim()
-
-  // DD/MM/YYYY
   if (s.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
     const [d, m, y] = s.split('/')
     return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
   }
-
-  // M/D/YY o MM/DD/YY (formato Excel corto, ej: 8/1/23)
   if (s.match(/^\d{1,2}\/\d{1,2}\/\d{2}$/)) {
     const [m, d, y] = s.split('/')
-    const year = parseInt(y) + 2000
-    return `${year}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
+    return `${parseInt(y) + 2000}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`
   }
-
-  // YYYY-MM-DD
   if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0, 10)
-
   return null
 }
 
@@ -62,7 +65,6 @@ function mapMoneda(val: any): string {
 
 async function getGoogleToken(): Promise<string> {
   const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON!)
-  
   const now = Math.floor(Date.now() / 1000)
   const payload = {
     iss: creds.client_email,
@@ -71,47 +73,27 @@ async function getGoogleToken(): Promise<string> {
     exp: now + 3600,
     iat: now,
   }
-
   const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   const body = btoa(JSON.stringify(payload))
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-  
   const signingInput = `${header}.${body}`
-  
-  const privateKeyPem = creds.private_key
-  const pemContents = privateKeyPem
+  const pem = creds.private_key
     .replace('-----BEGIN PRIVATE KEY-----', '')
     .replace('-----END PRIVATE KEY-----', '')
     .replace(/\n/g, '')
-  
-  const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0))
-  
+  const binaryDer = Uint8Array.from(atob(pem), c => c.charCodeAt(0))
   const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    binaryDer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
+    'pkcs8', binaryDer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']
   )
-  
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    cryptoKey,
-    new TextEncoder().encode(signingInput)
-  )
-  
-  const sig = Buffer.from(signature).toString('base64')
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-  
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(signingInput))
+  const sig = Buffer.from(signature).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
   const jwt = `${signingInput}.${sig}`
-  
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
   })
-  
   const tokenData = await tokenRes.json()
   if (!tokenData.access_token) throw new Error('Token error: ' + JSON.stringify(tokenData))
   return tokenData.access_token
@@ -120,16 +102,12 @@ async function getGoogleToken(): Promise<string> {
 async function readSheet(token: string): Promise<any[][]> {
   const url = `https://www.googleapis.com/drive/v3/files/${FILE_ID}?alt=media`
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-  if (!res.ok) {
-    const errBody = await res.text()
-    throw new Error(`Error descargando archivo: ${res.status} ${res.statusText} - ${errBody}`)
-  }
+  if (!res.ok) throw new Error(`Error descargando archivo: ${res.status} ${res.statusText} - ${await res.text()}`)
   const buffer = await res.arrayBuffer()
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheet = workbook.Sheets[SHEET_NAME]
-  if (!sheet) throw new Error(`Pestaña "${SHEET_NAME}" no encontrada. Pestañas disponibles: ${workbook.SheetNames.join(', ')}`)
-  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, dateNF: 'DD/MM/YYYY' })
-  return rows
+  if (!sheet) throw new Error(`Pestaña "${SHEET_NAME}" no encontrada. Disponibles: ${workbook.SheetNames.join(', ')}`)
+  return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, cellDates: true })
 }
 
 export async function GET() {
@@ -205,24 +183,27 @@ export async function GET() {
         concepto: row[iPropio] ? `${String(row[iPropio]).trim()} → ${String(row[iExterno] || '').trim()}` : null,
         evento: row[iNotas] ? String(row[iNotas]).trim() : null,
         moneda: mapMoneda(row[iPropio]),
-        monto: toNum(row[iMonto]),
-        cc_pesos:   iCCPesos  >= 0 ? toNum(row[iCCPesos])  : 0,
-        cc_dolares: iCCDolar  >= 0 ? toNum(row[iCCDolar])  : 0,
-        cc_euros:   iCCEuro   >= 0 ? toNum(row[iCCEuro])   : 0,
-        cc_reales:  iCCReal   >= 0 ? toNum(row[iCCReal])   : 0,
+        monto:      parseMonto(row[iMonto]),
+        cc_pesos:   iCCPesos >= 0 ? parseMonto(row[iCCPesos]) : 0,
+        cc_dolares: iCCDolar >= 0 ? parseMonto(row[iCCDolar]) : 0,
+        cc_euros:   iCCEuro  >= 0 ? parseMonto(row[iCCEuro])  : 0,
+        cc_reales:  iCCReal  >= 0 ? parseMonto(row[iCCReal])  : 0,
         anulado: false,
       })
     }
 
     if (movimientos.length === 0) {
-      const clientesEncontrados = Array.from(new Set(
-        rows.slice(headerIdx + 1, headerIdx + 50)
-          .map(r => r[iCliente] ? String(r[iCliente]).trim() : '(vacío)')
+      const clientes = Array.from(new Set(
+        rows.slice(headerIdx + 1, headerIdx + 50).map(r => r[iCliente] ? String(r[iCliente]).trim() : '(vacío)')
       ))
-      throw new Error(`Sin movimientos CTA CTE. Valores en col CLIENTE: ${clientesEncontrados.join(', ')}`)
+      throw new Error(`Sin movimientos CTA CTE. Valores en col CLIENTE: ${clientes.join(', ')}`)
     }
 
-    await supabase.from('diario').delete().eq('tipo', 'CTA CTE').eq('anulado', false)
+    const { error: delError } = await supabase
+      .from('diario')
+      .delete()
+      .eq('tipo', 'CTA CTE')
+    if (delError) throw new Error('Error borrando datos previos: ' + delError.message)
 
     for (let i = 0; i < movimientos.length; i += 500) {
       const { error } = await supabase.from('diario').insert(movimientos.slice(i, i + 500))

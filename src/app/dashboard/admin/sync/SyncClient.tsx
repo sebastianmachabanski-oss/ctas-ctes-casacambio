@@ -11,6 +11,8 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
   const [showInfo, setShowInfo] = useState(false)
   const [resultado, setResultado] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [currentTotal, setCurrentTotal] = useState(totalMovimientos)
+  const [currentSync, setCurrentSync] = useState(ultimaSync)
 
   async function handleSync() {
     if (!confirm('Esto reemplazará todos los movimientos CTA CTE con los datos actuales del Excel. ¿Continuar?')) return
@@ -24,6 +26,8 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
 
     if (!res.ok) { setError(data.error); return }
     setResultado(data)
+    setCurrentTotal(data.movimientos)
+    setCurrentSync(data.ultimaSync)
   }
 
   return (
@@ -33,24 +37,22 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
         <p className="text-gray-500 text-sm mt-1">Actualiza los datos desde Google Sheets</p>
       </div>
 
-      {/* Estado actual */}
       <div className="card p-5">
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="text-xs text-gray-500 mb-1">Movimientos en base</p>
-            <p className="text-2xl font-bold text-gray-900">{totalMovimientos.toLocaleString('es-AR')}</p>
+            <p className="text-2xl font-bold text-gray-900">{currentTotal.toLocaleString('es-AR')}</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-3">
             <p className="text-xs text-gray-500 mb-1">Última sincronización</p>
             <p className="text-sm font-medium text-gray-900">
-              {ultimaSync
-                ? new Date(ultimaSync).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+              {currentSync
+                ? new Date(currentSync).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                 : 'Nunca'}
             </p>
           </div>
         </div>
 
-        {/* Resultados */}
         {resultado && (
           <div className="mt-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
             <p className="font-semibold">✓ Sincronización exitosa</p>
@@ -82,7 +84,6 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
           </div>
         )}
 
-        {/* Botones */}
         <div className="mt-4 flex items-center gap-3">
           <button onClick={handleSync} className="btn-primary" disabled={loading}>
             {loading ? (
@@ -96,7 +97,6 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
             ) : '🔄 Sincronizar ahora'}
           </button>
 
-          {/* Botón de información */}
           <button onClick={() => setShowInfo(!showInfo)}
             className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-gray-400 transition-colors text-sm font-bold"
             title="Cómo funciona">
@@ -104,7 +104,6 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
           </button>
         </div>
 
-        {/* Panel de información colapsable */}
         {showInfo && (
           <div className="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-600 space-y-2">
             <ol className="space-y-1.5">
