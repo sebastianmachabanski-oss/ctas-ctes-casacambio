@@ -172,6 +172,7 @@ export async function GET() {
     const iCCReal   = headers.findIndex(h => h === 'REALES')
 
     const movimientos = []
+    const monedasIncompletas: { fecha: string; cuenta: string; operacion: string; falta: string }[] = []
 
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const row = rows[i]
@@ -182,6 +183,19 @@ export async function GET() {
       if (!fecha) continue
       const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
+
+      // Para que la planilla calcule bien el saldo en cuenta corriente, PROPIO y EXTERNO
+      // deben estar completos. Si falta alguno, el Excel ignora la fila al totalizar.
+      const propioVacio  = !String(row[iPropio]  || '').trim()
+      const externoVacio = !String(row[iExterno] || '').trim()
+      if (propioVacio || externoVacio) {
+        monedasIncompletas.push({
+          fecha,
+          cuenta: ctaCte,
+          operacion: String(row[iOpTipo] || '').trim().toUpperCase(),
+          falta: propioVacio && externoVacio ? 'PROPIO y EXTERNO' : propioVacio ? 'PROPIO' : 'EXTERNO',
+        })
+      }
 
       movimientos.push({
         fecha,
@@ -226,6 +240,7 @@ export async function GET() {
       movimientos: movimientos.length,
       cuentas: cuentasSet.size,
       ultimaSync: new Date().toISOString(),
+      monedasIncompletas,
     })
 
   } catch (err: any) {
