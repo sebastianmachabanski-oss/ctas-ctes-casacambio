@@ -6,9 +6,6 @@ const XLSX = require('xlsx')
 const FILE_ID    = '12F-FTw8ueaKdRgb6wr_r3y6PqJjjA_06'
 const SHEET_NAME = 'CAJA'
 
-// Todos los montos son enteros en este dataset.
-// Si Excel guardó 9265 como 9.265 (error de tipeo con punto como miles),
-// multiplicamos por 1000 hasta obtener entero: 9.265 -> 9265, 4.3 -> 4300.
 function parseMonto(val: any): number {
   if (val === null || val === undefined || val === '') return 0
   if (typeof val === 'number' && isFinite(val)) {
@@ -21,7 +18,6 @@ function parseMonto(val: any): number {
     }
     return Math.round(val * 100) / 100
   }
-  // Celda de texto: parsear string
   let s = String(val).trim()
   if (!s || s === '-') return 0
   s = s.replace(/\s/g, '').replace(/[%$€£]/g, '')
@@ -118,8 +114,6 @@ async function readSheet(token: string): Promise<any[][]> {
   const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
   const sheet = workbook.Sheets[SHEET_NAME]
   if (!sheet) throw new Error(`Pestaña "${SHEET_NAME}" no encontrada. Disponibles: ${workbook.SheetNames.join(', ')}`)
-  // raw:true para obtener valores binarios reales (números como números, no strings formateados)
-  // cellDates:true para obtener fechas como Date objects
   return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, cellDates: true })
 }
 
@@ -198,11 +192,11 @@ export async function GET() {
       throw new Error(`Sin movimientos CTA CTE. Valores en col CLIENTE: ${clientes.join(', ')}`)
     }
 
-    // Borrar TODO lo no anulado (incluye anulado=null, que .eq(false) no matchea)
-    const { error: delError } = await supabase.from('diario')
+    // Borrar TODOS los registros CTA CTE sin excepcion antes de reinsertar
+    const { error: delError } = await supabase
+      .from('diario')
       .delete()
       .eq('tipo', 'CTA CTE')
-      .or('anulado.is.null,anulado.eq.false')
     if (delError) throw new Error('Error borrando datos previos: ' + delError.message)
 
     for (let i = 0; i < movimientos.length; i += 500) {
