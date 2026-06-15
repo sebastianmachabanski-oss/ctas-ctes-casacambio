@@ -150,11 +150,7 @@ export async function GET() {
     const iCCReal   = headers.findIndex(h => h === 'REALES')
 
     const movimientos = []
-
-    // Diagnostico de dolares
-    let totalDolares = 0
-    let totalPesos = 0
-    const dolaresDecimales: any[] = []
+    const monedasIncompletas: { fecha: string; cuenta: string; operacion: string; falta: string }[] = []
 
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const row = rows[i]
@@ -166,17 +162,16 @@ export async function GET() {
       const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
 
-      const ccDol = iCCDolar >= 0 ? parseMonto(row[iCCDolar]) : 0
-      const ccPes = iCCPesos >= 0 ? parseMonto(row[iCCPesos]) : 0
-      totalDolares += ccDol
-      totalPesos += ccPes
-      if (ccDol !== 0 && !Number.isInteger(ccDol) && dolaresDecimales.length < 60) {
-        dolaresDecimales.push({
+      // Para que la planilla calcule bien el saldo en cuenta corriente, PROPIO y EXTERNO
+      // deben estar completos. Si falta alguno, el Excel ignora la fila al totalizar.
+      const propioVacio  = !String(row[iPropio]  || '').trim()
+      const externoVacio = !String(row[iExterno] || '').trim()
+      if (propioVacio || externoVacio) {
+        monedasIncompletas.push({
           fecha,
-          ctaCte,
-          op: String(row[iOpTipo] || '').trim(),
-          raw: JSON.stringify(row[iCCDolar]),
-          parsed: ccDol,
+          cuenta: ctaCte,
+          operacion: String(row[iOpTipo] || '').trim().toUpperCase(),
+          falta: propioVacio && externoVacio ? 'PROPIO y EXTERNO' : propioVacio ? 'PROPIO' : 'EXTERNO',
         })
       }
 
@@ -189,8 +184,8 @@ export async function GET() {
         evento: row[iNotas] ? String(row[iNotas]).trim() : null,
         moneda: mapMoneda(row[iPropio]),
         monto:      parseMonto(row[iMonto]),
-        cc_pesos:   ccPes,
-        cc_dolares: ccDol,
+        cc_pesos:   iCCPesos >= 0 ? parseMonto(row[iCCPesos]) : 0,
+        cc_dolares: iCCDolar >= 0 ? parseMonto(row[iCCDolar]) : 0,
         cc_euros:   iCCEuro  >= 0 ? parseMonto(row[iCCEuro])  : 0,
         cc_reales:  iCCReal  >= 0 ? parseMonto(row[iCCReal])  : 0,
         anulado: false,
@@ -226,9 +221,7 @@ export async function GET() {
       movimientos: movimientos.length,
       cuentas: cuentasSet.size,
       ultimaSync: new Date().toISOString(),
-      total_dolares: Math.round(totalDolares * 100) / 100,
-      total_pesos: Math.round(totalPesos * 100) / 100,
-      dolares_decimales: dolaresDecimales,
+      monedasIncompletas,
     })
 
   } catch (err: any) {

@@ -37,7 +37,7 @@ export default async function DeudoresPage() {
   return (
     <div className="p-4 md:p-6 space-y-5">
       <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Deudores</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Saldos Pendientes</h1>
         <p className="text-gray-500 text-sm mt-1">
           {deudores.length} cuenta{deudores.length !== 1 ? 's' : ''} con saldo pendiente
         </p>

@@ -30,8 +30,6 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
     setCurrentSync(data.ultimaSync)
   }
 
-  const fmtNum = (n: number) => new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(n)
-
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-2xl">
       <div>
@@ -62,6 +60,23 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
           </div>
         )}
 
+        {resultado && resultado.monedasIncompletas?.length > 0 && (
+          <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+            <p className="font-semibold">⚠️ {resultado.monedasIncompletas.length} fila{resultado.monedasIncompletas.length !== 1 ? 's' : ''} con moneda incompleta</p>
+            <p className="text-xs mb-2">Falta PROPIO o EXTERNO. El Excel ignora estas filas al totalizar el saldo en cuenta corriente — revisalas en la planilla.</p>
+            <ul className="text-xs space-y-1 max-h-48 overflow-auto">
+              {resultado.monedasIncompletas.map((m: any, i: number) => (
+                <li key={i} className="flex flex-wrap gap-x-2">
+                  <span className="font-medium">{m.cuenta}</span>
+                  <span className="opacity-70">{m.fecha}</span>
+                  <span className="opacity-70">{m.operacion}</span>
+                  <span className="font-medium">falta {m.falta}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {error && (
           <div className="mt-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
             <p className="font-semibold">Error en la sincronización</p>
@@ -88,27 +103,6 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
             i
           </button>
         </div>
-
-        {/* Diagnostico de totales */}
-        {resultado?.total_dolares !== undefined && (
-          <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm">
-            <p className="font-bold text-blue-800 mb-1">Totales calculados por la app (CTA CTE)</p>
-            <p>Total Dólares: <strong>{fmtNum(resultado.total_dolares)}</strong></p>
-            <p>Total Pesos: <strong>{fmtNum(resultado.total_pesos)}</strong></p>
-          </div>
-        )}
-
-        {/* Filas de dolares con decimales (sospechosas) */}
-        {resultado?.dolares_decimales && resultado.dolares_decimales.length > 0 && (
-          <div className="mt-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-xs font-mono overflow-auto max-h-80">
-            <p className="font-bold text-yellow-800 mb-1">Dólares con decimales ({resultado.dolares_decimales.length}):</p>
-            {resultado.dolares_decimales.map((row: any, i: number) => (
-              <div key={i} className="border-b border-yellow-100 py-0.5">
-                {row.fecha} {row.ctaCte} {row.op} — raw={row.raw} → <strong className="text-red-600">{row.parsed}</strong>
-              </div>
-            ))}
-          </div>
-        )}
 
         {showInfo && (
           <div className="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-600 space-y-2">
