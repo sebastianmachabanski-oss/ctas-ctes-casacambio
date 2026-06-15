@@ -9,15 +9,11 @@ const SHEET_NAME = 'CAJA'
 function parseMonto(val: any): number {
   if (val === null || val === undefined || val === '') return 0
   if (typeof val === 'number' && isFinite(val)) {
-    if (Number.isInteger(val)) return val
-    let v = val
-    for (let k = 0; k < 3; k++) {
-      v = v * 1000
-      const r = Math.round(v)
-      if (Math.abs(v - r) < 0.01) return r
-    }
+    // raw:true devuelve el valor binario real de la celda.
+    // Redondear a 2 decimales para evitar ruido de punto flotante.
     return Math.round(val * 100) / 100
   }
+  // Celda de texto: parsear string
   let s = String(val).trim()
   if (!s || s === '-') return 0
   s = s.replace(/\s/g, '').replace(/[%$€£]/g, '')
@@ -192,7 +188,6 @@ export async function GET() {
       throw new Error(`Sin movimientos CTA CTE. Valores en col CLIENTE: ${clientes.join(', ')}`)
     }
 
-    // Borrar TODOS los registros CTA CTE sin excepcion antes de reinsertar
     const { error: delError } = await supabase
       .from('diario')
       .delete()
