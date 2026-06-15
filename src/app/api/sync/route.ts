@@ -9,11 +9,8 @@ const SHEET_NAME = 'CAJA'
 function parseMonto(val: any): number {
   if (val === null || val === undefined || val === '') return 0
   if (typeof val === 'number' && isFinite(val)) {
-    // raw:true devuelve el valor binario real de la celda.
-    // Redondear a 2 decimales para evitar ruido de punto flotante.
     return Math.round(val * 100) / 100
   }
-  // Celda de texto: parsear string
   let s = String(val).trim()
   if (!s || s === '-') return 0
   s = s.replace(/\s/g, '').replace(/[%$€£]/g, '')
@@ -154,6 +151,11 @@ export async function GET() {
 
     const movimientos = []
 
+    // Diagnostico de dolares
+    let totalDolares = 0
+    let totalPesos = 0
+    const dolaresDecimales: any[] = []
+
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const row = rows[i]
       if (!row || !row[iCliente]) continue
@@ -164,6 +166,20 @@ export async function GET() {
       const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
 
+      const ccDol = iCCDolar >= 0 ? parseMonto(row[iCCDolar]) : 0
+      const ccPes = iCCPesos >= 0 ? parseMonto(row[iCCPesos]) : 0
+      totalDolares += ccDol
+      totalPesos += ccPes
+      if (ccDol !== 0 && !Number.isInteger(ccDol) && dolaresDecimales.length < 60) {
+        dolaresDecimales.push({
+          fecha,
+          ctaCte,
+          op: String(row[iOpTipo] || '').trim(),
+          raw: JSON.stringify(row[iCCDolar]),
+          parsed: ccDol,
+        })
+      }
+
       movimientos.push({
         fecha,
         tipo: 'CTA CTE',
@@ -173,8 +189,8 @@ export async function GET() {
         evento: row[iNotas] ? String(row[iNotas]).trim() : null,
         moneda: mapMoneda(row[iPropio]),
         monto:      parseMonto(row[iMonto]),
-        cc_pesos:   iCCPesos >= 0 ? parseMonto(row[iCCPesos]) : 0,
-        cc_dolares: iCCDolar >= 0 ? parseMonto(row[iCCDolar]) : 0,
+        cc_pesos:   ccPes,
+        cc_dolares: ccDol,
         cc_euros:   iCCEuro  >= 0 ? parseMonto(row[iCCEuro])  : 0,
         cc_reales:  iCCReal  >= 0 ? parseMonto(row[iCCReal])  : 0,
         anulado: false,
@@ -210,6 +226,9 @@ export async function GET() {
       movimientos: movimientos.length,
       cuentas: cuentasSet.size,
       ultimaSync: new Date().toISOString(),
+      total_dolares: Math.round(totalDolares * 100) / 100,
+      total_pesos: Math.round(totalPesos * 100) / 100,
+      dolares_decimales: dolaresDecimales,
     })
 
   } catch (err: any) {

@@ -30,6 +30,8 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
     setCurrentSync(data.ultimaSync)
   }
 
+  const fmtNum = (n: number) => new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(n)
+
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-2xl">
       <div>
@@ -87,20 +89,22 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
           </button>
         </div>
 
-        {/* Debug: EDY rows showing monto vs cc_dolares */}
-        {resultado?.debug_sample && resultado.debug_sample.length > 0 && (
+        {/* Diagnostico de totales */}
+        {resultado?.total_dolares !== undefined && (
+          <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm">
+            <p className="font-bold text-blue-800 mb-1">Totales calculados por la app (CTA CTE)</p>
+            <p>Total Dólares: <strong>{fmtNum(resultado.total_dolares)}</strong></p>
+            <p>Total Pesos: <strong>{fmtNum(resultado.total_pesos)}</strong></p>
+          </div>
+        )}
+
+        {/* Filas de dolares con decimales (sospechosas) */}
+        {resultado?.dolares_decimales && resultado.dolares_decimales.length > 0 && (
           <div className="mt-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-xs font-mono overflow-auto max-h-80">
-            <p className="font-bold text-yellow-800 mb-1">Debug EDY — índices: monto={resultado.debug_indices?.iMonto} dolares={resultado.debug_indices?.iCCDolar}</p>
-            <div className="grid grid-cols-5 gap-1 font-bold text-yellow-700 border-b border-yellow-300 pb-1 mb-1">
-              <span>fecha</span><span>monto_raw</span><span>monto→</span><span>dolar_raw</span><span>dolar→</span>
-            </div>
-            {resultado.debug_sample.map((row: any, i: number) => (
-              <div key={i} className="grid grid-cols-5 gap-1 border-b border-yellow-100 py-0.5">
-                <span>{row.fecha}</span>
-                <span>{row.monto_raw}</span>
-                <strong className={!Number.isInteger(row.monto_parsed) ? 'text-red-600' : 'text-green-700'}>{row.monto_parsed}</strong>
-                <span>{row.dolar_raw}</span>
-                <strong className={!Number.isInteger(row.dolar_parsed) ? 'text-red-600' : 'text-green-700'}>{row.dolar_parsed}</strong>
+            <p className="font-bold text-yellow-800 mb-1">Dólares con decimales ({resultado.dolares_decimales.length}):</p>
+            {resultado.dolares_decimales.map((row: any, i: number) => (
+              <div key={i} className="border-b border-yellow-100 py-0.5">
+                {row.fecha} {row.ctaCte} {row.op} — raw={row.raw} → <strong className="text-red-600">{row.parsed}</strong>
               </div>
             ))}
           </div>
