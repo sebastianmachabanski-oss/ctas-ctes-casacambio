@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 const MONEDAS = ['PESOS', 'DOLARES', 'EUROS', 'REALES']
+const TIPOS = ['CTA CTE', 'CAJA']
+const OPERACIONES = ['INGRESAN', 'EGRESAN']
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -92,33 +94,21 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card p-6 space-y-4">
+    <form onSubmit={handleSubmit} className="card p-4 md:p-6 space-y-5">
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
           {error}
         </div>
       )}
 
-      <div>
-        <label className="label">Tipo de transacción</label>
-        <div className="flex gap-3">
-          {['CTA CTE', 'CAJA'].map(t => (
-            <label key={t} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="tipo"
-                value={t}
-                checked={form.tipo === t}
-                onChange={e => set('tipo', e.target.value)}
-                className="accent-brand-600"
-              />
-              <span className="text-sm font-medium text-gray-700">{t}</span>
-            </label>
-          ))}
+      {/* Fila 1: Tipo + Fecha + Op */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="col-span-2 md:col-span-1">
+          <label className="label">Tipo de transacción</label>
+          <select className="input" value={form.tipo} onChange={e => set('tipo', e.target.value)}>
+            {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="label">Fecha</label>
           <input
@@ -129,7 +119,6 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
             required
           />
         </div>
-
         <div>
           <label className="label">Op</label>
           <select className="input" value={form.col_f} onChange={e => set('col_f', e.target.value)}>
@@ -139,43 +128,30 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         </div>
       </div>
 
-      <div>
-        <label className="label">Cuenta corriente</label>
-        <select
-          className="input"
-          value={form.cuenta_cte}
-          onChange={e => set('cuenta_cte', e.target.value)}
-          required
-        >
-          <option value="">— Seleccioná —</option>
-          {cuentas.map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="label">Operación</label>
-        <div className="flex gap-3">
-          {['INGRESAN', 'EGRESAN'].map(op => (
-            <label key={op} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="operacion"
-                value={op}
-                checked={form.operacion === op}
-                onChange={e => set('operacion', e.target.value)}
-                className="accent-brand-600"
-              />
-              <span className={`text-sm font-medium ${op === 'INGRESAN' ? 'text-green-700' : 'text-red-700'}`}>
-                {op}
-              </span>
-            </label>
-          ))}
+      {/* Fila 2: Cuenta + Operación */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Cuenta corriente</label>
+          <select
+            className="input"
+            value={form.cuenta_cte}
+            onChange={e => set('cuenta_cte', e.target.value)}
+            required
+          >
+            <option value="">— Seleccioná —</option>
+            {cuentas.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Operación</label>
+          <select className="input" value={form.operacion} onChange={e => set('operacion', e.target.value)}>
+            {OPERACIONES.map(op => <option key={op} value={op}>{op}</option>)}
+          </select>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      {/* Fila 3: Propio + Externo + Monto + Cotización */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
           <label className="label">Propio</label>
           <select className="input" value={form.propio} onChange={e => set('propio', e.target.value)}>
@@ -188,9 +164,6 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
             {MONEDAS.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="label">Monto</label>
           <input
@@ -218,6 +191,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         </div>
       </div>
 
+      {/* Fila 4: Notas */}
       <div>
         <label className="label">Notas</label>
         <input
