@@ -101,9 +101,12 @@ async function appendRowToExcel(token: string, data: {
   if (iEuros >= 0)   newRow[iEuros]   = data.cc_euros   || ''
   if (iReales >= 0)  newRow[iReales]  = data.cc_reales  || ''
 
-  // Append after last row with content
-  const lastRow = rows.length
-  XLSX.utils.sheet_add_aoa(sheet, [newRow], { origin: lastRow })
+  // Find last row with actual data in the FECHA column (ignores pre-populated formula rows)
+  let lastDataRow = headerIdx
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    if (rows[i] && rows[i][iDate] != null && rows[i][iDate] !== '') lastDataRow = i
+  }
+  XLSX.utils.sheet_add_aoa(sheet, [newRow], { origin: lastDataRow + 1 })
 
   const rawBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as Uint8Array
   const uploadBody = new Blob([rawBuffer.buffer as ArrayBuffer], {
