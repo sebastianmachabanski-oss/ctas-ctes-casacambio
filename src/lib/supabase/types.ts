@@ -8,6 +8,7 @@ export interface DiarioRow {
   operacion: string; concepto: string | null; evento: string | null
   detalle: string | null; recibo: string | null; moneda: string; monto: number
   cc_pesos: number | null; cc_dolares: number | null; cc_euros: number | null; cc_reales: number | null
+  cotizacion: number | null
   anulado: boolean; anulado_por: string | null; anulado_at: string | null
   motivo_anulacion: string | null; notas: string | null; creado_por: string | null
   created_at: string; updated_at: string
