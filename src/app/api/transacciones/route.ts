@@ -56,33 +56,32 @@ async function appendRowToExcel(token: string, data: {
   const COL_CAJA_COL  = 6  // G
   const COL_OPERACION = 7  // H
 
-  // Find header row: any row in the first 20 that contains both 'FECHA' and 'OPERACION' anywhere
+  // Find header row: first row containing 'FECHA' in any cell
   let headerIdx = -1
   let headers: string[] = []
   for (let i = 0; i < Math.min(20, rows.length); i++) {
     const row = rows[i]
     if (!row) continue
     const cells = row.map((c: any) => String(c || '').trim().toUpperCase())
-    const hasFecha     = cells.some(c => c === 'FECHA')
-    const hasOperacion = cells.some(c => c === 'OPERACION')
-    if (hasFecha && hasOperacion) {
+    if (cells.some(c => c === 'FECHA')) {
       headerIdx = i
       headers = cells
       break
     }
   }
-  if (headerIdx < 0) throw new Error(`No se encontró encabezado (FECHA+OPERACION) en las primeras 20 filas. Disponibles: ${rows.slice(0,5).map(r => r ? r.slice(0,5).join('|') : '').join(' / ')}`)
+  if (headerIdx < 0) throw new Error('No se encontró encabezado (FECHA) en las primeras 20 filas')
 
-  // Find first available row: col H has placeholder value 'OPERACION'
+  // Find first available row: any cell in the row contains exactly 'OPERACION?'
   let targetRow = -1
-  for (let i = headerIdx + 1; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
-    if (row && String(row[COL_OPERACION] || '').trim().toUpperCase() === 'OPERACION?') {
+    if (!row) continue
+    if (row.some((c: any) => String(c || '').trim().toUpperCase() === 'OPERACION?')) {
       targetRow = i
       break
     }
   }
-  if (targetRow < 0) throw new Error('No hay filas disponibles en el Excel (col H = OPERACION no encontrada)')
+  if (targetRow < 0) throw new Error('No hay filas disponibles en el Excel (ninguna celda con valor "OPERACION?")')
 
   // Find remaining column positions from header
   const col = (name: string) => headers.findIndex(h => h.includes(name))
