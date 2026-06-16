@@ -17,6 +17,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
 
   const [form, setForm] = useState({
     fecha: today(),
+    tipo: 'CTA CTE',
     col_f: 'C',
     cuenta_cte: cuentas[0] ?? '',
     operacion: 'INGRESAN',
@@ -97,6 +98,25 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
           {error}
         </div>
       )}
+
+      <div>
+        <label className="label">Tipo de transacción</label>
+        <div className="flex gap-3">
+          {['CTA CTE', 'CAJA'].map(t => (
+            <label key={t} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="tipo"
+                value={t}
+                checked={form.tipo === t}
+                onChange={e => set('tipo', e.target.value)}
+                className="accent-brand-600"
+              />
+              <span className="text-sm font-medium text-gray-700">{t}</span>
+            </label>
+          ))}
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
