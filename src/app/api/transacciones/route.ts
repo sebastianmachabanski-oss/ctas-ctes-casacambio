@@ -92,7 +92,7 @@ async function appendRowToExcel(token: string, data: {
   const lastRow = rows.length
   XLSX.utils.sheet_add_aoa(sheet, [newRow], { origin: lastRow })
 
-  const newBuffer: Buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+  const newBuffer: Uint8Array = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' })
 
   const uploadRes = await fetch(
     `https://www.googleapis.com/upload/drive/v3/files/${FILE_ID}?uploadType=media`,
