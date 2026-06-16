@@ -17,10 +17,10 @@ function Required() {
 export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [step, setStep] = useState<'idle' | 'supabase' | 'excel' | 'done'>('idle')
   const [excelOk, setExcelOk] = useState<boolean | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     fecha: today(),
@@ -59,33 +59,83 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     const validationError = validate()
     if (validationError) return setError(validationError)
 
+    const payload = {
+      ...form,
+      monto: Number(form.monto),
+      cotizacion: form.cotizacion ? Number(form.cotizacion) : null,
+    }
+
+    setStep('supabase')
     setLoading(true)
     try {
       const res = await fetch('/api/transacciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          monto: Number(form.monto),
-          cotizacion: form.cotizacion ? Number(form.cotizacion) : null,
-        }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) {
         setError(data.error ?? 'Error al guardar')
-      } else {
-        setExcelOk(data.excel ?? false)
-        setWarning(data.warning ?? null)
-        setSuccess(true)
+        setStep('idle')
+        setLoading(false)
+        return
       }
+
+      // Supabase insert succeeded — show intermediate screen
+      setStep('excel')
+      setLoading(false)
+
+      // Fire Excel write in background
+      fetch('/api/excel-write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+        .then(r => r.json())
+        .then((excelData: { excel: boolean; warning?: string }) => {
+          setExcelOk(excelData.excel ?? false)
+          setWarning(excelData.warning ?? null)
+          setStep('done')
+        })
+        .catch(() => {
+          setExcelOk(false)
+          setWarning('Error de conexión al actualizar Excel')
+          setStep('done')
+        })
     } catch {
       setError('Error de conexión. Verificá tu conexión e intentá de nuevo.')
-    } finally {
+      setStep('idle')
       setLoading(false)
     }
   }
 
-  if (success) {
+  function resetForm() {
+    setStep('idle')
+    setExcelOk(null)
+    setWarning(null)
+    setError(null)
+    setForm(f => ({ ...f, monto: '', cotizacion: '', notas: '' }))
+  }
+
+  // Intermediate: Supabase done, Excel in progress
+  if (step === 'excel') {
+    return (
+      <div className="card p-6 text-center space-y-4">
+        <div className="text-4xl">✅</div>
+        <p className="text-gray-800 font-semibold">Guardado en sistema</p>
+        <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+          <svg className="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          Actualizando Excel…
+        </div>
+      </div>
+    )
+  }
+
+  // Final: both done
+  if (step === 'done') {
     return (
       <div className="card p-6 text-center space-y-4">
         <div className="text-4xl">{excelOk ? '✅' : '⚠️'}</div>
@@ -94,12 +144,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
           {excelOk ? '✓ Registrado en sistema y en Excel' : `Sistema ✓ · Excel ✗: ${warning}`}
         </div>
         <div className="flex gap-3 justify-center pt-2">
-          <button className="btn-secondary" onClick={() => {
-            setSuccess(false)
-            setExcelOk(null)
-            setWarning(null)
-            setForm(f => ({ ...f, monto: '', cotizacion: '', notas: '' }))
-          }}>
+          <button className="btn-secondary" onClick={resetForm}>
             Nueva transacción
           </button>
           <button className="btn-primary" onClick={() => router.push('/dashboard/cuenta-corriente')}>
@@ -221,8 +266,8 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
       </div>
 
       <div className="flex items-center gap-4 pt-1">
-        <button type="submit" className="btn-primary flex-1" disabled={loading}>
-          {loading ? 'Guardando…' : 'Guardar transacción'}
+        <button type="submit" className="btn-primary flex-1" disabled={loading || step === 'supabase'}>
+          {loading || step === 'supabase' ? 'Guardando…' : 'Guardar transacción'}
         </button>
         <p className="text-xs text-gray-400 shrink-0"><Required /> Obligatorio</p>
       </div>
