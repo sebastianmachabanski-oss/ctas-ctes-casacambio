@@ -197,16 +197,22 @@ export async function POST(request: Request) {
   })
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
-  // Fire-and-forget Excel write so response returns immediately after Supabase insert
-  getGoogleToken(DRIVE_SCOPE)
-    .then(token => appendRowToExcel(token, {
+  // Write to Excel synchronously (Netlify kills background promises on return)
+  try {
+    const token = await getGoogleToken(DRIVE_SCOPE)
+    await appendRowToExcel(token, {
       fecha, tipo, col_f, cuenta_cte, operacion, propio, externo,
       monto: Number(monto),
       cotizacion: cotizacion ? Number(cotizacion) : null,
       notas: notas || null,
       cc_pesos, cc_dolares, cc_euros, cc_reales,
-    }))
-    .catch(err => console.error('Excel write error:', err.message))
-
-  return NextResponse.json({ success: true })
+    })
+    return NextResponse.json({ success: true, excel: true })
+  } catch (excelErr: any) {
+    return NextResponse.json({
+      success: true,
+      excel: false,
+      warning: `Guardado en sistema pero no en Excel: ${excelErr.message}`,
+    })
+  }
 }
