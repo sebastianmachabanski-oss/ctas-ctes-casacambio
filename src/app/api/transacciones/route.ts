@@ -75,7 +75,7 @@ async function appendRowToExcel(token: string, data: {
   let targetRow = -1
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i]
-    if (row && String(row[COL_OPERACION] || '').trim().toUpperCase() === 'OPERACION') {
+    if (row && String(row[COL_OPERACION] || '').trim().toUpperCase() === 'OPERACION?') {
       targetRow = i
       break
     }
