@@ -92,7 +92,10 @@ async function appendRowToExcel(token: string, data: {
   const lastRow = rows.length
   XLSX.utils.sheet_add_aoa(sheet, [newRow], { origin: lastRow })
 
-  const newBuffer: Buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+  const rawBuffer: Uint8Array = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' })
+  const uploadBody = new Blob([rawBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
 
   const uploadRes = await fetch(
     `https://www.googleapis.com/upload/drive/v3/files/${FILE_ID}?uploadType=media`,
@@ -102,7 +105,7 @@ async function appendRowToExcel(token: string, data: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       },
-      body: newBuffer,
+      body: uploadBody,
     }
   )
   if (!uploadRes.ok) {
