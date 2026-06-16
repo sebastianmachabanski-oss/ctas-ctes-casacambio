@@ -56,20 +56,22 @@ async function appendRowToExcel(token: string, data: {
   const COL_CAJA_COL  = 6  // G
   const COL_OPERACION = 7  // H
 
-  // Find header row (where col H = 'OPERACION' AND col D = 'FECHA')
+  // Find header row: any row in the first 20 that contains both 'FECHA' and 'OPERACION' anywhere
   let headerIdx = -1
   let headers: string[] = []
-  for (let i = 0; i < Math.min(10, rows.length); i++) {
+  for (let i = 0; i < Math.min(20, rows.length); i++) {
     const row = rows[i]
-    if (row &&
-        String(row[COL_FECHA]     || '').trim().toUpperCase() === 'FECHA' &&
-        String(row[COL_OPERACION] || '').trim().toUpperCase() === 'OPERACION') {
+    if (!row) continue
+    const cells = row.map((c: any) => String(c || '').trim().toUpperCase())
+    const hasFecha     = cells.some(c => c === 'FECHA')
+    const hasOperacion = cells.some(c => c === 'OPERACION')
+    if (hasFecha && hasOperacion) {
       headerIdx = i
-      headers = row.map((c: any) => String(c || '').trim().toUpperCase())
+      headers = cells
       break
     }
   }
-  if (headerIdx < 0) throw new Error('No se encontró la fila de encabezados en el Excel')
+  if (headerIdx < 0) throw new Error(`No se encontró encabezado (FECHA+OPERACION) en las primeras 20 filas. Disponibles: ${rows.slice(0,5).map(r => r ? r.slice(0,5).join('|') : '').join(' / ')}`)
 
   // Find first available row: col H has placeholder value 'OPERACION'
   let targetRow = -1
