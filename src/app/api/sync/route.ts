@@ -63,12 +63,12 @@ function mapMoneda(val: any): string {
   return m
 }
 
-async function getGoogleToken(): Promise<string> {
+export async function getGoogleToken(scope = 'https://www.googleapis.com/auth/drive.readonly'): Promise<string> {
   const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON!)
   const now = Math.floor(Date.now() / 1000)
   const payload = {
     iss: creds.client_email,
-    scope: 'https://www.googleapis.com/auth/drive.readonly',
+    scope,
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
     iat: now,
