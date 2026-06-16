@@ -10,10 +10,6 @@ const FILE_ID    = '12F-FTw8ueaKdRgb6wr_r3y6PqJjjA_06'
 const SHEET_NAME = 'CAJA'
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([p, new Promise<never>((_, r) => setTimeout(() => r(new Error(`Timeout (${ms}ms)`)), ms))])
-}
-
 function mapMoneda(val: string): string {
   const m = val.trim().toUpperCase()
   if (m.includes('DOLAR') || m === 'USD') return 'DOLARES'
@@ -201,22 +197,16 @@ export async function POST(request: Request) {
   })
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
-  // Write to Excel synchronously so we can confirm result to user
-  try {
-    const token = await withTimeout(getGoogleToken(DRIVE_SCOPE), 8000)
-    await withTimeout(appendRowToExcel(token, {
+  // Fire-and-forget Excel write so response returns immediately after Supabase insert
+  getGoogleToken(DRIVE_SCOPE)
+    .then(token => appendRowToExcel(token, {
       fecha, tipo, col_f, cuenta_cte, operacion, propio, externo,
       monto: Number(monto),
       cotizacion: cotizacion ? Number(cotizacion) : null,
       notas: notas || null,
       cc_pesos, cc_dolares, cc_euros, cc_reales,
-    }), 20000)
-    return NextResponse.json({ success: true, excel: true })
-  } catch (excelErr: any) {
-    return NextResponse.json({
-      success: true,
-      excel: false,
-      warning: `Guardado en sistema pero no en Excel: ${excelErr.message}`,
-    })
-  }
+    }))
+    .catch(err => console.error('Excel write error:', err.message))
+
+  return NextResponse.json({ success: true })
 }

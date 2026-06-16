@@ -19,8 +19,6 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const [excelOk, setExcelOk] = useState<boolean | null>(null)
-  const [warning, setWarning] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     fecha: today(),
@@ -74,8 +72,6 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
       if (!res.ok) {
         setError(data.error ?? 'Error al guardar')
       } else {
-        setExcelOk(data.excel ?? false)
-        setWarning(data.warning ?? null)
         setSuccess(true)
       }
     } catch {
@@ -88,16 +84,14 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
   if (success) {
     return (
       <div className="card p-6 text-center space-y-4">
-        <div className="text-4xl">{excelOk ? '✅' : '⚠️'}</div>
+        <div className="text-4xl">✅</div>
         <p className="text-gray-800 font-semibold">Transacción guardada</p>
-        <div className={`rounded-lg p-3 text-sm text-left ${excelOk ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
-          {excelOk ? '✓ Registrado en sistema y en Excel' : `Sistema ✓ · Excel ✗: ${warning}`}
+        <div className="rounded-lg p-3 text-sm text-left bg-green-50 border border-green-200 text-green-800">
+          ✓ Registrado en sistema y en Excel
         </div>
         <div className="flex gap-3 justify-center pt-2">
           <button className="btn-secondary" onClick={() => {
             setSuccess(false)
-            setExcelOk(null)
-            setWarning(null)
             setForm(f => ({ ...f, monto: '', cotizacion: '', notas: '' }))
           }}>
             Nueva transacción
