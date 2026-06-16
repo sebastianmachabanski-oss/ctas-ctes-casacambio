@@ -19,6 +19,7 @@ function mapMoneda(val: string): string {
 
 async function appendRowToExcel(token: string, data: {
   fecha: string
+  tipo: string
   col_f: string
   cuenta_cte: string
   operacion: string
@@ -73,9 +74,15 @@ async function appendRowToExcel(token: string, data: {
   const iColF = 5
 
   const newRow = new Array(headers.length).fill('')
-  if (iDate >= 0)    newRow[iDate]    = data.fecha
-  if (iCliente >= 0) newRow[iCliente] = 'CTA CTE'
-  if (iCtaCte >= 0)  newRow[iCtaCte]  = data.cuenta_cte
+  if (iDate >= 0) newRow[iDate] = data.fecha
+  // Inversion: CTA CTE → CLIENTE='CTA CTE', CAJA=cuenta; CAJA → CLIENTE=cuenta, CAJA='CAJA'
+  if (data.tipo === 'CAJA') {
+    if (iCliente >= 0) newRow[iCliente] = data.cuenta_cte
+    if (iCtaCte >= 0)  newRow[iCtaCte]  = 'CAJA'
+  } else {
+    if (iCliente >= 0) newRow[iCliente] = 'CTA CTE'
+    if (iCtaCte >= 0)  newRow[iCtaCte]  = data.cuenta_cte
+  }
   if (iOpTipo >= 0)  newRow[iOpTipo]  = data.operacion
   if (iColF < headers.length) newRow[iColF] = data.col_f
   if (iPropio >= 0)  newRow[iPropio]  = data.propio
@@ -126,10 +133,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   const body = await request.json()
-  const { fecha, col_f, cuenta_cte, operacion, propio, externo, monto, cotizacion, notas } = body
+  const { fecha, tipo, col_f, cuenta_cte, operacion, propio, externo, monto, cotizacion, notas } = body
 
-  if (!fecha || !col_f || !cuenta_cte || !operacion || !propio || !externo || monto == null)
+  if (!fecha || !tipo || !col_f || !cuenta_cte || !operacion || !propio || !externo || monto == null)
     return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+
+  if (!['CTA CTE', 'CAJA'].includes(tipo))
+    return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
 
   if (!['C', 'T'].includes(col_f))
     return NextResponse.json({ error: 'Op debe ser C o T' }, { status: 400 })
@@ -148,7 +158,7 @@ export async function POST(request: Request) {
   // Insert into Supabase
   const { error: insertError } = await supabase.from('diario').insert({
     fecha,
-    tipo: 'CTA CTE',
+    tipo,
     cuenta_cte,
     operacion,
     concepto: `${propio.trim()} → ${externo.trim()}`,
@@ -170,7 +180,7 @@ export async function POST(request: Request) {
   try {
     const token = await getGoogleToken(DRIVE_SCOPE)
     await appendRowToExcel(token, {
-      fecha, col_f, cuenta_cte, operacion, propio, externo,
+      fecha, tipo, col_f, cuenta_cte, operacion, propio, externo,
       monto: Number(monto),
       cotizacion: cotizacion ? Number(cotizacion) : null,
       notas: notas || null,
