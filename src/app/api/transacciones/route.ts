@@ -92,8 +92,8 @@ async function appendRowToExcel(token: string, data: {
   const lastRow = rows.length
   XLSX.utils.sheet_add_aoa(sheet, [newRow], { origin: lastRow })
 
-  const rawBuffer: Uint8Array = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' })
-  const uploadBody = new Blob([rawBuffer], {
+  const rawBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as Uint8Array
+  const uploadBody = new Blob([rawBuffer.buffer as ArrayBuffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
 
