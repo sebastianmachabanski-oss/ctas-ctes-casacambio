@@ -49,23 +49,41 @@ async function appendRowToExcel(token: string, data: {
 
   const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true })
 
-  // Find header row
+  // Fixed column positions (user confirmed: D=FECHA, E=CLIENTE, F=Op, G=CAJA, H=OPERACION)
+  const COL_FECHA     = 3  // D
+  const COL_CLIENTE   = 4  // E
+  const COL_F         = 5  // F
+  const COL_CAJA_COL  = 6  // G
+  const COL_OPERACION = 7  // H
+
+  // Find header row (where col H = 'OPERACION' AND col D = 'FECHA')
   let headerIdx = -1
   let headers: string[] = []
   for (let i = 0; i < Math.min(10, rows.length); i++) {
-    if (rows[i] && rows[i].some((c: any) => String(c || '').toUpperCase().includes('FECHA'))) {
+    const row = rows[i]
+    if (row &&
+        String(row[COL_FECHA]     || '').trim().toUpperCase() === 'FECHA' &&
+        String(row[COL_OPERACION] || '').trim().toUpperCase() === 'OPERACION') {
       headerIdx = i
-      headers = rows[i].map((c: any) => String(c || '').trim().toUpperCase())
+      headers = row.map((c: any) => String(c || '').trim().toUpperCase())
       break
     }
   }
-  if (headerIdx < 0) throw new Error('No se encontraron encabezados en el Excel')
+  if (headerIdx < 0) throw new Error('No se encontró la fila de encabezados en el Excel')
 
+  // Find first available row: col H has placeholder value 'OPERACION'
+  let targetRow = -1
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i]
+    if (row && String(row[COL_OPERACION] || '').trim().toUpperCase() === 'OPERACION?') {
+      targetRow = i
+      break
+    }
+  }
+  if (targetRow < 0) throw new Error('No hay filas disponibles en el Excel (col H = OPERACION no encontrada)')
+
+  // Find remaining column positions from header
   const col = (name: string) => headers.findIndex(h => h.includes(name))
-  const iDate       = col('FECHA')
-  const iCliente    = col('CLIENTE')
-  const iCtaCte     = col('CAJA')
-  const iOpTipo     = col('OPERACI')
   const iPropio     = col('PROPIO')
   const iExterno    = col('EXTERNO')
   const iMonto      = col('MONTO')
@@ -76,37 +94,34 @@ async function appendRowToExcel(token: string, data: {
   const iEuros      = headers.findIndex(h => h === 'EUROS')
   const iReales     = headers.findIndex(h => h === 'REALES')
 
-  // Col F (index 5) is the "Op" column used by Excel formulas
-  const iColF = 5
+  // Start with existing pre-allocated row (preserves formulas/values we don't know about)
+  const existingRow = rows[targetRow] ? [...rows[targetRow]] : []
+  const newRow = new Array(Math.max(existingRow.length, headers.length)).fill('')
+  existingRow.forEach((v, i) => { if (v != null) newRow[i] = v })
 
-  const newRow = new Array(headers.length).fill('')
-  if (iDate >= 0) newRow[iDate] = data.fecha
-  // Inversion: CTA CTE → CLIENTE='CTA CTE', CAJA=cuenta; CAJA → CLIENTE=cuenta, CAJA='CAJA'
+  // Override with user data
+  newRow[COL_FECHA] = data.fecha
+  newRow[COL_F]     = data.col_f
+  newRow[COL_OPERACION] = data.operacion
   if (data.tipo === 'CAJA') {
-    if (iCliente >= 0) newRow[iCliente] = data.cuenta_cte
-    if (iCtaCte >= 0)  newRow[iCtaCte]  = 'CAJA'
+    newRow[COL_CLIENTE]  = data.cuenta_cte
+    newRow[COL_CAJA_COL] = 'CAJA'
   } else {
-    if (iCliente >= 0) newRow[iCliente] = 'CTA CTE'
-    if (iCtaCte >= 0)  newRow[iCtaCte]  = data.cuenta_cte
+    newRow[COL_CLIENTE]  = 'CTA CTE'
+    newRow[COL_CAJA_COL] = data.cuenta_cte
   }
-  if (iOpTipo >= 0)  newRow[iOpTipo]  = data.operacion
-  if (iColF < headers.length) newRow[iColF] = data.col_f
-  if (iPropio >= 0)  newRow[iPropio]  = data.propio
-  if (iExterno >= 0) newRow[iExterno] = data.externo
-  if (iMonto >= 0)   newRow[iMonto]   = data.monto
-  if (iNotas >= 0)   newRow[iNotas]   = data.notas ?? ''
+  if (iPropio >= 0)   newRow[iPropio]   = data.propio
+  if (iExterno >= 0)  newRow[iExterno]  = data.externo
+  if (iMonto >= 0)    newRow[iMonto]    = data.monto
+  if (iNotas >= 0)    newRow[iNotas]    = data.notas ?? ''
   if (iCotizacion >= 0 && data.cotizacion != null) newRow[iCotizacion] = data.cotizacion
-  if (iPesos >= 0)   newRow[iPesos]   = data.cc_pesos   || ''
-  if (iDolares >= 0) newRow[iDolares] = data.cc_dolares || ''
-  if (iEuros >= 0)   newRow[iEuros]   = data.cc_euros   || ''
-  if (iReales >= 0)  newRow[iReales]  = data.cc_reales  || ''
+  if (iPesos >= 0)    newRow[iPesos]    = data.cc_pesos   || ''
+  if (iDolares >= 0)  newRow[iDolares]  = data.cc_dolares || ''
+  if (iEuros >= 0)    newRow[iEuros]    = data.cc_euros   || ''
+  if (iReales >= 0)   newRow[iReales]   = data.cc_reales  || ''
 
-  // Find last row with actual data in the FECHA column (ignores pre-populated formula rows)
-  let lastDataRow = headerIdx
-  for (let i = headerIdx + 1; i < rows.length; i++) {
-    if (rows[i] && rows[i][iDate] != null && rows[i][iDate] !== '') lastDataRow = i
-  }
-  XLSX.utils.sheet_add_aoa(sheet, [newRow], { origin: lastDataRow + 1 })
+  // Replace the pre-allocated row in place
+  XLSX.utils.sheet_add_aoa(sheet, [newRow], { origin: targetRow })
 
   const rawBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as Uint8Array
   const uploadBody = new Blob([rawBuffer.buffer as ArrayBuffer], {
@@ -185,16 +200,22 @@ export async function POST(request: Request) {
   })
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
-  // Responder inmediatamente — la escritura al Excel es fire-and-forget
-  getGoogleToken(DRIVE_SCOPE)
-    .then(token => appendRowToExcel(token, {
+  // Write to Excel synchronously so we can confirm result to user
+  try {
+    const token = await withTimeout(getGoogleToken(DRIVE_SCOPE), 8000)
+    await withTimeout(appendRowToExcel(token, {
       fecha, tipo, col_f, cuenta_cte, operacion, propio, externo,
       monto: Number(monto),
       cotizacion: cotizacion ? Number(cotizacion) : null,
       notas: notas || null,
       cc_pesos, cc_dolares, cc_euros, cc_reales,
-    }))
-    .catch(err => console.error('[transacciones] Excel write failed:', err))
-
-  return NextResponse.json({ success: true })
+    }), 20000)
+    return NextResponse.json({ success: true, excel: true })
+  } catch (excelErr: any) {
+    return NextResponse.json({
+      success: true,
+      excel: false,
+      warning: `Guardado en sistema pero no en Excel: ${excelErr.message}`,
+    })
+  }
 }
