@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getGoogleToken } from '@/app/api/sync/route'
+import { getGoogleToken } from '@/lib/google'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const XLSX = require('xlsx')
 
