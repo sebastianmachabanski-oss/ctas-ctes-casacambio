@@ -4,9 +4,15 @@ import { getGoogleToken } from '@/lib/google'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const XLSX = require('xlsx')
 
+export const maxDuration = 30
+
 const FILE_ID    = '12F-FTw8ueaKdRgb6wr_r3y6PqJjjA_06'
 const SHEET_NAME = 'CAJA'
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([p, new Promise<never>((_, r) => setTimeout(() => r(new Error(`Timeout (${ms}ms)`)), ms))])
+}
 
 function mapMoneda(val: string): string {
   const m = val.trim().toUpperCase()
@@ -176,23 +182,16 @@ export async function POST(request: Request) {
   })
   if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
 
-  // Write to Excel
-  try {
-    const token = await getGoogleToken(DRIVE_SCOPE)
-    await appendRowToExcel(token, {
+  // Responder inmediatamente — la escritura al Excel es fire-and-forget
+  getGoogleToken(DRIVE_SCOPE)
+    .then(token => appendRowToExcel(token, {
       fecha, tipo, col_f, cuenta_cte, operacion, propio, externo,
       monto: Number(monto),
       cotizacion: cotizacion ? Number(cotizacion) : null,
       notas: notas || null,
       cc_pesos, cc_dolares, cc_euros, cc_reales,
-    })
-  } catch (excelErr: any) {
-    // Excel write failed but Supabase insert succeeded — report partial success
-    return NextResponse.json({
-      success: true,
-      warning: `Guardado en sistema pero no en Excel: ${excelErr.message}`,
-    })
-  }
+    }))
+    .catch(err => console.error('[transacciones] Excel write failed:', err))
 
   return NextResponse.json({ success: true })
 }
