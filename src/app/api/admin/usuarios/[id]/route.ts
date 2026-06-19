@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 const CLAVE_INICIAL = 'Cliente1234!'
@@ -15,15 +15,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!await isSuperusuario(supabase, user.id)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   const body = await request.json()
+  const admin = createAdminClient()
 
-  // Restablecer contraseña → vuelve a Cliente1234! y fuerza cambio
+  // Restablecer contraseña
   if (body.reset_password) {
-    const { error } = await supabase.rpc('admin_cambiar_clave', {
-      p_user_id: params.id,
-      p_nueva_clave: CLAVE_INICIAL
-    })
+    const { error } = await admin.auth.admin.updateUserById(params.id, { password: CLAVE_INICIAL })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    await supabase.from('profiles').update({ debe_cambiar_clave: true }).eq('id', params.id)
+    await admin.from('profiles').update({ debe_cambiar_clave: true }).eq('id', params.id)
     return NextResponse.json({ success: true, clave: CLAVE_INICIAL })
   }
 
@@ -36,7 +34,19 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (body.telefono   !== undefined) updates.telefono   = body.telefono
   if (body.notas      !== undefined) updates.notas      = body.notas
 
-  const { error } = await supabase.from('profiles').update(updates).eq('id', params.id)
+  const { error } = await admin.from('profiles').update(updates).eq('id', params.id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ success: true })
+}
+
+export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  if (!await isSuperusuario(supabase, user.id)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+
+  const admin = createAdminClient()
+  const { error } = await admin.auth.admin.deleteUser(params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ success: true })
 }
