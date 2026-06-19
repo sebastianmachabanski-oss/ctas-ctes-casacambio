@@ -29,6 +29,9 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
+  // Limpiar perfil huérfano de un intento previo fallido (mismo email, sin auth user)
+  await admin.from('profiles').delete().eq('email', email)
+
   // Crear usuario en Supabase Auth — se pasa metadata para que el trigger de profiles lo use
   const { data: newUser, error: createError } = await admin.auth.admin.createUser({
     email,
@@ -36,7 +39,7 @@ export async function POST(request: Request) {
     email_confirm: true,
     user_metadata: { nombre, rol, cuenta_cte: cuenta_cte || null },
   })
-  if (createError) return NextResponse.json({ error: createError.message, code: (createError as any).code, status: (createError as any).status, details: JSON.stringify(createError) }, { status: 500 })
+  if (createError) return NextResponse.json({ error: createError.message }, { status: 500 })
 
   // Upsert perfil (por si el trigger no lo creó o para completar campos)
   const { error: profileError } = await admin.from('profiles').upsert({
