@@ -8,7 +8,7 @@ import type { Profile } from '@/lib/supabase/types'
 const navItems = {
   superusuario: [
     { href: '/dashboard/cuenta-corriente',    label: 'Cuentas Corrientes',  icon: '📋' },
-    { href: '/dashboard/nueva-transaccion',   label: 'Nueva transacción',   icon: '➕' },
+    { href: '/dashboard/nueva-transaccion',   label: 'Nueva transacción',   icon: '➕', disabled: true },
     { href: '/dashboard/admin/usuarios',      label: 'Usuarios',            icon: '👥' },
     { href: '/dashboard/deudores',            label: 'Saldos Pendientes',   icon: '📊' },
     { href: '/dashboard/admin/sync',          label: 'Sincronizar Excel',   icon: '🔄' },
@@ -16,7 +16,7 @@ const navItems = {
   ],
   operador: [
     { href: '/dashboard/cuenta-corriente',    label: 'Cuentas Corrientes',  icon: '📋' },
-    { href: '/dashboard/nueva-transaccion',   label: 'Nueva transacción',   icon: '➕' },
+    { href: '/dashboard/nueva-transaccion',   label: 'Nueva transacción',   icon: '➕', disabled: true },
     { href: '/dashboard/deudores',            label: 'Saldos Pendientes',   icon: '📊' },
     { href: '/dashboard/mi-cuenta',           label: 'Mi cuenta',           icon: '🔑' },
   ],
@@ -53,6 +53,16 @@ export default function Sidebar({ profile }: { profile: Profile }) {
       <nav className="flex-1 p-3 space-y-1">
         {items.map(item => {
           const active = pathname.startsWith(item.href)
+          if ((item as any).disabled) {
+            return (
+              <span key={item.href}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-brand-600 cursor-not-allowed select-none">
+                <span className="text-base opacity-40">{item.icon}</span>
+                <span className="opacity-40">{item.label}</span>
+                <span className="ml-auto text-xs opacity-50">pronto</span>
+              </span>
+            )
+          }
           return (
             <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${active ? 'bg-brand-700 text-white font-medium' : 'text-brand-200 hover:bg-brand-800 hover:text-white'}`}>
