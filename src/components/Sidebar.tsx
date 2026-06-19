@@ -59,7 +59,6 @@ export default function Sidebar({ profile }: { profile: Profile }) {
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-brand-600 cursor-not-allowed select-none">
                 <span className="text-base opacity-40">{item.icon}</span>
                 <span className="opacity-40">{item.label}</span>
-                <span className="ml-auto text-xs opacity-50">pronto</span>
               </span>
             )
           }
