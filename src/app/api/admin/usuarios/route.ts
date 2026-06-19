@@ -28,13 +28,20 @@ export async function POST(request: Request) {
   if (rol === 'cliente' && !cuenta_cte) return NextResponse.json({ error: 'La cuenta corriente es obligatoria para clientes' }, { status: 400 })
 
   const admin = createAdminClient()
+  const emailLower = email.toLowerCase()
 
-  // Borrar usuario de Auth preexistente con el mismo email (intentos previos fallidos)
-  const { data: existing } = await admin.auth.admin.listUsers()
-  const previo = existing?.users?.find(
-    (u: any) => (u.email ?? '').toLowerCase() === email.toLowerCase()
-  )
-  if (previo) await admin.auth.admin.deleteUser(previo.id)
+  // Borrar usuario(s) de Auth preexistentes con el mismo email (intentos previos fallidos).
+  // Se recorren todas las páginas porque listUsers pagina de a 50.
+  for (let page = 1; page <= 50; page++) {
+    const { data: existing } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+    const users = existing?.users ?? []
+    for (const u of users as any[]) {
+      if ((u.email ?? '').toLowerCase() === emailLower) {
+        await admin.auth.admin.deleteUser(u.id)       // hard delete
+      }
+    }
+    if (users.length < 1000) break
+  }
 
   // Limpiar perfil huérfano de un intento previo fallido (mismo email, sin auth user)
   await admin.from('profiles').delete().eq('email', email)
