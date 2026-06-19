@@ -29,15 +29,16 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
-  // Crear usuario en Supabase Auth con la clave inicial
+  // Crear usuario en Supabase Auth — se pasa metadata para que el trigger de profiles lo use
   const { data: newUser, error: createError } = await admin.auth.admin.createUser({
     email,
     password: CLAVE_INICIAL,
     email_confirm: true,
+    user_metadata: { nombre, rol, cuenta_cte: cuenta_cte || null },
   })
   if (createError) return NextResponse.json({ error: createError.message }, { status: 500 })
 
-  // Upsert perfil
+  // Upsert perfil (por si el trigger no lo creó o para completar campos)
   const { error: profileError } = await admin.from('profiles').upsert({
     id: newUser.user.id,
     email,
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
     notas: notas || null,
     debe_cambiar_clave: true,
     activo: true,
-  })
+  }, { onConflict: 'id' })
   if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 })
 
   return NextResponse.json({ success: true, clave_inicial: CLAVE_INICIAL })
