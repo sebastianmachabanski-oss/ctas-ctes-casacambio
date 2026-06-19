@@ -28,6 +28,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
   const [editando, setEditando] = useState<Usuario | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
   const [claveMsg, setClaveMsg] = useState<string | null>(null)
   const [form, setForm] = useState({ nombre: '', email: '', telefono: '', rol: 'cliente', cuenta_cte: '', notas: '' })
 
@@ -48,14 +49,18 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
   }
 
   async function handleCrear(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true); setError(null)
+    e.preventDefault(); setLoading(true); setError(null); setDebugInfo(null)
     const res = await fetch('/api/admin/usuarios', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     })
     const data = await res.json()
     setLoading(false)
-    if (!res.ok) { setError(data.error); return }
+    if (!res.ok) {
+      setError(data.error)
+      setDebugInfo(data.debug ? JSON.stringify(data.debug, null, 2) : null)
+      return
+    }
     setClaveMsg(data.clave_inicial)
   }
 
@@ -287,6 +292,9 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                   🔐 La contraseña inicial será <strong>Cliente1234!</strong> — el cliente deberá cambiarla en su primer acceso.
                 </div>
                 {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
+                {debugInfo && (
+                  <pre className="p-3 rounded-lg bg-gray-900 text-green-300 text-[10px] leading-tight overflow-auto max-h-60 whitespace-pre-wrap break-all">{debugInfo}</pre>
+                )}
                 <div className="flex gap-3">
                   <button type="submit" className="btn-primary flex-1" disabled={loading}>{loading ? 'Creando...' : 'Crear usuario'}</button>
                   <button type="button" className="btn-secondary" onClick={() => setModal(null)}>Cancelar</button>
