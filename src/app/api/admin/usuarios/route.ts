@@ -29,6 +29,13 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient()
 
+  // Borrar usuario de Auth preexistente con el mismo email (intentos previos fallidos)
+  const { data: existing } = await admin.auth.admin.listUsers()
+  const previo = existing?.users?.find(
+    (u: any) => (u.email ?? '').toLowerCase() === email.toLowerCase()
+  )
+  if (previo) await admin.auth.admin.deleteUser(previo.id)
+
   // Limpiar perfil huérfano de un intento previo fallido (mismo email, sin auth user)
   await admin.from('profiles').delete().eq('email', email)
 
