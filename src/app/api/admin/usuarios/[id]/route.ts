@@ -46,7 +46,13 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!await isSuperusuario(supabase, user.id)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   const admin = createAdminClient()
-  const { error } = await admin.auth.admin.deleteUser(params.id)
+
+  // Intentar borrar de auth (puede no existir si fue creado con el RPC viejo)
+  await admin.auth.admin.deleteUser(params.id)
+
+  // Siempre borrar el perfil
+  const { error } = await admin.from('profiles').delete().eq('id', params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
   return NextResponse.json({ success: true })
 }
