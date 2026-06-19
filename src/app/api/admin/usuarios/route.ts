@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     email_confirm: true,
     user_metadata: { nombre, rol, cuenta_cte: cuenta_cte || null },
   })
-  if (createError) return NextResponse.json({ error: createError.message }, { status: 500 })
+  if (createError) return NextResponse.json({ error: createError.message, code: (createError as any).code, status: (createError as any).status, details: JSON.stringify(createError) }, { status: 500 })
 
   // Upsert perfil (por si el trigger no lo creó o para completar campos)
   const { error: profileError } = await admin.from('profiles').upsert({
