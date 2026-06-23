@@ -4,7 +4,7 @@ import { getGoogleToken } from '@/lib/google'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const XLSX = require('xlsx')
 
-const FILE_ID    = '1tuURACcfs09rRkynmVLqLD90Je5r-u58'
+const FILE_ID    = '12F-FTw8ueaKdRgb6wr_r3y6PqJjjA_06'
 const SHEET_NAME = 'CAJA'
 
 function parseMonto(val: any): number {

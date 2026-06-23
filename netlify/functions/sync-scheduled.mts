@@ -4,7 +4,7 @@ import * as XLSX from "xlsx"
 
 // IMPORTANTE: este job debe replicar EXACTAMENTE la lógica del sync manual
 // (src/app/api/sync/route.ts). Misma planilla (CAJA), mismo parser y columnas.
-const FILE_ID    = '1tuURACcfs09rRkynmVLqLD90Je5r-u58'
+const FILE_ID    = '12F-FTw8ueaKdRgb6wr_r3y6PqJjjA_06'
 const SHEET_NAME = 'CAJA'
 
 function parseMonto(val: any): number {
