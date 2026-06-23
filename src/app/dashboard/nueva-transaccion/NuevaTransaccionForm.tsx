@@ -271,7 +271,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         </button>
         <p className="text-xs text-gray-400 shrink-0"><Required /> Obligatorio</p>
       </div>
-      <p className="text-sm text-gray-500 text-center">Funcionalidad en desarrollo</p>
+      <p className="text-sm text-red-500 text-center">Funcionalidad en desarrollo</p>
     </form>
   )
 }
