@@ -266,11 +266,12 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
       </div>
 
       <div className="flex items-center gap-4 pt-1">
-        <button type="submit" className="btn-primary flex-1" disabled={loading || step === 'supabase'}>
-          {loading || step === 'supabase' ? 'Guardando…' : 'Guardar transacción'}
+        <button type="submit" className="btn-primary flex-1" disabled>
+          Guardar transacción
         </button>
         <p className="text-xs text-gray-400 shrink-0"><Required /> Obligatorio</p>
       </div>
+      <p className="text-sm text-gray-500 text-center">Funcionalidad en desarrollo</p>
     </form>
   )
 }
