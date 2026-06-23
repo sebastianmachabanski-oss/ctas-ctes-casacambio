@@ -193,15 +193,26 @@ export default async function handler() {
 
     const { error: delError } = await supabase.from('diario').delete().eq('tipo', 'CTA CTE')
     if (delError) throw new Error('Error borrando datos previos: ' + delError.message)
-    for (let i = 0; i < movimientos.length; i += 500) {
-      const { error } = await supabase.from('diario').insert(movimientos.slice(i, i + 500))
-      if (error) throw new Error(error.message)
+
+    // Insertar en lotes grandes y en paralelo (con límite de concurrencia).
+    const BATCH = 1000
+    const CONCURRENCY = 8
+    const batches: any[][] = []
+    for (let i = 0; i < movimientos.length; i += BATCH) batches.push(movimientos.slice(i, i + BATCH))
+    for (let i = 0; i < batches.length; i += CONCURRENCY) {
+      const results = await Promise.all(
+        batches.slice(i, i + CONCURRENCY).map(b => supabase.from('diario').insert(b))
+      )
+      const failed = results.find(r => r.error)
+      if (failed?.error) throw new Error(failed.error.message)
     }
 
+    // Upsert masivo de cuentas en una sola llamada.
     const cuentas = Array.from(new Set(movimientos.map(m => m.cuenta_cte)))
-    for (const nombre of cuentas) {
-      await supabase.from('cuentas_corrientes')
-        .upsert({ nombre, activo: true }, { onConflict: 'nombre', ignoreDuplicates: true })
+    if (cuentas.length) {
+      const { error: ccError } = await supabase.from('cuentas_corrientes')
+        .upsert(cuentas.map(nombre => ({ nombre, activo: true })), { onConflict: 'nombre', ignoreDuplicates: true })
+      if (ccError) throw new Error(ccError.message)
     }
 
     console.log(`✅ Sync OK: ${movimientos.length} movimientos, ${cuentas.length} cuentas`)
@@ -211,5 +222,5 @@ export default async function handler() {
 }
 
 export const config: Config = {
-  schedule: "*/15 * * * *"
+  schedule: "*/30 * * * *"
 }
