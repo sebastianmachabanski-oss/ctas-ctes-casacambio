@@ -4,6 +4,8 @@ import { getGoogleToken } from '@/lib/google'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const XLSX = require('xlsx')
 
+export const maxDuration = 60
+
 const FILE_ID    = '1tuURACcfs09rRkynmVLqLD90Je5r-u58'
 const SHEET_NAME = 'CAJA'
 
@@ -171,15 +173,28 @@ export async function GET() {
       .eq('tipo', 'CTA CTE')
     if (delError) throw new Error('Error borrando datos previos: ' + delError.message)
 
-    for (let i = 0; i < movimientos.length; i += 500) {
-      const { error } = await supabase.from('diario').insert(movimientos.slice(i, i + 500))
-      if (error) throw new Error('Error insertando: ' + error.message)
+    // Insertar en lotes grandes y en paralelo (con límite de concurrencia)
+    // para reducir las idas y vueltas a la base.
+    const BATCH = 1000
+    const CONCURRENCY = 8
+    const batches: any[][] = []
+    for (let i = 0; i < movimientos.length; i += BATCH) batches.push(movimientos.slice(i, i + BATCH))
+    for (let i = 0; i < batches.length; i += CONCURRENCY) {
+      const results = await Promise.all(
+        batches.slice(i, i + CONCURRENCY).map(b => supabase.from('diario').insert(b))
+      )
+      const failed = results.find(r => r.error)
+      if (failed?.error) throw new Error('Error insertando: ' + failed.error.message)
     }
 
+    // Upsert masivo de cuentas en una sola llamada (antes era una por cuenta).
     const cuentasSet = new Set(movimientos.map(m => m.cuenta_cte))
-    for (const nombre of Array.from(cuentasSet)) {
-      await supabase.from('cuentas_corrientes')
-        .upsert({ nombre, activo: true }, { onConflict: 'nombre', ignoreDuplicates: true })
+    const cuentasRows = Array.from(cuentasSet).map(nombre => ({ nombre, activo: true }))
+    if (cuentasRows.length) {
+      const { error: ccError } = await supabase
+        .from('cuentas_corrientes')
+        .upsert(cuentasRows, { onConflict: 'nombre', ignoreDuplicates: true })
+      if (ccError) throw new Error('Error actualizando cuentas: ' + ccError.message)
     }
 
     return NextResponse.json({
