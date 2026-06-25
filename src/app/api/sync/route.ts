@@ -117,8 +117,14 @@ export async function GET() {
     const iCCEuro   = headers.findIndex(h => h === 'EUROS')
     const iCCReal   = headers.findIndex(h => h === 'REALES')
 
+    // Sincronización INCREMENTAL: solo los últimos 30 días (rápido y sin riesgo de timeout).
+    const desde = new Date()
+    desde.setDate(desde.getDate() - 30)
+    const windowStart = desde.toISOString().slice(0, 10)
+
     const movimientos = []
     const monedasIncompletas: { fecha: string; cuenta: string; operacion: string; falta: string }[] = []
+    let ctaCteTotal = 0
 
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const row = rows[i]
@@ -129,6 +135,8 @@ export async function GET() {
       if (!fecha) continue
       const ctaCte = String(row[iCtaCte] || '').trim()
       if (!ctaCte) continue
+      ctaCteTotal++
+      if (fecha < windowStart) continue   // incremental: ignorar filas fuera de la ventana
 
       // Para que la planilla calcule bien el saldo en cuenta corriente, PROPIO y EXTERNO
       // deben estar completos. Si falta alguno, el Excel ignora la fila al totalizar.
@@ -160,17 +168,21 @@ export async function GET() {
       })
     }
 
-    if (movimientos.length === 0) {
+    // Si no hay NINGUNA fila CTA CTE en toda la planilla, probablemente sea un problema
+    // de mapeo de columnas (diagnóstico). Una ventana vacía sin más, en cambio, es válida.
+    if (ctaCteTotal === 0) {
       const clientes = Array.from(new Set(
         rows.slice(headerIdx + 1, headerIdx + 50).map(r => r[iCliente] ? String(r[iCliente]).trim() : '(vacío)')
       ))
       throw new Error(`Sin movimientos CTA CTE. Valores en col CLIENTE: ${clientes.join(', ')}`)
     }
 
+    // Incremental: borra e inserta solo la ventana de los últimos 30 días.
     const { error: delError } = await supabase
       .from('diario')
       .delete()
       .eq('tipo', 'CTA CTE')
+      .gte('fecha', windowStart)
     if (delError) throw new Error('Error borrando datos previos: ' + delError.message)
 
     // Insertar en lotes grandes y en paralelo (con límite de concurrencia)
@@ -197,9 +209,17 @@ export async function GET() {
       if (ccError) throw new Error('Error actualizando cuentas: ' + ccError.message)
     }
 
+    // Total de CTA CTE en base (para mostrar en la UI el total real, no solo la ventana).
+    const { count: totalEnBase } = await supabase
+      .from('diario')
+      .select('*', { count: 'exact', head: true })
+      .eq('tipo', 'CTA CTE')
+
     return NextResponse.json({
       success: true,
-      movimientos: movimientos.length,
+      total: totalEnBase ?? 0,          // total de movimientos CTA CTE en base
+      procesados: movimientos.length,   // procesados en esta corrida (ventana 30 días)
+      desde: windowStart,
       cuentas: cuentasSet.size,
       ultimaSync: new Date().toISOString(),
       monedasIncompletas,

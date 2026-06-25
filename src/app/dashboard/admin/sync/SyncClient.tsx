@@ -15,7 +15,7 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
   const [currentSync, setCurrentSync] = useState(ultimaSync)
 
   async function handleSync() {
-    if (!confirm('Esto reemplazará todos los movimientos CTA CTE con los datos actuales del Excel. ¿Continuar?')) return
+    if (!confirm('Esto actualizará los movimientos CTA CTE de los últimos 30 días con los datos del Excel. ¿Continuar?')) return
     setLoading(true)
     setError(null)
     setResultado(null)
@@ -26,7 +26,7 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
 
     if (!res.ok) { setError(data.error); return }
     setResultado(data)
-    setCurrentTotal(data.movimientos)
+    setCurrentTotal(data.total)
     setCurrentSync(data.ultimaSync)
   }
 
@@ -56,7 +56,7 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
         {resultado && (
           <div className="mt-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
             <p className="font-semibold">✓ Sincronización exitosa</p>
-            <p>{resultado.movimientos.toLocaleString('es-AR')} movimientos · {resultado.cuentas} cuentas actualizadas</p>
+            <p>{resultado.procesados.toLocaleString('es-AR')} movimientos actualizados (últimos 30 días) · {resultado.cuentas} cuentas</p>
           </div>
         )}
 
@@ -108,7 +108,7 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
           <div className="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-600 space-y-2">
             <ol className="space-y-1.5">
               <li className="flex gap-2"><span className="font-bold text-brand-600">1.</span> Lee los movimientos de la solapa DIARIO donde TIPO = CTA CTE</li>
-              <li className="flex gap-2"><span className="font-bold text-brand-600">2.</span> Reemplaza los datos existentes con los nuevos</li>
+              <li className="flex gap-2"><span className="font-bold text-brand-600">2.</span> Actualiza los movimientos de los últimos 30 días (incremental)</li>
               <li className="flex gap-2"><span className="font-bold text-brand-600">3.</span> Los clientes ven la información actualizada inmediatamente</li>
             </ol>
             <p className="text-xs text-amber-600 mt-2">⚠️ Los movimientos anulados manualmente se conservan.</p>
