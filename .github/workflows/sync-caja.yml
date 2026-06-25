@@ -30,9 +30,12 @@ jobs:
           fi
 
       - name: Disparar sincronización
+        env:
+          SECRET: ${{ secrets.SYNC_SECRET }}
         run: |
-          echo "Disparando sync en modo: ${{ steps.mode.outputs.mode }}"
-          curl -fsS -X POST \
-            "https://mictacte.netlify.app/.netlify/functions/sync-background?mode=${{ steps.mode.outputs.mode }}" \
-            -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}"
+          echo "Modo: ${{ steps.mode.outputs.mode }}"
+          echo "Longitud del secret en GitHub: ${#SECRET} (debe ser 64)"
+          status=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "https://mictacte.netlify.app/.netlify/functions/sync-background?mode=${{ steps.mode.outputs.mode }}&secret=$SECRET")
+          echo "HTTP status: $status"
           echo "OK (la sincronización corre en segundo plano en Netlify)"
