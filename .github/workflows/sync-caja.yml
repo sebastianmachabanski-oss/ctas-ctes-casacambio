@@ -1,0 +1,38 @@
+name: Sincronizar CAJA
+
+# Dispara la sincronización planilla -> base de datos llamando al endpoint de Netlify.
+# Reemplaza al scheduler de Netlify (que no estaba disparando los crons de forma confiable).
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # incremental: cada 15 minutos
+    - cron: "0 3 * * *"      # full: diario 03:00 UTC (00:00 Argentina)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Modo de sincronización"
+        type: choice
+        options: [incremental, full]
+        default: full
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determinar modo
+        id: mode
+        run: |
+          if [ "${{ github.event.schedule }}" = "0 3 * * *" ]; then
+            echo "mode=full" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.inputs.mode }}" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=incremental" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Disparar sincronización
+        run: |
+          echo "Disparando sync en modo: ${{ steps.mode.outputs.mode }}"
+          curl -fsS -X POST \
+            "https://mictacte.netlify.app/.netlify/functions/sync-background?mode=${{ steps.mode.outputs.mode }}" \
+            -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}"
+          echo "OK (la sincronización corre en segundo plano en Netlify)"
