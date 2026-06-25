@@ -1,11 +1,9 @@
 name: Sincronizar CAJA
 
 # Dispara la sincronización planilla -> base de datos llamando al endpoint de Netlify.
-# Reemplaza al scheduler de Netlify (que no estaba disparando los crons de forma confiable).
+# El disparo AUTOMÁTICO lo maneja cron-job.org (más confiable y puntual que el cron
+# de GitHub). Acá queda solo el disparo MANUAL (Run workflow) como respaldo.
 on:
-  schedule:
-    - cron: "*/15 * * * *"   # incremental: cada 15 minutos
-    - cron: "0 3 * * *"      # full: diario 03:00 UTC (00:00 Argentina)
   workflow_dispatch:
     inputs:
       mode:
