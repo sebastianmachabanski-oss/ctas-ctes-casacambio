@@ -34,8 +34,10 @@ jobs:
           SECRET: ${{ secrets.SYNC_SECRET }}
         run: |
           echo "Modo: ${{ steps.mode.outputs.mode }}"
-          echo "Longitud del secret en GitHub: ${#SECRET} (debe ser 64)"
-          status=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-            "https://mictacte.netlify.app/.netlify/functions/sync-background?mode=${{ steps.mode.outputs.mode }}&secret=$SECRET")
-          echo "HTTP status: $status"
+          # -L sigue el redirect (307) del runtime de Next.js, igual que el navegador.
+          # El secreto va en query y en header para que sobreviva al redirect.
+          status=$(curl -sS -L -o /dev/null -w "%{http_code}" -X POST \
+            "https://mictacte.netlify.app/.netlify/functions/sync-background?mode=${{ steps.mode.outputs.mode }}&secret=$SECRET" \
+            -H "x-sync-secret: $SECRET")
+          echo "HTTP status final: $status (esperado 202)"
           echo "OK (la sincronización corre en segundo plano en Netlify)"
