@@ -33,9 +33,8 @@ jobs:
         env:
           SECRET: ${{ secrets.SYNC_SECRET }}
         run: |
-          URL="https://mictacte.netlify.app/.netlify/functions/sync-background?mode=${{ steps.mode.outputs.mode }}&secret=$SECRET"
           echo "Modo: ${{ steps.mode.outputs.mode }}"
-          echo "--- sin seguir redirect (vemos a donde manda) ---"
-          curl -sS -o /dev/null -w "status=%{http_code}  location=%{redirect_url}\n" "$URL" -H "x-sync-secret: $SECRET"
-          echo "--- siguiendo redirect ---"
-          curl -sS -L -o /dev/null -w "status_final=%{http_code}  url_final=%{url_effective}  redirects=%{num_redirects}\n" "$URL" -H "x-sync-secret: $SECRET"
+          # Esperado tras el fix del middleware: status=202 y location vacío (llega a la función).
+          curl -sS -o /dev/null -w "status=%{http_code}  location=%{redirect_url}\n" \
+            "https://mictacte.netlify.app/.netlify/functions/sync-background?mode=${{ steps.mode.outputs.mode }}&secret=$SECRET" \
+            -H "x-sync-secret: $SECRET"
