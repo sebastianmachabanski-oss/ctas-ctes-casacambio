@@ -34,10 +34,7 @@ jobs:
           SECRET: ${{ secrets.SYNC_SECRET }}
         run: |
           echo "Modo: ${{ steps.mode.outputs.mode }}"
-          # GET + -L (sigue el redirect de Next.js), idéntico a abrir la URL en el navegador.
-          # El secreto va en query y en header.
-          status=$(curl -sS -L -o /dev/null -w "%{http_code}" \
+          # Esperado tras el fix del middleware: status=202 y location vacío (llega a la función).
+          curl -sS -o /dev/null -w "status=%{http_code}  location=%{redirect_url}\n" \
             "https://mictacte.netlify.app/.netlify/functions/sync-background?mode=${{ steps.mode.outputs.mode }}&secret=$SECRET" \
-            -H "x-sync-secret: $SECRET")
-          echo "HTTP status final: $status (esperado 200/202)"
-          echo "OK (la sincronización corre en segundo plano en Netlify)"
+            -H "x-sync-secret: $SECRET"
