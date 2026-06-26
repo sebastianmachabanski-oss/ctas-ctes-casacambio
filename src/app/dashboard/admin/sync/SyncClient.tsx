@@ -26,8 +26,7 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
 
     if (!res.ok) { setError(data.error); return }
     setResultado(data)
-    setCurrentTotal(data.total)
-    setCurrentSync(data.ultimaSync)
+    setCurrentSync(new Date().toISOString())
   }
 
   return (
@@ -54,9 +53,9 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
         </div>
 
         {resultado && (
-          <div className="mt-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
-            <p className="font-semibold">✓ Sincronización exitosa</p>
-            <p>{resultado.procesados.toLocaleString('es-AR')} movimientos actualizados (últimos 30 días) · {resultado.cuentas} cuentas</p>
+          <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm">
+            <p className="font-semibold">✓ Sincronización iniciada</p>
+            <p>Se está actualizando en segundo plano (últimos 30 días). En unos segundos los datos quedan al día — recargá la página para ver el total actualizado.</p>
           </div>
         )}
 
