@@ -221,6 +221,7 @@ export default async function handler(req: Request) {
   // Seguridad: solo se ejecuta con el secreto compartido (lo pasan los cron triggers).
   const url = new URL(req.url)
   const mode: 'full' | 'incremental' = url.searchParams.get('mode') === 'full' ? 'full' : 'incremental'
+  const force = url.searchParams.get('force') === '1'  // ignora el chequeo de modifiedTime (botón manual)
   const secret = req.headers.get('x-sync-secret') || url.searchParams.get('secret')
   if (!process.env.SYNC_SECRET || secret !== process.env.SYNC_SECRET) {
     return new Response('Unauthorized', { status: 401 })
@@ -235,7 +236,7 @@ export default async function handler(req: Request) {
 
     // En modo incremental, si el archivo no cambió desde la última corrida, no hacemos nada.
     const modifiedTime = await getFileModifiedTime(token)
-    if (mode === 'incremental' && modifiedTime) {
+    if (mode === 'incremental' && modifiedTime && !force) {
       const last = await getSyncState(supabase, 'caja_modified_time')
       if (last === modifiedTime) {
         console.log('⏭️  Incremental: planilla sin cambios, se omite.')

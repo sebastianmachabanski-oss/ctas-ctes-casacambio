@@ -20,10 +20,16 @@ export async function GET(request: Request) {
   const secret = process.env.SYNC_SECRET || ''
   const base = process.env.URL || process.env.DEPLOY_PRIME_URL || new URL(request.url).origin
 
+  // Estado ANTES de disparar: la UI hace polling y sabe que terminó cuando cambia.
+  const { data: st } = await supabase
+    .from('sync_state').select('updated_at').eq('key', 'caja_modified_time').maybeSingle()
+  const before = (st as any)?.updated_at ?? null
+
   try {
+    // force=1: el botón manual siempre procesa (aunque no haya cambios) para poder confirmar.
     // GET con el secreto (en query y header). El middleware deja pasar /.netlify/.
     const res = await fetch(
-      `${base}/.netlify/functions/sync-background?mode=${mode}&secret=${encodeURIComponent(secret)}`,
+      `${base}/.netlify/functions/sync-background?mode=${mode}&force=1&secret=${encodeURIComponent(secret)}`,
       { headers: { 'x-sync-secret': secret } }
     )
     if (!res.ok) {
@@ -32,7 +38,7 @@ export async function GET(request: Request) {
         { status: 502 }
       )
     }
-    return NextResponse.json({ started: true, mode })
+    return NextResponse.json({ started: true, mode, before })
   } catch (err: any) {
     return NextResponse.json({ error: 'Error al iniciar la sincronización: ' + err.message }, { status: 500 })
   }

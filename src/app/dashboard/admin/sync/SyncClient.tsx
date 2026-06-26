@@ -22,11 +22,28 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
 
     const res = await fetch('/api/sync')
     const data = await res.json()
-    setLoading(false)
+    if (!res.ok) { setLoading(false); setError(data.error); return }
 
-    if (!res.ok) { setError(data.error); return }
-    setResultado(data)
-    setCurrentSync(new Date().toISOString())
+    // El sync corre en segundo plano; hacemos polling hasta confirmar que terminó.
+    const before = data.before
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+    const start = Date.now()
+    while (Date.now() - start < 90000) {
+      await sleep(2500)
+      try {
+        const sres = await fetch('/api/sync-status')
+        const sdata = await sres.json()
+        if (sres.ok && sdata.updatedAt && sdata.updatedAt !== before) {
+          setLoading(false)
+          setCurrentTotal(sdata.total)
+          setCurrentSync(sdata.updatedAt)
+          setResultado({ done: true, total: sdata.total })
+          return
+        }
+      } catch { /* reintenta */ }
+    }
+    setLoading(false)
+    setError('La sincronización está tardando más de lo normal. Recargá la página en un momento para verificar.')
   }
 
   return (
@@ -53,9 +70,9 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
         </div>
 
         {resultado && (
-          <div className="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm">
-            <p className="font-semibold">✓ Sincronización iniciada</p>
-            <p>Se está actualizando en segundo plano (últimos 30 días). En unos segundos los datos quedan al día — recargá la página para ver el total actualizado.</p>
+          <div className="mt-4 p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
+            <p className="font-semibold">✓ Sincronización completada</p>
+            <p>{Number(resultado.total).toLocaleString('es-AR')} movimientos CTA CTE en base · actualizado recién</p>
           </div>
         )}
 
