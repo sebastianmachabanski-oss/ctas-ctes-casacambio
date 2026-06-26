@@ -1,3 +1,4 @@
+// Sync CAJA — planilla Excel (Drive) → base de datos. Ver docs/SINCRONIZACION.md.
 import { createClient } from "@supabase/supabase-js"
 import * as XLSX from "xlsx"
 
