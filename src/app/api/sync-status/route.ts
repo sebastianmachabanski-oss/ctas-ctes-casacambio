@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 // Estado de la sincronización, para que el botón de la app haga polling y confirme
 // cuándo terminó: `updatedAt` cambia cuando una corrida escribió en base; `total` es
@@ -13,10 +13,12 @@ export async function GET() {
   if (!profile || (profile as any).rol !== 'superusuario')
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
-  const { data: st } = await supabase
+  // sync_state tiene RLS sin políticas de usuario; hay que usar el service role para leerla.
+  const admin = createAdminClient()
+  const { data: st } = await admin
     .from('sync_state').select('value').eq('key', 'last_run').maybeSingle()
 
-  const { count } = await supabase
+  const { count } = await admin
     .from('diario').select('*', { count: 'exact', head: true }).eq('tipo', 'CTA CTE')
 
   return NextResponse.json({
