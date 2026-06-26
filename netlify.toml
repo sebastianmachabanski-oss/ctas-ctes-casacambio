@@ -1,5 +1,7 @@
 [build]
-  command = "npm run build"
+  # Se borra .next/cache antes de desplegar: es el caché de build (puede pesar cientos
+  # de MB y hacía fallar la subida con HTTP 500). No se necesita en runtime.
+  command = "npm run build && rm -rf .next/cache"
   publish = ".next"
 
 [functions]
