@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export const maxDuration = 30
 
@@ -20,9 +20,11 @@ export async function GET(request: Request) {
   const secret = process.env.SYNC_SECRET || ''
   const base = process.env.URL || process.env.DEPLOY_PRIME_URL || new URL(request.url).origin
 
+  // sync_state tiene RLS sin políticas de usuario; hay que usar el service role para leerla.
   // Marca de la última corrida ANTES de disparar: la UI hace polling y sabe que terminó
   // cuando esta marca cambia (la función la actualiza al final de cada corrida).
-  const { data: st } = await supabase
+  const admin = createAdminClient()
+  const { data: st } = await admin
     .from('sync_state').select('value').eq('key', 'last_run').maybeSingle()
   const before = (st as any)?.value ?? null
 
