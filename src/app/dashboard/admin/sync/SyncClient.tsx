@@ -24,19 +24,25 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
     const data = await res.json()
     if (!res.ok) { setLoading(false); setError(data.error); return }
 
-    // El sync corre en segundo plano; hacemos polling hasta confirmar que terminó.
+    // El sync corre en segundo plano; hacemos polling de la marca `lastRun` hasta confirmar.
     const before = data.before
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
     const start = Date.now()
-    while (Date.now() - start < 90000) {
-      await sleep(2500)
+    while (Date.now() - start < 120000) {
+      await sleep(3000)
       try {
         const sres = await fetch('/api/sync-status')
         const sdata = await sres.json()
-        if (sres.ok && sdata.updatedAt && sdata.updatedAt !== before) {
+        if (sres.ok && sdata.lastRun && sdata.lastRun !== before) {
           setLoading(false)
+          let info: any = {}
+          try { info = JSON.parse(sdata.lastRun) } catch { /* */ }
+          if (info.ok === false) {
+            setError('La sincronización falló: ' + (info.error || 'error desconocido'))
+            return
+          }
           setCurrentTotal(sdata.total)
-          setCurrentSync(sdata.updatedAt)
+          setCurrentSync(info.at || new Date().toISOString())
           setResultado({ done: true, total: sdata.total })
           return
         }
