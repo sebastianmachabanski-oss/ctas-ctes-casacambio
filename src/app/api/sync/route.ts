@@ -20,10 +20,11 @@ export async function GET(request: Request) {
   const secret = process.env.SYNC_SECRET || ''
   const base = process.env.URL || process.env.DEPLOY_PRIME_URL || new URL(request.url).origin
 
-  // Estado ANTES de disparar: la UI hace polling y sabe que terminó cuando cambia.
+  // Marca de la última corrida ANTES de disparar: la UI hace polling y sabe que terminó
+  // cuando esta marca cambia (la función la actualiza al final de cada corrida).
   const { data: st } = await supabase
-    .from('sync_state').select('updated_at').eq('key', 'caja_modified_time').maybeSingle()
-  const before = (st as any)?.updated_at ?? null
+    .from('sync_state').select('value').eq('key', 'last_run').maybeSingle()
+  const before = (st as any)?.value ?? null
 
   try {
     // force=1: el botón manual siempre procesa (aunque no haya cambios) para poder confirmar.

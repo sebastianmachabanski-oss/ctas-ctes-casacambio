@@ -14,13 +14,13 @@ export async function GET() {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   const { data: st } = await supabase
-    .from('sync_state').select('updated_at').eq('key', 'caja_modified_time').maybeSingle()
+    .from('sync_state').select('value').eq('key', 'last_run').maybeSingle()
 
   const { count } = await supabase
     .from('diario').select('*', { count: 'exact', head: true }).eq('tipo', 'CTA CTE')
 
   return NextResponse.json({
-    updatedAt: (st as any)?.updated_at ?? null,
+    lastRun: (st as any)?.value ?? null,   // JSON: { at, ok, mode, error?, ... }
     total: count ?? 0,
   })
 }

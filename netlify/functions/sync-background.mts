@@ -227,11 +227,17 @@ export default async function handler(req: Request) {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
+  // Registra el fin de CADA corrida (ok, skip o error). El botón de la app hace polling
+  // de esta marca para confirmar que terminó —y para mostrar el error si falló—.
+  const recordRun = (payload: any) =>
+    setSyncState(supabase, 'last_run', JSON.stringify({ at: new Date().toISOString(), ...payload })).catch(() => {})
+
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
     const token = await getGoogleToken()
 
     // En modo incremental, si el archivo no cambió desde la última corrida, no hacemos nada.
@@ -240,6 +246,7 @@ export default async function handler(req: Request) {
       const last = await getSyncState(supabase, 'caja_modified_time')
       if (last === modifiedTime) {
         console.log('⏭️  Incremental: planilla sin cambios, se omite.')
+        await recordRun({ ok: true, mode, skipped: true })
         return new Response('skipped', { status: 200 })
       }
     }
@@ -256,6 +263,7 @@ export default async function handler(req: Request) {
       const nCuentas = await upsertCuentas(supabase, todos)
       if (modifiedTime) await setSyncState(supabase, 'caja_modified_time', modifiedTime)
       console.log(`✅ Full OK: ${todos.length} movimientos, ${nCuentas} cuentas`)
+      await recordRun({ ok: true, mode, procesados: todos.length })
       return new Response('ok-full', { status: 200 })
     }
 
@@ -272,10 +280,12 @@ export default async function handler(req: Request) {
     const nCuentas = await upsertCuentas(supabase, ventana)
     if (modifiedTime) await setSyncState(supabase, 'caja_modified_time', modifiedTime)
     console.log(`✅ Incremental OK (desde ${windowStart}): ${ventana.length} movimientos, ${nCuentas} cuentas`)
+    await recordRun({ ok: true, mode, procesados: ventana.length })
     return new Response('ok-incremental', { status: 200 })
 
   } catch (err: any) {
     console.error('❌ Sync error:', err.message)
+    await recordRun({ ok: false, mode, error: err.message })
     return new Response('error: ' + err.message, { status: 500 })
   }
 }
