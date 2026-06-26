@@ -233,10 +233,14 @@ export default async function handler(req: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
+  const startedAt = new Date().toISOString()
   // Registra el fin de CADA corrida (ok, skip o error). El botón de la app hace polling
   // de esta marca para confirmar que terminó —y para mostrar el error si falló—.
-  const recordRun = (payload: any) =>
-    setSyncState(supabase, 'last_run', JSON.stringify({ at: new Date().toISOString(), ...payload })).catch(() => {})
+  const recordRun = (payload: any) => {
+    const at = new Date().toISOString()
+    const duration_s = Math.round((Date.parse(at) - Date.parse(startedAt)) / 1000)
+    return setSyncState(supabase, 'last_run', JSON.stringify({ started_at: startedAt, at, duration_s, ...payload })).catch(() => {})
+  }
 
   try {
     const token = await getGoogleToken()
