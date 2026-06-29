@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 const MONEDAS = ['PESOS', 'DOLARES', 'EUROS', 'REALES']
-const TIPOS = ['CTA CTE', 'CAJA']
+const TIPOS = ['CTA CTE', 'CAJA', 'COMPRA', 'VENTA', 'GASTOS']
 const OPERACIONES = ['INGRESAN', 'EGRESAN']
 
 function today() {
