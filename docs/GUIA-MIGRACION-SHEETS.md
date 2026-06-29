@@ -85,6 +85,14 @@ y las columnas de agrupación temporal: `AÑO · MES · SEMANA`.
      querés como etiqueta. Para agrupar en TD por mes, lo más cómodo es dejar `FECHA`
      real y agrupar dentro de la TD (Sheets agrupa por año/mes/trimestre solo).
    - `SEMANA` → `=ISOWEEKNUM(D2)` (o `=YEAR(D2)&"-"&TEXT(ISOWEEKNUM(D2),"00")`).
+   - ⚠️ **Cuidado con el formato de `SEMANA`/`MES`.** En el Excel original, `SEMANA` es
+     un código `AAAASS` (ej. `202448` = 2024, semana 48) y `MES` es un número de serie de
+     fecha. Si la columna `SEMANA` queda con **formato de Fecha**, un control de filtros
+     la muestra como una fecha disparatada (ej. `202448` → "domingo, abril 12, 2454"),
+     porque interpreta el número como serie de fecha. Solución: seleccioná la columna
+     `SEMANA` → **Formato → Número → Número** (o "Texto sin formato"). `MES`, en cambio,
+     sí es fecha: dejalo como fecha o formatealo como `aaaa-mm`. Generarlas con las
+     fórmulas de arriba evita el problema de raíz.
 4. ⚠️ **La fila de encabezados debe ser la primera del rango.** En el Excel original,
    la solapa `CAJA` tiene un bloque de totales/resumen ARRIBA de los encabezados (por eso
    la sincronización busca la fila de títulos dentro de las primeras filas). Si armás una
