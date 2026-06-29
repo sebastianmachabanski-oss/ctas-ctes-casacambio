@@ -103,13 +103,27 @@ y las columnas de agrupación temporal: `AÑO · MES · SEMANA`.
      **arranque ahí** (ej. si los títulos están en la fila 4, usá `CAJA!A4:AO33011`).
    - Lo más limpio: borrá las filas de totales de arriba para que los títulos queden en
      la **fila 1**. La sincronización lo tolera (escanea las primeras filas igual).
-5. **Tip clave**: convertí el rango del DIARIO en un **rango con nombre** para que las TD
-   no se rompan al crecer:
-   - Seleccioná todo el DIARIO **con encabezados** (empezando en la fila de títulos, ej.
-     `A4:AO50000`, dejando filas de sobra hacia abajo).
-   - Datos → **Rangos con nombre** → nombralo `DIARIO`.
-   - Cuando crees cada TD **y cada control de filtros**, usá `DIARIO` como origen en vez
-     de seleccionar a mano.
+5. **Tip clave — usá un rango ABIERTO para que las TD crezcan solas.** Como origen de las
+   TD y los controles de filtro, usá un rango **sin tope de fila**, desde la fila de
+   encabezados hasta el final de la columna:
+   ```
+   CAJA!A6:AO        (poné la fila de tus encabezados; acá, la 6)
+   ```
+   Al no tener número de fila al final, **incluye automáticamente todas las filas que se
+   agreguen** después. No hay que tocar nada nunca más.
+   - ⚠️ **Un rango con nombre NO se auto-expande.** Si definís `DIARIO` con un tope fijo
+     (ej. `A6:AO33011` + unas filas), tarde o temprano lo tendrías que agrandar a mano.
+     Si querés usar el nombre `DIARIO`, definilo igual como **abierto**: Datos → Rangos
+     con nombre → `DIARIO` = `CAJA!A6:AO`. O directamente usá `A6:AO` como origen y
+     olvidate del named range.
+   - **Las TD de Google Sheets se recalculan solas** cuando cambian los datos (a
+     diferencia de Excel). Con el rango abierto, las filas que agregue la sincronización
+     aparecen automáticamente en las TD.
+   - Costo del rango abierto: las filas vacías del final aparecen como **"(Vacío)"** en
+     slicers y TD. Destildalo en el slicer o filtralo en la TD; es el único mantenimiento
+     y es trivial.
+   - Nota: el editor de TD acepta rangos con nombre, pero hay que **tipearlos exacto** en
+     el campo de datos (no aparecen en el selector visual).
 
 ---
 
