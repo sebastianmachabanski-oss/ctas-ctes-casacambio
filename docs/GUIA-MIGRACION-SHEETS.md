@@ -85,12 +85,23 @@ y las columnas de agrupación temporal: `AÑO · MES · SEMANA`.
      querés como etiqueta. Para agrupar en TD por mes, lo más cómodo es dejar `FECHA`
      real y agrupar dentro de la TD (Sheets agrupa por año/mes/trimestre solo).
    - `SEMANA` → `=ISOWEEKNUM(D2)` (o `=YEAR(D2)&"-"&TEXT(ISOWEEKNUM(D2),"00")`).
-4. **Tip clave**: convertí el rango del DIARIO en un **rango con nombre** para que las TD
+4. ⚠️ **La fila de encabezados debe ser la primera del rango.** En el Excel original,
+   la solapa `CAJA` tiene un bloque de totales/resumen ARRIBA de los encabezados (por eso
+   la sincronización busca la fila de títulos dentro de las primeras filas). Si armás una
+   TD o un control de filtros sobre `CAJA!A1`, Google toma esa fila de totales como
+   "encabezados" y el desplegable de columnas muestra **valores sueltos** (ej.
+   `FALT 84000`, `MARIA 900`) en vez de los nombres `FECHA`, `CLIENTE`, `CAJA`…
+   - Solución: identificá en qué fila están los títulos reales y hacé que el rango
+     **arranque ahí** (ej. si los títulos están en la fila 4, usá `CAJA!A4:AO33011`).
+   - Lo más limpio: borrá las filas de totales de arriba para que los títulos queden en
+     la **fila 1**. La sincronización lo tolera (escanea las primeras filas igual).
+5. **Tip clave**: convertí el rango del DIARIO en un **rango con nombre** para que las TD
    no se rompan al crecer:
-   - Seleccioná todo el DIARIO **con encabezados** (ej. `A1:T50000`, dejando filas de
-     sobra hacia abajo).
+   - Seleccioná todo el DIARIO **con encabezados** (empezando en la fila de títulos, ej.
+     `A4:AO50000`, dejando filas de sobra hacia abajo).
    - Datos → **Rangos con nombre** → nombralo `DIARIO`.
-   - Cuando crees cada TD, usá `DIARIO` como origen en vez de seleccionar a mano.
+   - Cuando crees cada TD **y cada control de filtros**, usá `DIARIO` como origen en vez
+     de seleccionar a mano.
 
 ---
 
@@ -138,6 +149,18 @@ de diseño**, no en la hoja. El equivalente real, visible e interactivo, se llam
   principal por pestaña** con sus controles arriba (que es el layout original).
 - En el menú de **tres puntos** del control podés fijar un **valor por defecto** y
   activar **"mostrar solo datos válidos"**.
+
+### 4.8 Colapsar / expandir un campo de filas (ver solo subtotales)
+
+Cuando una TD tiene varios campos en Filas (ej. `RESULTADO TT`: `NOTAS` arriba y después
+`NRO`, `FECHA`, …), podés colapsar el campo de más arriba para ver **solo los subtotales**
+(`Total ADRI - MZA`, etc.) sin el detalle.
+
+- **Un grupo por vez:** usá los botones **`+` / `–`** que aparecen a la izquierda de cada
+  grupo.
+- **Todo el campo de una:** **clic derecho** sobre cualquier valor de ese campo (ej. una
+  celda de `NOTAS`) → **"Contraer todos los elementos de NOTAS"**.
+  Para reabrir: clic derecho → **"Expandir todos los elementos de NOTAS"**.
 
 ### 4.1 `CLIENTES CAJA` — saldo por cliente
 - **Filtros:** `FECHA`, `OPERACIÓN`, `CUENTA`, `CAJA`
