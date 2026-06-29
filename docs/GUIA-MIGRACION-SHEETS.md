@@ -106,8 +106,38 @@ y las columnas de agrupación temporal: `AÑO · MES · SEMANA`.
 5. Para cada campo de **Valores**: Sheets pone "SUMA de X" por defecto — dejalo en
    **SUMA** (es lo que hacían las TD originales).
 
-> En las tablas de abajo, "Filtros" = lo que en Sheets es la sección **Filtros** del
-> editor (equivale a los "campos de página" de Excel).
+> En las tablas de abajo, "Filtros" = los campos por los que el usuario va a poder
+> filtrar (los "campos de página" de Excel). **Importante:** en Google Sheets NO los
+> pongas en la sección "Filtros" del editor —ahí quedan ocultos en el panel—. Usá
+> **Controles de filtro (slicers)**, que sí se ven sobre la hoja. Ver sección 4.7.
+
+### 4.7 Filtros visibles en pantalla — Controles de filtro (slicers)
+
+En Excel los filtros de la TD se muestran arriba de la tabla y el usuario elige desde
+ahí. En Google Sheets, los "Filtros" del editor de TD **quedan escondidos en el panel
+de diseño**, no en la hoja. El equivalente real, visible e interactivo, se llama
+**Control de filtros** (slicer / segmentador).
+
+**Cómo agregarlo (uno por cada campo de "Filtros" de las tablas 4.1–4.6):**
+
+1. Hacé clic en la **tabla dinámica** (o en una celda de ella).
+2. Menú **Insertar → Control de filtros** (o **Datos → Agregar control de filtros**).
+3. En el panel derecho elegí la **columna** a filtrar (ej. `CLIENTE`).
+4. Arrastrá el control flotante a la zona de **arriba de la TD**.
+5. Repetí para cada filtro de esa solapa (ej. en `HISTORICO CLIENTE`: `CLIENTE`, `MES`,
+   `CAJA` → tres controles).
+6. El usuario hace clic en el control sobre la hoja y elige los valores; la TD se
+   actualiza sola.
+
+**Detalles:**
+
+- **No** pongas esos campos también en la sección "Filtros" del editor: alcanza con el
+  control de filtros.
+- Un control de filtros filtra el **rango de datos de origen**, así que afecta a todas
+  las TD y gráficos del mismo origen **en esa pestaña**. Por eso conviene **una TD
+  principal por pestaña** con sus controles arriba (que es el layout original).
+- En el menú de **tres puntos** del control podés fijar un **valor por defecto** y
+  activar **"mostrar solo datos válidos"**.
 
 ### 4.1 `CLIENTES CAJA` — saldo por cliente
 - **Filtros:** `FECHA`, `OPERACIÓN`, `CUENTA`, `CAJA`
