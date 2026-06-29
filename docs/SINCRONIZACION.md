@@ -5,13 +5,27 @@ archivo **Excel `CAJA`** en Google Drive.
 
 ## Idea general
 
-- La **planilla** (Excel `.xlsx` en Drive) es donde se cargan/editan los datos a mano.
+- La **planilla** es donde se cargan/editan los datos a mano.
 - La **base de datos** (Supabase) es lo que consulta la app (saldos, filtros, deudores).
 - La sincronización copia planilla → base, en dos modos: **incremental** y **full**.
 
-> ⚠️ El archivo debe ser **Excel `.xlsx` binario** (no Hoja de Google nativa) y la
-> **pestaña** debe llamarse exactamente **`CAJA`**. Si se convierte a Google Sheet
-> nativo, la lectura por `?alt=media` deja de funcionar.
+## Fuente de datos: Excel o Google Sheet (conmutable)
+
+La función de sync puede leer de dos orígenes, según la env var **`SYNC_SOURCE`**:
+
+| `SYNC_SOURCE` | Origen | Cómo lee |
+|---|---|---|
+| *(sin definir)* o `excel` | **Excel `.xlsx`** en Drive (`EXCEL_FILE_ID`) | Descarga el binario por `?alt=media` y lo parsea con `xlsx`. Comportamiento histórico. |
+| `sheets` | **Google Sheet nativo** (`SHEET_ID`) | Lee con la **Google Sheets API** (`spreadsheets.values.get`). Más rápido y simple. |
+
+- **Default seguro:** mientras `SYNC_SOURCE` no sea `sheets`, todo funciona como siempre
+  (Excel). El switch es instantáneo y reversible: se cambia la env var en Netlify y se
+  redeploya; para volver atrás, se saca la var.
+- En ambos casos la **pestaña** debe llamarse exactamente **`CAJA`** y la lógica de
+  parseo (buscar encabezados, filtrar `CTA CTE`, mapear columnas) es idéntica.
+- Para la fuente `sheets`: la **Google Sheets API** debe estar habilitada en el proyecto
+  y el Sheet debe estar **compartido con la cuenta de servicio** (Lector alcanza).
+- La marca `last_run` en `sync_state` incluye `source` para saber con qué origen corrió.
 
 ## Modos
 
@@ -56,11 +70,14 @@ https://<sitio>/.netlify/functions/sync-background?mode=incremental&secret=<SYNC
 1. **Env vars en Netlify:** `SYNC_SECRET` (protege el endpoint), más las existentes
    `GOOGLE_SERVICE_ACCOUNT_JSON`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 2. **Migración** `migrations/2026-06-24_sync_state.sql` corrida en Supabase.
-3. El service account del JSON debe tener acceso **Editor** al archivo en Drive.
-4. El `FILE_ID` está hardcodeado en `sync-background.mts` y `src/app/api/sync/route.ts`.
-   Si cambia el archivo, actualizar en ambos.
+3. El service account del JSON debe tener acceso al archivo: **Editor** al `.xlsx`
+   (fuente `excel`), o al menos **Lector** al Google Sheet (fuente `sheets`).
+4. Los IDs (`EXCEL_FILE_ID` y `SHEET_ID`) están hardcodeados en `sync-background.mts`.
+   Si cambia algún archivo, actualizar ahí.
 5. **cron-job.org:** dos jobs apuntando a la URL del endpoint con `&secret=<SYNC_SECRET>`
    (uno `mode=incremental` cada 15 min, otro `mode=full` diario).
+6. **Para usar la fuente `sheets`:** habilitar la Google Sheets API en el proyecto,
+   compartir el Sheet con la cuenta de servicio, y poner `SYNC_SOURCE=sheets` en Netlify.
 
 ## Verificación
 
@@ -76,8 +93,10 @@ https://<sitio>/.netlify/functions/sync-background?mode=incremental&secret=<SYNC
 | Respuesta `307 → /login` | El middleware está interceptando la ruta (ver bypass en `src/middleware.ts`). |
 | `Unauthorized` (401) | Falta o no coincide `SYNC_SECRET`. |
 | `307 → otra URL` / no corre | Falta seguir el redirect, o método equivocado. La función responde a **GET**. |
-| `Error descargando archivo: 403` | El archivo se convirtió a Google Sheet nativo, o el service account perdió acceso. |
-| `Pestaña "CAJA" no encontrada` | La pestaña del Excel no se llama `CAJA`. |
+| `Error descargando archivo: 403` (fuente `excel`) | El archivo se convirtió a Google Sheet nativo, o el service account perdió acceso. |
+| `Error leyendo Google Sheet: 403` (fuente `sheets`) | El Sheet no está compartido con la cuenta de servicio, o la Sheets API no está habilitada. |
+| `Error leyendo Google Sheet: 404` (fuente `sheets`) | `SHEET_ID` incorrecto. |
+| `Pestaña "CAJA" no encontrada` | La pestaña no se llama `CAJA`. |
 
 ## Limitaciones conocidas
 
