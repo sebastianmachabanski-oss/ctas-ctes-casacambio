@@ -149,7 +149,6 @@ de diseño**, no en la hoja. El equivalente real, visible e interactivo, se llam
   principal por pestaña** con sus controles arriba (que es el layout original).
 - En el menú de **tres puntos** del control podés fijar un **valor por defecto** y
   activar **"mostrar solo datos válidos"**.
-
 ### 4.8 Colapsar / expandir un campo de filas (ver solo subtotales)
 
 Cuando una TD tiene varios campos en Filas (ej. `RESULTADO TT`: `NOTAS` arriba y después
