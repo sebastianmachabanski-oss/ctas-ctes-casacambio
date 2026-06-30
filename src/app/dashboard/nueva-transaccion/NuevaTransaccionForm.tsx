@@ -20,7 +20,7 @@ function Required() {
   return <span className="text-red-500 ml-0.5">*</span>
 }
 
-export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] }) {
+export default function NuevaTransaccionForm({ clientes }: { clientes: string[] }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'idle' | 'supabase' | 'done'>('idle')
@@ -32,7 +32,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     fecha: today(),
     tipo: 'CTA CTE',
     col_f: 'C',
-    cuenta_cte: cuentas[0] ?? '',
+    cuenta_cte: '',
     operacion: 'INGRESAN',
     propio: 'DOLARES',
     externo: 'DOLARES',
@@ -42,6 +42,19 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     debe: '',
     notas: '',
   })
+
+  // Buscador del selector de Cliente: texto tipeado + visibilidad del desplegable.
+  const [clienteQuery, setClienteQuery] = useState('')
+  const [clienteOpen, setClienteOpen] = useState(false)
+  const clientesFiltrados = clientes
+    .filter(c => c.toUpperCase().includes(clienteQuery.trim().toUpperCase()))
+    .sort((a, b) => a.localeCompare(b, 'es'))
+
+  function elegirCliente(nombre: string) {
+    set('cuenta_cte', nombre)
+    setClienteQuery(nombre)
+    setClienteOpen(false)
+  }
 
   const operacionesDisponibles = OPERACIONES_POR_TIPO[form.tipo] ?? []
   const cotizacionRequerida = OPERACIONES_REQUIEREN_COTIZACION.includes(form.operacion)
@@ -60,7 +73,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     if (!form.fecha)       return 'La fecha es obligatoria'
     if (!form.tipo)        return 'El tipo de transacción es obligatorio'
     if (!form.col_f)       return 'Op es obligatorio'
-    if (!form.cuenta_cte)  return 'Seleccioná una cuenta corriente'
+    if (!form.cuenta_cte)  return 'Seleccioná un cliente de la lista'
     if (!form.operacion)   return 'La operación es obligatoria'
     if (!form.propio)      return 'El campo Propio es obligatorio'
     if (!form.externo)     return 'El campo Externo es obligatorio'
@@ -209,17 +222,41 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
 
       {/* Fila 2: Cuenta + Operación */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="label">Cuenta corriente<Required /></label>
-          <select
+        <div className="relative">
+          <label className="label">Cliente<Required /></label>
+          <input
+            type="text"
             className="input"
-            value={form.cuenta_cte}
-            onChange={e => set('cuenta_cte', e.target.value)}
+            value={clienteQuery}
+            onChange={e => {
+              setClienteQuery(e.target.value)
+              set('cuenta_cte', '') // obliga a elegir un cliente real de la lista
+              setClienteOpen(true)
+            }}
+            onFocus={() => setClienteOpen(true)}
+            onBlur={() => setTimeout(() => setClienteOpen(false), 150)}
+            placeholder="Buscar cliente…"
+            autoComplete="off"
             required
-          >
-            <option value="">— Seleccioná —</option>
-            {cuentas.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          />
+          {clienteOpen && (
+            <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+              {clientesFiltrados.length > 0 ? clientesFiltrados.map(c => (
+                <li key={c}>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => elegirCliente(c)}
+                  >
+                    {c}
+                  </button>
+                </li>
+              )) : (
+                <li className="px-3 py-2 text-sm text-gray-400">Sin resultados</li>
+              )}
+            </ul>
+          )}
         </div>
         <div>
           <label className="label">Operación<Required /></label>

@@ -11,8 +11,11 @@ export default async function NuevaTransaccionPage() {
   const rol = (profileData as any)?.rol
   if (rol !== 'superusuario' && rol !== 'operador') redirect('/dashboard')
 
-  const { data: cuentas } = await supabase
-    .from('cuentas_corrientes')
+  // Unión de todos los nombres que aparecen en las columnas CLIENTE y CAJA de la planilla
+  // (la calcula el sync). Distinto de `cuentas_corrientes`, que solo tiene clientes con
+  // movimientos de tipo CTA CTE.
+  const { data: clientes } = await supabase
+    .from('clientes')
     .select('nombre')
     .eq('activo', true)
     .order('nombre')
@@ -25,7 +28,7 @@ export default async function NuevaTransaccionPage() {
       </div>
 
       <div className="max-w-3xl">
-        <NuevaTransaccionForm cuentas={(cuentas ?? []).map(c => c.nombre)} />
+        <NuevaTransaccionForm clientes={(clientes ?? []).map(c => c.nombre)} />
       </div>
     </div>
   )
