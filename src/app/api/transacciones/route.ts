@@ -35,16 +35,27 @@ export async function POST(request: Request) {
   if (!['C', 'T'].includes(col_f))
     return NextResponse.json({ error: 'Op debe ser C o T' }, { status: 400 })
 
-  if (!['INGRESAN', 'EGRESAN'].includes(operacion))
-    return NextResponse.json({ error: 'Operación inválida' }, { status: 400 })
+  // La Operación disponible depende del Tipo: CTA CTE solo mueve cuenta corriente
+  // (INGRESAN/EGRESAN); CAJA admite además las operaciones de caja (compra/venta/gastos).
+  const OPERACIONES_VALIDAS: Record<string, string[]> = {
+    'CTA CTE': ['INGRESAN', 'EGRESAN'],
+    'CAJA': ['COMPRA', 'VENTA', 'INGRESAN', 'EGRESAN', 'GASTOS'],
+  }
+  if (!OPERACIONES_VALIDAS[tipo]?.includes(operacion))
+    return NextResponse.json({ error: 'Operación inválida para el tipo seleccionado' }, { status: 400 })
 
-  // Calculate currency deltas for Supabase (view uses SUM)
-  const sign = operacion === 'INGRESAN' ? 1 : -1
+  // Calculate currency deltas for Supabase (view uses SUM). Solo aplica a movimientos de
+  // cuenta corriente (INGRESAN/EGRESAN) — `diario` solo lo consultan las vistas de CTA CTE.
+  // Las operaciones de CAJA (COMPRA/VENTA/GASTOS) no mueven saldo de cta cte: quedan en 0.
   const monedaNorm = mapMoneda(propio)
-  const cc_pesos    = monedaNorm === 'PESOS'   ? sign * monto : 0
-  const cc_dolares  = monedaNorm === 'DOLARES' ? sign * monto : 0
-  const cc_euros    = monedaNorm === 'EUROS'   ? sign * monto : 0
-  const cc_reales   = monedaNorm === 'REALES'  ? sign * monto : 0
+  let cc_pesos = 0, cc_dolares = 0, cc_euros = 0, cc_reales = 0
+  if (operacion === 'INGRESAN' || operacion === 'EGRESAN') {
+    const sign = operacion === 'INGRESAN' ? 1 : -1
+    cc_pesos    = monedaNorm === 'PESOS'   ? sign * monto : 0
+    cc_dolares  = monedaNorm === 'DOLARES' ? sign * monto : 0
+    cc_euros    = monedaNorm === 'EUROS'   ? sign * monto : 0
+    cc_reales   = monedaNorm === 'REALES'  ? sign * monto : 0
+  }
 
   // Insert into Supabase
   const { error: insertError } = await supabase.from('diario').insert({
