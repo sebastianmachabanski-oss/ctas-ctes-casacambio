@@ -6,9 +6,34 @@ const XLSX = require('xlsx')
 
 export const maxDuration = 30
 
-const FILE_ID    = '1tuURACcfs09rRkynmVLqLD90Je5r-u58'
-const SHEET_NAME = 'CAJA'
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
+const EXCEL_FILE_ID = '1tuURACcfs09rRkynmVLqLD90Je5r-u58'             // .xlsx viejo (Drive)
+const SHEET_ID       = '1BxW5TGUbi12LHATOIjnkBc71GY9JZARsy5_LP5Sl1CE' // Google Sheet nuevo
+const SHEET_NAME     = 'CAJA'
+const DRIVE_SCOPE     = 'https://www.googleapis.com/auth/drive'
+const SHEETS_SCOPE    = 'https://www.googleapis.com/auth/spreadsheets'
+
+// Conmutable por env var, igual patrón que SYNC_SOURCE en sync-background.mts.
+// Mientras WRITE_SOURCE no sea 'sheets', se mantiene el camino histórico (Excel).
+const WRITE_SOURCE: 'excel' | 'sheets' = process.env.WRITE_SOURCE === 'sheets' ? 'sheets' : 'excel'
+
+interface NuevaTransaccion {
+  fecha: string
+  tipo: string
+  col_f: string
+  cuenta_cte: string
+  operacion: string
+  propio: string
+  externo: string
+  monto: number
+  cotizacion: number | null
+  costo_porcentaje: number | null
+  debe: string | null
+  notas: string | null
+  cc_pesos: number
+  cc_dolares: number
+  cc_euros: number
+  cc_reales: number
+}
 
 function mapMoneda(val: string): string {
   const m = val.trim().toUpperCase()
@@ -19,23 +44,11 @@ function mapMoneda(val: string): string {
   return m
 }
 
-async function appendRowToExcel(token: string, data: {
-  fecha: string
-  tipo: string
-  col_f: string
-  cuenta_cte: string
-  operacion: string
-  propio: string
-  externo: string
-  monto: number
-  cotizacion: number | null
-  notas: string | null
-  cc_pesos: number
-  cc_dolares: number
-  cc_euros: number
-  cc_reales: number
-}) {
-  const url = `https://www.googleapis.com/drive/v3/files/${FILE_ID}?alt=media`
+// ─────────────────────────────────────────────────────────────────────────
+// Fuente 'excel': baja/sube el .xlsx binario de Drive (comportamiento histórico).
+// ─────────────────────────────────────────────────────────────────────────
+async function appendRowToExcel(token: string, data: NuevaTransaccion) {
+  const url = `https://www.googleapis.com/drive/v3/files/${EXCEL_FILE_ID}?alt=media`
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
   if (!res.ok) throw new Error(`Error descargando archivo: ${res.status} ${await res.text()}`)
   const buffer = await res.arrayBuffer()
@@ -126,7 +139,7 @@ async function appendRowToExcel(token: string, data: {
   })
 
   const uploadRes = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files/${FILE_ID}?uploadType=media`,
+    `https://www.googleapis.com/upload/drive/v3/files/${EXCEL_FILE_ID}?uploadType=media`,
     {
       method: 'PATCH',
       headers: {
@@ -142,6 +155,183 @@ async function appendRowToExcel(token: string, data: {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Fuente 'sheets': escribe directo en el Google Sheet nativo con la Sheets API.
+//
+// La app solo carga las columnas de ENTRADA (FECHA, CLIENTE, OP, CAJA, OPERACIÓN,
+// PROPIO, EXTERNO, MONTO, COT, COSTO %, DEBE, NOTAS). Las columnas CALCULADAS
+// (CUENTA, PESOS, CHEQUES, DOLARES, EUROS, REALES, NRO) las genera la propia
+// planilla con fórmulas ya almacenadas: se copia la fórmula de la última fila
+// con datos hacia la fila nueva (igual que "arrastrar" la fórmula a mano),
+// Sheets ajusta las referencias relativas solas.
+// ─────────────────────────────────────────────────────────────────────────
+
+// Headers de entrada (los carga la app) y calculados (los genera la fórmula de la planilla).
+const CALC_HEADERS = ['CUENTA', 'PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'NRO']
+
+function colLetter(index0: number): string {
+  let n = index0 + 1
+  let s = ''
+  while (n > 0) {
+    const rem = (n - 1) % 26
+    s = String.fromCharCode(65 + rem) + s
+    n = Math.floor((n - 1) / 26)
+  }
+  return s
+}
+
+function toSheetDate(iso: string): string {
+  // 'YYYY-MM-DD' -> 'DD/MM/YYYY', el formato del resto de la columna FECHA.
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
+async function sheetsFetch(token: string, path: string, init?: RequestInit) {
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+  })
+  if (!res.ok) throw new Error(`Sheets API ${res.status}: ${await res.text()}`)
+  return res.json()
+}
+
+async function getSheetGid(token: string): Promise<number> {
+  const data = await sheetsFetch(token, '?fields=sheets.properties')
+  const sheet = (data.sheets ?? []).find((s: any) => s.properties?.title === SHEET_NAME)
+  if (!sheet) throw new Error(`Pestaña "${SHEET_NAME}" no encontrada`)
+  return sheet.properties.sheetId
+}
+
+// Localiza la fila de encabezados (busca 'FECHA') y devuelve los nombres de columna
+// normalizados, en el mismo orden en que aparecen en la planilla.
+async function getHeaderCells(token: string): Promise<string[]> {
+  const range = encodeURIComponent(`${SHEET_NAME}!A1:Z15`)
+  const data = await sheetsFetch(token, `/values/${range}`)
+  const rows: any[][] = data.values ?? []
+  for (const row of rows) {
+    const cells = (row ?? []).map((c: any) => String(c || '').trim().toUpperCase())
+    if (cells.includes('FECHA')) return cells
+  }
+  throw new Error('No se encontró la fila de encabezados (FECHA) en la planilla')
+}
+
+async function getLastDataRow(token: string, fechaCol: string): Promise<number> {
+  const range = encodeURIComponent(`${SHEET_NAME}!${fechaCol}:${fechaCol}`)
+  const data = await sheetsFetch(token, `/values/${range}`)
+  const values: any[][] = data.values ?? []
+  if (!values.length) throw new Error('No se encontraron filas con FECHA')
+  return values.length // El rango arranca en la fila 1, así que esto es el N° de fila 1-indexado.
+}
+
+async function isRowEmpty(token: string, row: number, fechaCol: string): Promise<boolean> {
+  const range = encodeURIComponent(`${SHEET_NAME}!${fechaCol}${row}`)
+  const data = await sheetsFetch(token, `/values/${range}`)
+  return !(data.values && data.values[0] && data.values[0][0])
+}
+
+async function copyFormulasDown(
+  token: string, sheetId: number, sourceRow: number, targetRow: number, startCol: number, endCol: number
+) {
+  await sheetsFetch(token, ':batchUpdate', {
+    method: 'POST',
+    body: JSON.stringify({
+      requests: [{
+        copyPaste: {
+          source: { sheetId, startRowIndex: sourceRow - 1, endRowIndex: sourceRow, startColumnIndex: startCol, endColumnIndex: endCol + 1 },
+          destination: { sheetId, startRowIndex: targetRow - 1, endRowIndex: targetRow, startColumnIndex: startCol, endColumnIndex: endCol + 1 },
+          pasteType: 'PASTE_FORMULA',
+        },
+      }],
+    }),
+  })
+}
+
+async function writeInputRow(token: string, targetRow: number, startCol: number, endCol: number, values: any[]) {
+  const range = `${SHEET_NAME}!${colLetter(startCol)}${targetRow}:${colLetter(endCol)}${targetRow}`
+  await sheetsFetch(token, `/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`, {
+    method: 'PUT',
+    body: JSON.stringify({ range, values: [values] }),
+  })
+}
+
+async function appendRowToSheet(token: string, data: NuevaTransaccion) {
+  const headers = await getHeaderCells(token)
+
+  // 'OPERACI' (sin acento al final) matchea tanto 'OPERACIÓN' como 'OPERACION'.
+  const find = (name: string) => headers.findIndex(h => h === name)
+  const findContains = (name: string) => headers.findIndex(h => h.includes(name))
+
+  const iFecha     = find('FECHA')
+  const iCliente   = find('CLIENTE')
+  const iOp        = find('OP')
+  const iCaja      = find('CAJA')
+  const iOperacion = findContains('OPERACI')
+  const iPropio    = find('PROPIO')
+  const iExterno   = find('EXTERNO')
+  const iMonto     = find('MONTO')
+  const iCot       = find('COT')
+  const iCostoPct  = findContains('COSTO')
+  const iDebe      = find('DEBE')
+  const iNotas     = find('NOTAS')
+
+  const required: Record<string, number> = {
+    FECHA: iFecha, CLIENTE: iCliente, OP: iOp, CAJA: iCaja, OPERACIÓN: iOperacion,
+    PROPIO: iPropio, EXTERNO: iExterno, MONTO: iMonto, COT: iCot,
+  }
+  for (const [name, idx] of Object.entries(required)) {
+    if (idx < 0) throw new Error(`No se encontró la columna "${name}" en la planilla`)
+  }
+
+  const inputIdx = [iFecha, iCliente, iOp, iCaja, iOperacion, iPropio, iExterno, iMonto, iCot, iCostoPct, iDebe, iNotas]
+    .filter(i => i >= 0)
+  const startCol = Math.min(...inputIdx)
+  const endCol = Math.max(...inputIdx)
+  const fechaColLetter = colLetter(iFecha)
+
+  // Ubica la primera fila libre después del último dato. Reintenta una vez por si dos
+  // escrituras chocan justo en el mismo instante (colisión rara, pero posible).
+  let targetRow = -1
+  for (let attempt = 0; attempt < 2 && targetRow < 0; attempt++) {
+    const lastRow = await getLastDataRow(token, fechaColLetter)
+    const candidate = lastRow + 1
+    if (await isRowEmpty(token, candidate, fechaColLetter)) targetRow = candidate
+  }
+  if (targetRow < 0) throw new Error('No se pudo encontrar una fila libre para escribir (reintentar)')
+
+  // Las columnas calculadas (CUENTA, PESOS, ...) se completan copiando la fórmula de la
+  // fila anterior — Sheets ajusta las referencias relativas a la fila nueva, como un
+  // "arrastrar hacia abajo" manual.
+  const calcIdx = CALC_HEADERS.map(h => headers.findIndex(c => c === h)).filter(i => i >= 0)
+  if (calcIdx.length) {
+    const gid = await getSheetGid(token)
+    await copyFormulasDown(token, gid, targetRow - 1, targetRow, Math.min(...calcIdx), Math.max(...calcIdx))
+  }
+
+  const row = new Array(endCol - startCol + 1).fill('')
+  const put = (idx: number, val: any) => { if (idx >= 0) row[idx - startCol] = val }
+  put(iFecha, toSheetDate(data.fecha))
+  put(iOp, data.col_f)
+  put(iOperacion, data.operacion)
+  if (data.tipo === 'CAJA') {
+    put(iCliente, data.cuenta_cte)
+    put(iCaja, 'CAJA')
+  } else {
+    put(iCliente, 'CTA CTE')
+    put(iCaja, data.cuenta_cte)
+  }
+  put(iPropio, data.propio)
+  put(iExterno, data.externo)
+  put(iMonto, data.monto)
+  put(iCot, data.cotizacion ?? '')
+  if (data.costo_porcentaje != null) put(iCostoPct, data.costo_porcentaje)
+  if (data.debe) put(iDebe, data.debe)
+  if (data.notas) put(iNotas, data.notas)
+
+  await writeInputRow(token, targetRow, startCol, endCol, row)
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -154,25 +344,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ excel: false, warning: 'Sin permisos' })
 
   const body = await request.json()
-  const { fecha, tipo, col_f, cuenta_cte, operacion, propio, externo, monto, cotizacion, notas } = body
+  const {
+    fecha, tipo, col_f, cuenta_cte, operacion, propio, externo, monto, cotizacion,
+    costo_porcentaje, debe, notas,
+  } = body
 
-  // Recalculate cc_* deltas
-  const sign = operacion === 'INGRESAN' ? 1 : -1
+  // Recalculate cc_* deltas (solo informativo para el camino Excel; el Sheet no las usa).
+  const sign = operacion === 'INGRESAN' ? 1 : operacion === 'EGRESAN' ? -1 : 0
   const monedaNorm = mapMoneda(propio)
-  const cc_pesos    = monedaNorm === 'PESOS'   ? sign * monto : 0
-  const cc_dolares  = monedaNorm === 'DOLARES' ? sign * monto : 0
-  const cc_euros    = monedaNorm === 'EUROS'   ? sign * monto : 0
-  const cc_reales   = monedaNorm === 'REALES'  ? sign * monto : 0
+  const cc_pesos    = sign && monedaNorm === 'PESOS'   ? sign * monto : 0
+  const cc_dolares  = sign && monedaNorm === 'DOLARES' ? sign * monto : 0
+  const cc_euros    = sign && monedaNorm === 'EUROS'   ? sign * monto : 0
+  const cc_reales   = sign && monedaNorm === 'REALES'  ? sign * monto : 0
+
+  const data: NuevaTransaccion = {
+    fecha, tipo, col_f, cuenta_cte, operacion, propio, externo,
+    monto: Number(monto),
+    cotizacion: cotizacion ? Number(cotizacion) : null,
+    costo_porcentaje: costo_porcentaje ? Number(costo_porcentaje) : null,
+    debe: debe || null,
+    notas: notas || null,
+    cc_pesos, cc_dolares, cc_euros, cc_reales,
+  }
 
   try {
-    const token = await getGoogleToken(DRIVE_SCOPE)
-    await appendRowToExcel(token, {
-      fecha, tipo, col_f, cuenta_cte, operacion, propio, externo,
-      monto: Number(monto),
-      cotizacion: cotizacion ? Number(cotizacion) : null,
-      notas: notas || null,
-      cc_pesos, cc_dolares, cc_euros, cc_reales,
-    })
+    if (WRITE_SOURCE === 'sheets') {
+      const token = await getGoogleToken(SHEETS_SCOPE)
+      await appendRowToSheet(token, data)
+    } else {
+      const token = await getGoogleToken(DRIVE_SCOPE)
+      await appendRowToExcel(token, data)
+    }
     return NextResponse.json({ excel: true })
   } catch (excelErr: any) {
     return NextResponse.json({ excel: false, warning: excelErr.message })
