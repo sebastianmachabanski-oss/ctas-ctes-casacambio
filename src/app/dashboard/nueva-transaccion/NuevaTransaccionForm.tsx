@@ -23,7 +23,7 @@ function Required() {
 export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState<'idle' | 'supabase' | 'excel' | 'done'>('idle')
+  const [step, setStep] = useState<'idle' | 'supabase' | 'done'>('idle')
   const [excelOk, setExcelOk] = useState<boolean | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -101,11 +101,12 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         return
       }
 
-      // Supabase insert succeeded — show intermediate screen
-      setStep('excel')
+      // Supabase ya quedó guardado: mostramos la confirmación de una. La escritura en la
+      // planilla sigue en segundo plano y actualiza su propio estado sin bloquear al usuario.
+      setStep('done')
       setLoading(false)
+      setExcelOk(null) // null = todavía sincronizando con la planilla
 
-      // Fire Excel write in background
       fetch('/api/excel-write', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,12 +116,10 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         .then((excelData: { excel: boolean; warning?: string }) => {
           setExcelOk(excelData.excel ?? false)
           setWarning(excelData.warning ?? null)
-          setStep('done')
         })
         .catch(() => {
           setExcelOk(false)
-          setWarning('Error de conexión al actualizar Excel')
-          setStep('done')
+          setWarning('Error de conexión al actualizar la planilla')
         })
     } catch {
       setError('Error de conexión. Verificá tu conexión e intentá de nuevo.')
@@ -137,31 +136,29 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     setForm(f => ({ ...f, monto: '', cotizacion: '', costo_porcentaje: '', debe: '', notas: '' }))
   }
 
-  // Intermediate: Supabase done, Excel in progress
-  if (step === 'excel') {
-    return (
-      <div className="card p-6 text-center space-y-4">
-        <div className="text-4xl">✅</div>
-        <p className="text-gray-800 font-semibold">Guardado en sistema</p>
-        <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-          <svg className="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          Actualizando Excel…
-        </div>
-      </div>
-    )
-  }
-
-  // Final: both done
+  // La transacción ya quedó guardada en el sistema (Supabase). La planilla se actualiza en
+  // segundo plano: este estado se refresca solo cuando esa escritura responde, sin bloquear.
   if (step === 'done') {
     return (
       <div className="card p-6 text-center space-y-4">
-        <div className="text-4xl">{excelOk ? '✅' : '⚠️'}</div>
+        <div className="text-4xl">{excelOk === false ? '⚠️' : '✅'}</div>
         <p className="text-gray-800 font-semibold">Transacción guardada</p>
-        <div className={`rounded-lg p-3 text-sm text-left ${excelOk ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
-          {excelOk ? '✓ Registrado en sistema y en Excel' : `Sistema ✓ · Excel ✗: ${warning}`}
+        <div className={`rounded-lg p-3 text-sm text-left ${
+          excelOk === false
+            ? 'bg-amber-50 border border-amber-200 text-amber-800'
+            : 'bg-green-50 border border-green-200 text-green-800'
+        }`}>
+          {excelOk === true && '✓ Registrado en sistema y en la planilla'}
+          {excelOk === false && `Sistema ✓ · Planilla ✗: ${warning}`}
+          {excelOk === null && (
+            <span className="flex items-center gap-2">
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              ✓ Registrado en sistema · sincronizando con la planilla…
+            </span>
+          )}
         </div>
         <div className="flex gap-3 justify-center pt-2">
           <button className="btn-secondary" onClick={resetForm}>

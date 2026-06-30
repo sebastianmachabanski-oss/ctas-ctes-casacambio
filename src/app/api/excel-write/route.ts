@@ -158,16 +158,15 @@ async function appendRowToExcel(token: string, data: NuevaTransaccion) {
 // ─────────────────────────────────────────────────────────────────────────
 // Fuente 'sheets': escribe directo en el Google Sheet nativo con la Sheets API.
 //
-// La app solo carga las columnas de ENTRADA (FECHA, CLIENTE, OP, CAJA, OPERACIÓN,
-// PROPIO, EXTERNO, MONTO, COT, COSTO %, DEBE, NOTAS). Las columnas CALCULADAS
-// (CUENTA, PESOS, CHEQUES, DOLARES, EUROS, REALES, NRO) las genera la propia
-// planilla con fórmulas ya almacenadas: se copia la fórmula de la última fila
-// con datos hacia la fila nueva (igual que "arrastrar" la fórmula a mano),
-// Sheets ajusta las referencias relativas solas.
+// La planilla mantiene filas pre-armadas (con las fórmulas de CUENTA, PESOS,
+// CHEQUES, DOLARES, EUROS, REALES, NRO ya puestas) esperando datos: se
+// identifican porque la columna OPERACIÓN todavía tiene el texto literal
+// "OPERACION?" (el valor por defecto de la validación de datos de esa
+// columna). La app busca la PRIMERA fila en orden con ese marcador y
+// escribe ahí encima solo las columnas de ENTRADA (FECHA, CLIENTE, OP, CAJA,
+// OPERACIÓN, PROPIO, EXTERNO, MONTO, COT, COSTO %, DEBE, NOTAS) — las
+// fórmulas ya presentes en esa fila calculan solas al completarse.
 // ─────────────────────────────────────────────────────────────────────────
-
-// Headers de entrada (los carga la app) y calculados (los genera la fórmula de la planilla).
-const CALC_HEADERS = ['CUENTA', 'PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'NRO']
 
 function colLetter(index0: number): string {
   let n = index0 + 1
@@ -195,13 +194,6 @@ async function sheetsFetch(token: string, path: string, init?: RequestInit) {
   return res.json()
 }
 
-async function getSheetGid(token: string): Promise<number> {
-  const data = await sheetsFetch(token, '?fields=sheets.properties')
-  const sheet = (data.sheets ?? []).find((s: any) => s.properties?.title === SHEET_NAME)
-  if (!sheet) throw new Error(`Pestaña "${SHEET_NAME}" no encontrada`)
-  return sheet.properties.sheetId
-}
-
 // Localiza la fila de encabezados (busca 'FECHA') y devuelve los nombres de columna
 // normalizados, en el mismo orden en que aparecen en la planilla.
 async function getHeaderCells(token: string): Promise<string[]> {
@@ -215,35 +207,15 @@ async function getHeaderCells(token: string): Promise<string[]> {
   throw new Error('No se encontró la fila de encabezados (FECHA) en la planilla')
 }
 
-async function getLastDataRow(token: string, fechaCol: string): Promise<number> {
-  const range = encodeURIComponent(`${SHEET_NAME}!${fechaCol}:${fechaCol}`)
+// Primera fila (en orden) cuya columna OPERACIÓN todavía dice "OPERACION?": es una fila
+// pre-armada con fórmulas, lista para recibir datos. Lee solo esa columna (liviano).
+async function findFilaLibre(token: string, operacionCol: string): Promise<number> {
+  const range = encodeURIComponent(`${SHEET_NAME}!${operacionCol}:${operacionCol}`)
   const data = await sheetsFetch(token, `/values/${range}`)
   const values: any[][] = data.values ?? []
-  if (!values.length) throw new Error('No se encontraron filas con FECHA')
-  return values.length // El rango arranca en la fila 1, así que esto es el N° de fila 1-indexado.
-}
-
-async function isRowEmpty(token: string, row: number, fechaCol: string): Promise<boolean> {
-  const range = encodeURIComponent(`${SHEET_NAME}!${fechaCol}${row}`)
-  const data = await sheetsFetch(token, `/values/${range}`)
-  return !(data.values && data.values[0] && data.values[0][0])
-}
-
-async function copyFormulasDown(
-  token: string, sheetId: number, sourceRow: number, targetRow: number, startCol: number, endCol: number
-) {
-  await sheetsFetch(token, ':batchUpdate', {
-    method: 'POST',
-    body: JSON.stringify({
-      requests: [{
-        copyPaste: {
-          source: { sheetId, startRowIndex: sourceRow - 1, endRowIndex: sourceRow, startColumnIndex: startCol, endColumnIndex: endCol + 1 },
-          destination: { sheetId, startRowIndex: targetRow - 1, endRowIndex: targetRow, startColumnIndex: startCol, endColumnIndex: endCol + 1 },
-          pasteType: 'PASTE_FORMULA',
-        },
-      }],
-    }),
-  })
+  const idx = values.findIndex(row => String(row?.[0] ?? '').trim().toUpperCase() === 'OPERACION?')
+  if (idx < 0) throw new Error('No hay filas disponibles en la planilla (ninguna celda OPERACIÓN = "OPERACION?")')
+  return idx + 1 // El rango arranca en la fila 1, así que esto ya es el N° de fila 1-indexado.
 }
 
 async function writeInputRow(token: string, targetRow: number, startCol: number, endCol: number, values: any[]) {
@@ -286,26 +258,9 @@ async function appendRowToSheet(token: string, data: NuevaTransaccion) {
     .filter(i => i >= 0)
   const startCol = Math.min(...inputIdx)
   const endCol = Math.max(...inputIdx)
-  const fechaColLetter = colLetter(iFecha)
+  const operacionColLetter = colLetter(iOperacion)
 
-  // Ubica la primera fila libre después del último dato. Reintenta una vez por si dos
-  // escrituras chocan justo en el mismo instante (colisión rara, pero posible).
-  let targetRow = -1
-  for (let attempt = 0; attempt < 2 && targetRow < 0; attempt++) {
-    const lastRow = await getLastDataRow(token, fechaColLetter)
-    const candidate = lastRow + 1
-    if (await isRowEmpty(token, candidate, fechaColLetter)) targetRow = candidate
-  }
-  if (targetRow < 0) throw new Error('No se pudo encontrar una fila libre para escribir (reintentar)')
-
-  // Las columnas calculadas (CUENTA, PESOS, ...) se completan copiando la fórmula de la
-  // fila anterior — Sheets ajusta las referencias relativas a la fila nueva, como un
-  // "arrastrar hacia abajo" manual.
-  const calcIdx = CALC_HEADERS.map(h => headers.findIndex(c => c === h)).filter(i => i >= 0)
-  if (calcIdx.length) {
-    const gid = await getSheetGid(token)
-    await copyFormulasDown(token, gid, targetRow - 1, targetRow, Math.min(...calcIdx), Math.max(...calcIdx))
-  }
+  const targetRow = await findFilaLibre(token, operacionColLetter)
 
   const row = new Array(endCol - startCol + 1).fill('')
   const put = (idx: number, val: any) => { if (idx >= 0) row[idx - startCol] = val }
