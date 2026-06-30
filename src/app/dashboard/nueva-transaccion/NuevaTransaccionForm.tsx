@@ -3,8 +3,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 const MONEDAS = ['PESOS', 'DOLARES', 'EUROS', 'REALES']
-const TIPOS = ['CTA CTE', 'CAJA', 'COMPRA', 'VENTA', 'GASTOS']
-const OPERACIONES = ['INGRESAN', 'EGRESAN']
+const TIPOS = ['CTA CTE', 'CAJA']
+// La Operación disponible depende del Tipo de transacción elegido.
+const OPERACIONES_POR_TIPO: Record<string, string[]> = {
+  'CTA CTE': ['INGRESAN', 'EGRESAN'],
+  'CAJA': ['COMPRA', 'VENTA', 'INGRESAN', 'EGRESAN', 'GASTOS'],
+}
+// Cotización obligatoria solo para operaciones de compra/venta de moneda.
+const OPERACIONES_REQUIEREN_COTIZACION = ['COMPRA', 'VENTA']
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -32,11 +38,22 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     externo: 'DOLARES',
     monto: '',
     cotizacion: '',
+    costo_porcentaje: '',
+    debe: '',
     notas: '',
   })
 
+  const operacionesDisponibles = OPERACIONES_POR_TIPO[form.tipo] ?? []
+  const cotizacionRequerida = OPERACIONES_REQUIEREN_COTIZACION.includes(form.operacion)
+
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
+  }
+
+  function setTipo(tipo: string) {
+    // Al cambiar el Tipo, la Operación puede dejar de ser válida: la reseteamos a la primera opción.
+    const opciones = OPERACIONES_POR_TIPO[tipo] ?? []
+    setForm(f => ({ ...f, tipo, operacion: opciones[0] ?? '' }))
   }
 
   function validate(): string | null {
@@ -49,6 +66,8 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     if (!form.externo)     return 'El campo Externo es obligatorio'
     if (!form.monto || isNaN(Number(form.monto)) || Number(form.monto) <= 0)
       return 'El monto debe ser un número mayor a 0'
+    if (cotizacionRequerida && (!form.cotizacion || isNaN(Number(form.cotizacion)) || Number(form.cotizacion) <= 0))
+      return 'La cotización es obligatoria para operaciones de Compra/Venta'
     return null
   }
 
@@ -63,6 +82,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
       ...form,
       monto: Number(form.monto),
       cotizacion: form.cotizacion ? Number(form.cotizacion) : null,
+      costo_porcentaje: form.costo_porcentaje ? Number(form.costo_porcentaje) : null,
     }
 
     setStep('supabase')
@@ -114,7 +134,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     setExcelOk(null)
     setWarning(null)
     setError(null)
-    setForm(f => ({ ...f, monto: '', cotizacion: '', notas: '' }))
+    setForm(f => ({ ...f, monto: '', cotizacion: '', costo_porcentaje: '', debe: '', notas: '' }))
   }
 
   // Intermediate: Supabase done, Excel in progress
@@ -167,7 +187,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div className="col-span-2 md:col-span-1">
           <label className="label">Tipo de transacción<Required /></label>
-          <select className="input" value={form.tipo} onChange={e => set('tipo', e.target.value)}>
+          <select className="input" value={form.tipo} onChange={e => setTipo(e.target.value)}>
             {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
@@ -207,7 +227,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         <div>
           <label className="label">Operación<Required /></label>
           <select className="input" value={form.operacion} onChange={e => set('operacion', e.target.value)}>
-            {OPERACIONES.map(op => <option key={op} value={op}>{op}</option>)}
+            {operacionesDisponibles.map(op => <option key={op} value={op}>{op}</option>)}
           </select>
         </div>
       </div>
@@ -240,7 +260,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
           />
         </div>
         <div>
-          <label className="label">Cotización</label>
+          <label className="label">Cotización{cotizacionRequerida && <Required />}</label>
           <input
             type="number"
             step="0.0001"
@@ -253,7 +273,31 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         </div>
       </div>
 
-      {/* Fila 4: Notas */}
+      {/* Fila 4: Costo % + Debe */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="label">Costo %</label>
+          <input
+            type="number"
+            step="0.01"
+            className="input"
+            value={form.costo_porcentaje}
+            onChange={e => set('costo_porcentaje', e.target.value)}
+            placeholder="0.00"
+          />
+        </div>
+        <div>
+          <label className="label">Debe</label>
+          <input
+            type="text"
+            className="input"
+            value={form.debe}
+            onChange={e => set('debe', e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Fila 5: Notas */}
       <div>
         <label className="label">Notas</label>
         <input
