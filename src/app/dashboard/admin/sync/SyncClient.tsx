@@ -28,7 +28,7 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
     const before = data.before
     const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
     const start = Date.now()
-    // El archivo tiene ~33k filas; la descarga + parseo puede tardar 3-5 min.
+    // Leyendo del Google Sheet el sync tarda pocos segundos; el margen es por las dudas.
     while (Date.now() - start < 360000) {
       await sleep(3000)
       try {
@@ -115,7 +115,7 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
                 </svg>
-                Sincronizando (puede tardar 3-5 min)...
+                Sincronizando...
               </span>
             ) : '🔄 Sincronizar ahora'}
           </button>
