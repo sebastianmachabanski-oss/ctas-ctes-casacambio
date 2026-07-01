@@ -409,12 +409,12 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
       </div>
 
       <div className="flex items-center gap-4 pt-1">
-        <button type="submit" className="btn-primary flex-1" disabled={loading}>
-          {loading ? 'Guardando…' : 'Guardar transacción'}
+        <button type="submit" className="btn-primary flex-1" disabled>
+          Guardar transacción
         </button>
         <p className="text-xs text-gray-400 shrink-0"><Required /> Obligatorio</p>
       </div>
-      <p className="text-sm text-amber-600 text-center">⚠️ Rama de prueba — usar solo con datos de prueba</p>
+      <p className="text-sm text-red-500 text-center">Funcionalidad en desarrollo</p>
     </form>
   )
 }
