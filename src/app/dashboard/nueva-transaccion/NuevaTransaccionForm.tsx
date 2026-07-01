@@ -13,7 +13,20 @@ const OPERACIONES_POR_TIPO: Record<string, string[]> = {
 const OPERACIONES_REQUIEREN_COTIZACION = ['COMPRA', 'VENTA']
 
 function today() {
-  return new Date().toISOString().slice(0, 10)
+  // OJO: toISOString() da la fecha en UTC, no en horario local — de noche en Argentina
+  // (UTC-3) ya es "mañana" en UTC y proponía el día siguiente. Se arma con componentes
+  // locales para que siempre sea el día de hoy en el huso horario del usuario.
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function formatoDDMMYYYY(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ''
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
 }
 
 function Required() {
@@ -255,6 +268,11 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
             onChange={e => set('fecha', e.target.value)}
             required
           />
+          {/* El formato visual del selector nativo lo define el navegador; esta línea
+              confirma la fecha elegida siempre en DD/MM/AAAA, sin depender de eso. */}
+          {form.fecha && (
+            <p className="text-xs text-gray-400 mt-1">{formatoDDMMYYYY(form.fecha)}</p>
+          )}
         </div>
         <div>
           <label className="label">Op<Required /></label>
