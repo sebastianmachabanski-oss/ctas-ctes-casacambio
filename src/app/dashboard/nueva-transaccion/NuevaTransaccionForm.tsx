@@ -13,17 +13,30 @@ const OPERACIONES_POR_TIPO: Record<string, string[]> = {
 const OPERACIONES_REQUIEREN_COTIZACION = ['COMPRA', 'VENTA']
 
 function today() {
-  return new Date().toISOString().slice(0, 10)
+  // OJO: toISOString() da la fecha en UTC, no en horario local — de noche en Argentina
+  // (UTC-3) ya es "mañana" en UTC y proponía el día siguiente. Se arma con componentes
+  // locales para que siempre sea el día de hoy en el huso horario del usuario.
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function formatoDDMMYYYY(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return ''
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
 }
 
 function Required() {
   return <span className="text-red-500 ml-0.5">*</span>
 }
 
-export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] }) {
+export default function NuevaTransaccionForm({ clientes }: { clientes: string[] }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState<'idle' | 'supabase' | 'excel' | 'done'>('idle')
+  const [step, setStep] = useState<'idle' | 'supabase' | 'done'>('idle')
   const [excelOk, setExcelOk] = useState<boolean | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -32,7 +45,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     fecha: today(),
     tipo: 'CTA CTE',
     col_f: 'C',
-    cuenta_cte: cuentas[0] ?? '',
+    cuenta_cte: '',
     operacion: 'INGRESAN',
     propio: 'DOLARES',
     externo: 'DOLARES',
@@ -42,6 +55,64 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     debe: '',
     notas: '',
   })
+
+  // Buscador del selector de Cliente: texto tipeado + visibilidad del desplegable.
+  // clientesLocal arranca con la lista del server y crece en memoria cuando se da de alta
+  // un cliente nuevo, para que sea buscable en la misma sesión sin esperar al próximo sync.
+  const [clientesLocal, setClientesLocal] = useState(clientes)
+  const [clienteQuery, setClienteQuery] = useState('')
+  const [clienteOpen, setClienteOpen] = useState(false)
+  const [clienteGuardando, setClienteGuardando] = useState(false)
+  const clientesFiltrados = clientesLocal
+    .filter(c => c.toUpperCase().includes(clienteQuery.trim().toUpperCase()))
+    .sort((a, b) => a.localeCompare(b, 'es'))
+
+  function elegirCliente(nombre: string) {
+    set('cuenta_cte', nombre)
+    setClienteQuery(nombre)
+    setClienteOpen(false)
+  }
+
+  // Enter en el buscador de Cliente: si matchea exacto a uno existente, lo selecciona. Si
+  // no existe ningún cliente con ese nombre, pregunta si darlo de alta como cliente nuevo.
+  async function handleClienteKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return
+    e.preventDefault() // no disparar el submit del formulario
+    const query = clienteQuery.trim()
+    if (!query || clienteGuardando) return
+
+    const existente = clientesLocal.find(c => c.toUpperCase() === query.toUpperCase())
+    if (existente) { elegirCliente(existente); return }
+
+    setClienteOpen(false)
+    const confirmado = confirm(`"${query}" no está en la lista de clientes. ¿Querés agregarlo como cliente nuevo?`)
+    if (!confirmado) {
+      // Puede haber sido un error de tipeo: vacía el campo para que elija uno correcto.
+      setClienteQuery('')
+      set('cuenta_cte', '')
+      return
+    }
+
+    setClienteGuardando(true)
+    try {
+      const res = await fetch('/api/clientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: query }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert('No se pudo agregar el cliente: ' + (data.error ?? 'error desconocido'))
+        return
+      }
+      setClientesLocal(prev => [...prev, data.nombre])
+      elegirCliente(data.nombre)
+    } catch {
+      alert('Error de conexión al agregar el cliente')
+    } finally {
+      setClienteGuardando(false)
+    }
+  }
 
   const operacionesDisponibles = OPERACIONES_POR_TIPO[form.tipo] ?? []
   const cotizacionRequerida = OPERACIONES_REQUIEREN_COTIZACION.includes(form.operacion)
@@ -60,7 +131,7 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     if (!form.fecha)       return 'La fecha es obligatoria'
     if (!form.tipo)        return 'El tipo de transacción es obligatorio'
     if (!form.col_f)       return 'Op es obligatorio'
-    if (!form.cuenta_cte)  return 'Seleccioná una cuenta corriente'
+    if (!form.cuenta_cte)  return 'Seleccioná un cliente de la lista'
     if (!form.operacion)   return 'La operación es obligatoria'
     if (!form.propio)      return 'El campo Propio es obligatorio'
     if (!form.externo)     return 'El campo Externo es obligatorio'
@@ -101,11 +172,12 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         return
       }
 
-      // Supabase insert succeeded — show intermediate screen
-      setStep('excel')
+      // Supabase ya quedó guardado: mostramos la confirmación de una. La escritura en la
+      // planilla sigue en segundo plano y actualiza su propio estado sin bloquear al usuario.
+      setStep('done')
       setLoading(false)
+      setExcelOk(null) // null = todavía sincronizando con la planilla
 
-      // Fire Excel write in background
       fetch('/api/excel-write', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,12 +187,10 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         .then((excelData: { excel: boolean; warning?: string }) => {
           setExcelOk(excelData.excel ?? false)
           setWarning(excelData.warning ?? null)
-          setStep('done')
         })
         .catch(() => {
           setExcelOk(false)
-          setWarning('Error de conexión al actualizar Excel')
-          setStep('done')
+          setWarning('Error de conexión al actualizar la planilla')
         })
     } catch {
       setError('Error de conexión. Verificá tu conexión e intentá de nuevo.')
@@ -137,31 +207,29 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     setForm(f => ({ ...f, monto: '', cotizacion: '', costo_porcentaje: '', debe: '', notas: '' }))
   }
 
-  // Intermediate: Supabase done, Excel in progress
-  if (step === 'excel') {
-    return (
-      <div className="card p-6 text-center space-y-4">
-        <div className="text-4xl">✅</div>
-        <p className="text-gray-800 font-semibold">Guardado en sistema</p>
-        <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-          <svg className="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-          </svg>
-          Actualizando Excel…
-        </div>
-      </div>
-    )
-  }
-
-  // Final: both done
+  // La transacción ya quedó guardada en el sistema (Supabase). La planilla se actualiza en
+  // segundo plano: este estado se refresca solo cuando esa escritura responde, sin bloquear.
   if (step === 'done') {
     return (
       <div className="card p-6 text-center space-y-4">
-        <div className="text-4xl">{excelOk ? '✅' : '⚠️'}</div>
+        <div className="text-4xl">{excelOk === false ? '⚠️' : '✅'}</div>
         <p className="text-gray-800 font-semibold">Transacción guardada</p>
-        <div className={`rounded-lg p-3 text-sm text-left ${excelOk ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
-          {excelOk ? '✓ Registrado en sistema y en Excel' : `Sistema ✓ · Excel ✗: ${warning}`}
+        <div className={`rounded-lg p-3 text-sm text-left ${
+          excelOk === false
+            ? 'bg-amber-50 border border-amber-200 text-amber-800'
+            : 'bg-green-50 border border-green-200 text-green-800'
+        }`}>
+          {excelOk === true && '✓ Registrado en sistema y en la planilla'}
+          {excelOk === false && `Sistema ✓ · Planilla ✗: ${warning}`}
+          {excelOk === null && (
+            <span className="flex items-center gap-2">
+              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              ✓ Registrado en sistema · sincronizando con la planilla…
+            </span>
+          )}
         </div>
         <div className="flex gap-3 justify-center pt-2">
           <button className="btn-secondary" onClick={resetForm}>
@@ -200,6 +268,11 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
             onChange={e => set('fecha', e.target.value)}
             required
           />
+          {/* El formato visual del selector nativo lo define el navegador; esta línea
+              confirma la fecha elegida siempre en DD/MM/AAAA, sin depender de eso. */}
+          {form.fecha && (
+            <p className="text-xs text-gray-400 mt-1">{formatoDDMMYYYY(form.fecha)}</p>
+          )}
         </div>
         <div>
           <label className="label">Op<Required /></label>
@@ -212,17 +285,43 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
 
       {/* Fila 2: Cuenta + Operación */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="label">Cuenta corriente<Required /></label>
-          <select
+        <div className="relative">
+          <label className="label">Cliente<Required /></label>
+          <input
+            type="text"
             className="input"
-            value={form.cuenta_cte}
-            onChange={e => set('cuenta_cte', e.target.value)}
+            value={clienteQuery}
+            onChange={e => {
+              setClienteQuery(e.target.value)
+              set('cuenta_cte', '') // obliga a elegir un cliente real de la lista
+              setClienteOpen(true)
+            }}
+            onFocus={() => setClienteOpen(true)}
+            onBlur={() => setTimeout(() => setClienteOpen(false), 150)}
+            onKeyDown={handleClienteKeyDown}
+            placeholder="Buscar cliente… (Enter para agregar uno nuevo)"
+            autoComplete="off"
+            disabled={clienteGuardando}
             required
-          >
-            <option value="">— Seleccioná —</option>
-            {cuentas.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          />
+          {clienteOpen && (
+            <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+              {clientesFiltrados.length > 0 ? clientesFiltrados.map(c => (
+                <li key={c}>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => elegirCliente(c)}
+                  >
+                    {c}
+                  </button>
+                </li>
+              )) : (
+                <li className="px-3 py-2 text-sm text-gray-400">Sin resultados — Enter para agregarlo como cliente nuevo</li>
+              )}
+            </ul>
+          )}
         </div>
         <div>
           <label className="label">Operación<Required /></label>

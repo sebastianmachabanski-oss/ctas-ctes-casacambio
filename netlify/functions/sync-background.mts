@@ -168,18 +168,44 @@ async function readFromSheets(token: string): Promise<any[][]> {
   return (data.values ?? []) as any[][]
 }
 
-function parseMovimientos(rows: any[][]): any[] {
-  let headerIdx = -1
-  let headers: string[] = []
+function findHeaderRow(rows: any[][]): { headerIdx: number; headers: string[] } {
   for (let i = 0; i < Math.min(10, rows.length); i++) {
     if (rows[i]?.some((c: any) => String(c || '').toUpperCase().includes('FECHA'))) {
-      headerIdx = i
-      headers = rows[i].map((c: any) => String(c || '').trim().toUpperCase())
-      break
+      return { headerIdx: i, headers: rows[i].map((c: any) => String(c || '').trim().toUpperCase()) }
     }
   }
-  if (headerIdx < 0) throw new Error('No se encontraron encabezados')
+  throw new Error('No se encontraron encabezados')
+}
 
+// Valores que aparecen en CLIENTE/CAJA pero NO son nombres de cliente reales: son los
+// marcadores de tipo de la otra columna, o la fila libre sin completar.
+const NO_ES_CLIENTE = new Set(['CTA CTE', 'CAJA', 'OPERACION?', ''])
+
+// Unión de los nombres reales de cliente, vengan de la columna CLIENTE (cuando el
+// movimiento es de CAJA, ahí queda el nombre real) o de la columna CAJA (cuando el
+// movimiento es de CTA CTE, ahí queda el nombre real) — sin importar el tipo de
+// movimiento, a diferencia de parseMovimientos que solo mira filas CTA CTE.
+function parseClientes(rows: any[][]): string[] {
+  const { headerIdx, headers } = findHeaderRow(rows)
+  const col = (name: string) => headers.findIndex(h => h.includes(name))
+  const iCliente = col('CLIENTE')
+  const iCaja    = col('CAJA')
+
+  const nombres = new Set<string>()
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row) continue
+    for (const idx of [iCliente, iCaja]) {
+      if (idx < 0) continue
+      const val = String(row[idx] ?? '').trim()
+      if (val && !NO_ES_CLIENTE.has(val.toUpperCase())) nombres.add(val)
+    }
+  }
+  return Array.from(nombres)
+}
+
+function parseMovimientos(rows: any[][]): any[] {
+  const { headerIdx, headers } = findHeaderRow(rows)
   const col = (name: string) => headers.findIndex(h => h.includes(name))
   const iDate    = col('FECHA')
   const iCliente = col('CLIENTE')
@@ -244,6 +270,18 @@ async function upsertCuentas(supabase: any, movimientos: any[]) {
   return cuentas.length
 }
 
+// Tolerante: si la tabla `clientes` todavía no existe (falta correr la migración), no
+// rompe el sync — solo se pierde la actualización del selector de Nueva Transacción.
+async function upsertClientes(supabase: any, nombres: string[]): Promise<number> {
+  if (!nombres.length) return 0
+  try {
+    const { error } = await supabase.from('clientes')
+      .upsert(nombres.map(nombre => ({ nombre, activo: true })), { onConflict: 'nombre', ignoreDuplicates: true })
+    if (error) { console.error('⚠️  No se pudo actualizar clientes:', error.message); return 0 }
+    return nombres.length
+  } catch { return 0 }
+}
+
 // Lectura/escritura tolerante del estado de sync. Si la tabla sync_state no existe
 // todavía, simplemente no se aplica la optimización de modifiedTime (no rompe nada).
 async function getSyncState(supabase: any, key: string): Promise<string | null> {
@@ -301,6 +339,9 @@ export default async function handler(req: Request) {
     const rows = await readSheetRows(token)
     if (rows.length < 2) throw new Error('El sheet está vacío')
     const todos = parseMovimientos(rows)
+    // Lista de clientes para el selector de Nueva Transacción: se recalcula siempre sobre
+    // el sheet completo (no depende de la ventana del incremental ni del filtro CTA CTE).
+    const nClientes = await upsertClientes(supabase, parseClientes(rows))
 
     if (mode === 'full') {
       if (!todos.length) throw new Error('Sin movimientos CTA CTE')
@@ -309,7 +350,7 @@ export default async function handler(req: Request) {
       await insertEnParalelo(supabase, todos)
       const nCuentas = await upsertCuentas(supabase, todos)
       if (modifiedTime) await setSyncState(supabase, 'caja_modified_time', modifiedTime)
-      console.log(`✅ Full OK: ${todos.length} movimientos, ${nCuentas} cuentas`)
+      console.log(`✅ Full OK: ${todos.length} movimientos, ${nCuentas} cuentas, ${nClientes} clientes`)
       await recordRun({ ok: true, mode, procesados: todos.length })
       return new Response('ok-full', { status: 200 })
     }
@@ -326,7 +367,7 @@ export default async function handler(req: Request) {
     await insertEnParalelo(supabase, ventana)
     const nCuentas = await upsertCuentas(supabase, ventana)
     if (modifiedTime) await setSyncState(supabase, 'caja_modified_time', modifiedTime)
-    console.log(`✅ Incremental OK (desde ${windowStart}): ${ventana.length} movimientos, ${nCuentas} cuentas`)
+    console.log(`✅ Incremental OK (desde ${windowStart}): ${ventana.length} movimientos, ${nCuentas} cuentas, ${nClientes} clientes`)
     await recordRun({ ok: true, mode, procesados: ventana.length })
     return new Response('ok-incremental', { status: 200 })
 

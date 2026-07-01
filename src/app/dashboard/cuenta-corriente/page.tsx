@@ -4,6 +4,13 @@ import FiltrosMovimientos from '@/components/cuenta-corriente/FiltrosMovimientos
 import TablaMovimientos from '@/components/cuenta-corriente/TablaMovimientos'
 import TarjetasSaldos from '@/components/cuenta-corriente/TarjetasSaldos'
 
+// El servidor (Netlify) corre en UTC sin importar el huso del usuario: usar la fecha
+// local del proceso daría el día siguiente durante la noche en Argentina. Se fija
+// explícitamente el huso de Argentina para que "hoy" sea siempre el correcto.
+function hoyArgentina(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date())
+}
+
 export default async function CuentaCorrientePage({
   searchParams,
 }: {
@@ -57,7 +64,7 @@ export default async function CuentaCorrientePage({
 
   // Siempre mostrar movimientos (con o sin fechas)
   let desdeQuery = desde || undefined
-  let hastaQuery = hasta || new Date().toISOString().slice(0, 10)
+  let hastaQuery = hasta || hoyArgentina()
 
   // Si no hay fecha desde, buscar la más antigua
   if (!desdeQuery) {
