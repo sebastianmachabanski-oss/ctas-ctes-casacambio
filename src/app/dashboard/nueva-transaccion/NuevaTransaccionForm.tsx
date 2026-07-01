@@ -44,9 +44,13 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
   })
 
   // Buscador del selector de Cliente: texto tipeado + visibilidad del desplegable.
+  // clientesLocal arranca con la lista del server y crece en memoria cuando se da de alta
+  // un cliente nuevo, para que sea buscable en la misma sesión sin esperar al próximo sync.
+  const [clientesLocal, setClientesLocal] = useState(clientes)
   const [clienteQuery, setClienteQuery] = useState('')
   const [clienteOpen, setClienteOpen] = useState(false)
-  const clientesFiltrados = clientes
+  const [clienteGuardando, setClienteGuardando] = useState(false)
+  const clientesFiltrados = clientesLocal
     .filter(c => c.toUpperCase().includes(clienteQuery.trim().toUpperCase()))
     .sort((a, b) => a.localeCompare(b, 'es'))
 
@@ -54,6 +58,47 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
     set('cuenta_cte', nombre)
     setClienteQuery(nombre)
     setClienteOpen(false)
+  }
+
+  // Enter en el buscador de Cliente: si matchea exacto a uno existente, lo selecciona. Si
+  // no existe ningún cliente con ese nombre, pregunta si darlo de alta como cliente nuevo.
+  async function handleClienteKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return
+    e.preventDefault() // no disparar el submit del formulario
+    const query = clienteQuery.trim()
+    if (!query || clienteGuardando) return
+
+    const existente = clientesLocal.find(c => c.toUpperCase() === query.toUpperCase())
+    if (existente) { elegirCliente(existente); return }
+
+    setClienteOpen(false)
+    const confirmado = confirm(`"${query}" no está en la lista de clientes. ¿Querés agregarlo como cliente nuevo?`)
+    if (!confirmado) {
+      // Puede haber sido un error de tipeo: vacía el campo para que elija uno correcto.
+      setClienteQuery('')
+      set('cuenta_cte', '')
+      return
+    }
+
+    setClienteGuardando(true)
+    try {
+      const res = await fetch('/api/clientes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: query }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert('No se pudo agregar el cliente: ' + (data.error ?? 'error desconocido'))
+        return
+      }
+      setClientesLocal(prev => [...prev, data.nombre])
+      elegirCliente(data.nombre)
+    } catch {
+      alert('Error de conexión al agregar el cliente')
+    } finally {
+      setClienteGuardando(false)
+    }
   }
 
   const operacionesDisponibles = OPERACIONES_POR_TIPO[form.tipo] ?? []
@@ -235,8 +280,10 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
             }}
             onFocus={() => setClienteOpen(true)}
             onBlur={() => setTimeout(() => setClienteOpen(false), 150)}
-            placeholder="Buscar cliente…"
+            onKeyDown={handleClienteKeyDown}
+            placeholder="Buscar cliente… (Enter para agregar uno nuevo)"
             autoComplete="off"
+            disabled={clienteGuardando}
             required
           />
           {clienteOpen && (
@@ -253,7 +300,7 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
                   </button>
                 </li>
               )) : (
-                <li className="px-3 py-2 text-sm text-gray-400">Sin resultados</li>
+                <li className="px-3 py-2 text-sm text-gray-400">Sin resultados — Enter para agregarlo como cliente nuevo</li>
               )}
             </ul>
           )}
