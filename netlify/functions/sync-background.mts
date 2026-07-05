@@ -168,6 +168,21 @@ async function readFromSheets(token: string): Promise<any[][]> {
   return (data.values ?? []) as any[][]
 }
 
+// Igual que readFromSheets pero con UNFORMATTED_VALUE: números crudos (sin el redondeo
+// del formato de celda) y fechas como serial. La usa el espejo de CAJA para que las sumas
+// coincidan EXACTO con la aritmética interna de la planilla — leyendo valores formateados
+// se acumula deriva de redondeo (medida en la reconciliación de julio 2026: ~7 dólares en
+// 34.000 filas). parseFecha ya interpreta seriales y parseMonto números.
+async function readFromSheetsUnformatted(token: string): Promise<any[][]> {
+  const range = encodeURIComponent(SHEET_NAME)
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}` +
+              `?valueRenderOption=UNFORMATTED_VALUE&majorDimension=ROWS`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) throw new Error(`Error leyendo Google Sheet (raw): ${res.status} ${await res.text()}`)
+  const data = await res.json()
+  return (data.values ?? []) as any[][]
+}
+
 function findHeaderRow(rows: any[][]): { headerIdx: number; headers: string[] } {
   for (let i = 0; i < Math.min(10, rows.length); i++) {
     if (rows[i]?.some((c: any) => String(c || '').toUpperCase().includes('FECHA'))) {
@@ -249,16 +264,126 @@ function parseMovimientos(rows: any[][]): any[] {
   return movimientos
 }
 
-async function insertEnParalelo(supabase: any, movimientos: any[]) {
+async function insertEnParalelo(supabase: any, movimientos: any[], tabla = 'diario') {
   const batches: any[][] = []
   for (let i = 0; i < movimientos.length; i += BATCH) batches.push(movimientos.slice(i, i + BATCH))
   for (let i = 0; i < batches.length; i += CONCURRENCY) {
     const results = await Promise.all(
-      batches.slice(i, i + CONCURRENCY).map(b => supabase.from('diario').insert(b))
+      batches.slice(i, i + CONCURRENCY).map(b => supabase.from(tabla).insert(b))
     )
     const failed = results.find((r: any) => r.error)
-    if (failed?.error) throw new Error('Error insertando: ' + failed.error.message)
+    if (failed?.error) throw new Error(`Error insertando en ${tabla}: ` + failed.error.message)
   }
+}
+
+// TODAS las filas de CAJA (compras, ventas, gastos, cta cte, saldos iniciales, etc.),
+// con los campos crudos y las 10 columnas que calcula la planilla — espejo completo para
+// la tabla `movimientos_caja`, sobre la que se construyen los reportes de la app.
+// Exportada para poder validarla con scripts/validar-sync-caja.mts sobre datos reales.
+export function parseMovimientosCaja(rows: any[][]): any[] {
+  const { headerIdx, headers } = findHeaderRow(rows)
+  const col = (name: string) => headers.findIndex(h => h.includes(name))
+  const colExacta = (name: string) => headers.findIndex(h => h === name)
+  const iDate    = col('FECHA')
+  const iCliente = col('CLIENTE')
+  const iCaja    = col('CAJA')
+  const iOp      = col('OPERACI')   // 'OPERACIÓN' (la primera; no confunde con OPERACION PROPIA/EXTERNA)
+  const iPropio  = col('PROPIO')
+  const iExterno = col('EXTERNO')
+  const iMonto   = col('MONTO')
+  const iCot     = colExacta('COT')
+  const iCosto   = col('COSTO')
+  const iDebe    = colExacta('DEBE')
+  const iNotas   = col('NOTAS')
+  const iCuenta  = colExacta('CUENTA')
+  const iCalc: Record<string, number> = {
+    pesos: colExacta('PESOS'), cheques: colExacta('CHEQUES'), dolares: colExacta('DOLARES'),
+    euros: colExacta('EUROS'), reales: colExacta('REALES'), banco: colExacta('BANCO'),
+    cc_pesos: colExacta('CC PESOS'), cc_dolares: colExacta('CC DOLARES'),
+    cc_euros: colExacta('CC EUROS'), cc_reales: colExacta('CC REALES'),
+  }
+
+  const movimientos: any[] = []
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row) continue
+    const fecha = parseFecha(row[iDate])
+    if (!fecha) continue
+    const operacion = String(row[iOp] ?? '').trim().toUpperCase()
+    if (!operacion) continue
+
+    const clienteRaw = String(row[iCliente] ?? '').trim()
+    const esCtaCte = clienteRaw.toUpperCase() === 'CTA CTE'
+    // En filas CAJA el nombre está en la columna CLIENTE (texto libre, clientes eventuales,
+    // NO normalizado — decisión de negocio); en filas CTA CTE está en la columna CAJA.
+    const cliente = esCtaCte ? String(row[iCaja] ?? '').trim() : clienteRaw
+
+    const mov: any = {
+      fila_sheet: i + 1,
+      fecha,
+      tipo: esCtaCte ? 'CTA CTE' : 'CAJA',
+      cliente: cliente || null,
+      operacion,
+      propio:  iPropio  >= 0 && row[iPropio]  ? String(row[iPropio]).trim().toUpperCase()  : null,
+      externo: iExterno >= 0 && row[iExterno] ? String(row[iExterno]).trim().toUpperCase() : null,
+      monto: parseMonto(row[iMonto]),
+      cot:       iCot   >= 0 && String(row[iCot] ?? '').trim()   !== '' ? parseMonto(row[iCot])   : null,
+      costo_pct: iCosto >= 0 && String(row[iCosto] ?? '').trim() !== '' ? parseMonto(row[iCosto]) : null,
+      debe:  iDebe  >= 0 && String(row[iDebe] ?? '').trim()  ? String(row[iDebe]).trim()  : null,
+      notas: iNotas >= 0 && String(row[iNotas] ?? '').trim() ? String(row[iNotas]).trim() : null,
+      cuenta: iCuenta >= 0 && String(row[iCuenta] ?? '').trim() ? String(row[iCuenta]).trim().toUpperCase() : null,
+    }
+    for (const [campo, idx] of Object.entries(iCalc)) {
+      mov[campo] = idx >= 0 ? parseMonto(row[idx]) : 0
+    }
+    movimientos.push(mov)
+  }
+  return movimientos
+}
+
+// Sincroniza `movimientos_caja`. Tolerante: si la tabla todavía no existe (falta correr
+// la migración), avisa y sigue — el resto del sync no se ve afectado.
+// Devuelve un resumen para registrar en sync_state, incluida la validación automática:
+// tras insertar compara conteo y sumas por columna (vía caja_totales) contra lo parseado.
+async function syncCaja(
+  supabase: any, todos: any[], mode: 'full' | 'incremental', windowStart: string
+): Promise<any> {
+  const probe = await supabase.from('movimientos_caja').select('id', { head: true, count: 'exact' }).limit(1)
+  if (probe.error) {
+    console.warn('⚠️  movimientos_caja no disponible (¿falta la migración?):', probe.error.message)
+    return { skipped: true, motivo: probe.error.message }
+  }
+
+  const lote = mode === 'full' ? todos : todos.filter(m => m.fecha >= windowStart)
+  if (mode === 'full') {
+    const del = await supabase.from('movimientos_caja').delete().not('id', 'is', null)
+    if (del.error) throw new Error('Error vaciando movimientos_caja: ' + del.error.message)
+  } else {
+    const del = await supabase.from('movimientos_caja').delete().gte('fecha', windowStart)
+    if (del.error) throw new Error('Error borrando ventana de movimientos_caja: ' + del.error.message)
+  }
+  await insertEnParalelo(supabase, lote, 'movimientos_caja')
+
+  // Validación automática de la corrida: lo que quedó en la base debe coincidir EXACTO
+  // con lo parseado de la planilla (conteo + suma de cada columna de moneda).
+  const desde = mode === 'full' ? null : windowStart
+  const { data: tot, error: totError } = await supabase.rpc('caja_totales', { p_desde: desde, p_hasta: null })
+  if (totError || !tot) {
+    console.warn('⚠️  No se pudo validar (caja_totales):', totError?.message)
+    return { procesados: lote.length, validado: null }
+  }
+  const columnas = ['pesos','cheques','dolares','euros','reales','banco','cc_pesos','cc_dolares','cc_euros','cc_reales']
+  const esperado: Record<string, number> = { filas: lote.length }
+  for (const c of columnas) esperado[c] = Math.round(lote.reduce((s, m) => s + (m[c] || 0), 0) * 100) / 100
+  const difs = Object.entries(esperado)
+    .filter(([k, v]) => Math.abs(Number(tot[k] ?? 0) - v) > 0.01)
+    .map(([k, v]) => `${k}: db=${tot[k]} esperado=${v}`)
+  if (difs.length) {
+    console.error('❌ Validación movimientos_caja con diferencias:', difs.join(' | '))
+    return { procesados: lote.length, validado: false, diferencias: difs }
+  }
+  console.log(`✅ movimientos_caja OK: ${lote.length} filas, sumas validadas contra la planilla`)
+  return { procesados: lote.length, validado: true }
 }
 
 async function upsertCuentas(supabase: any, movimientos: any[]) {
@@ -343,6 +468,15 @@ export default async function handler(req: Request) {
     // el sheet completo (no depende de la ventana del incremental ni del filtro CTA CTE).
     const nClientes = await upsertClientes(supabase, parseClientes(rows))
 
+    // Espejo completo de CAJA → movimientos_caja (todas las operaciones, no solo CTA CTE).
+    // Corre en el mismo modo (full/incremental) y valida sus propias sumas al terminar.
+    // Lee valores SIN formato para coincidir exacto con la planilla (la fuente excel ya
+    // viene cruda por raw:true; para sheets se hace una segunda lectura UNFORMATTED).
+    const rowsCaja = SYNC_SOURCE === 'sheets' ? await readFromSheetsUnformatted(token) : rows
+    const desdeCaja = new Date()
+    desdeCaja.setDate(desdeCaja.getDate() - WINDOW_DAYS)
+    const caja = await syncCaja(supabase, parseMovimientosCaja(rowsCaja), mode, desdeCaja.toISOString().slice(0, 10))
+
     if (mode === 'full') {
       if (!todos.length) throw new Error('Sin movimientos CTA CTE')
       const { error: delError } = await supabase.from('diario').delete().eq('tipo', 'CTA CTE')
@@ -351,7 +485,7 @@ export default async function handler(req: Request) {
       const nCuentas = await upsertCuentas(supabase, todos)
       if (modifiedTime) await setSyncState(supabase, 'caja_modified_time', modifiedTime)
       console.log(`✅ Full OK: ${todos.length} movimientos, ${nCuentas} cuentas, ${nClientes} clientes`)
-      await recordRun({ ok: true, mode, procesados: todos.length })
+      await recordRun({ ok: true, mode, procesados: todos.length, caja })
       return new Response('ok-full', { status: 200 })
     }
 
@@ -368,7 +502,7 @@ export default async function handler(req: Request) {
     const nCuentas = await upsertCuentas(supabase, ventana)
     if (modifiedTime) await setSyncState(supabase, 'caja_modified_time', modifiedTime)
     console.log(`✅ Incremental OK (desde ${windowStart}): ${ventana.length} movimientos, ${nCuentas} cuentas, ${nClientes} clientes`)
-    await recordRun({ ok: true, mode, procesados: ventana.length })
+    await recordRun({ ok: true, mode, procesados: ventana.length, caja })
     return new Response('ok-incremental', { status: 200 })
 
   } catch (err: any) {

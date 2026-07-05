@@ -104,3 +104,32 @@ https://<sitio>/.netlify/functions/sync-background?mode=incremental&secret=<SYNC
   refleja recién con el **full** diario (o disparando un full a mano).
 - Con Excel binario, el incremental igual **descarga el archivo entero** (no se puede
   bajar por partes); el `modifiedTime` evita descargarlo cuando no hubo cambios.
+
+## Espejo completo de CAJA (`movimientos_caja`)
+
+Desde julio 2026 el sync también llena `movimientos_caja`: **todas** las filas de la
+solapa CAJA (compras, ventas, gastos, saldos iniciales, cta cte, etc.), no solo CTA CTE.
+Es la base sobre la que se construyen los reportes de la app (situación de caja,
+clientes, histórico, ganancias). Requiere la migración
+`migrations/2026-07-05_movimientos_caja.sql`; hasta que se corra, el sync la saltea con
+un warning y todo lo demás sigue funcionando igual.
+
+Puntos de diseño:
+
+- **Valores sin formato**: para el espejo se lee el Sheet con `UNFORMATTED_VALUE`
+  (la fuente `excel` ya viene cruda por `raw:true`). Leyendo valores formateados las
+  sumas acumulan deriva de redondeo — medida en la reconciliación de julio 2026:
+  ~7 dólares sobre 34.000 filas. Con crudos, la suma de `dolares` hasta el 1/7/2026
+  coincide EXACTO con el SALDO INICIAL de R CAJA (445.565,43).
+- **`cliente` es texto libre, no normalizado**: en filas de tipo CAJA son clientes
+  eventuales tal como se tipearon (decisión de negocio 5/7/2026). En filas CTA CTE
+  guarda el nombre de la cuenta corriente (tomado de la columna CAJA de la planilla).
+- **Columnas calculadas de la planilla** (`pesos`…`cc_reales`): se importan tal cual;
+  durante la convivencia son la fuente de verdad. El motor de cálculo de la app
+  (`src/lib/motor-calculo`) las recalculará en paralelo para validar antes de reemplazarlas.
+- **Validación automática por corrida**: tras insertar, el sync compara conteo y suma
+  de cada columna contra lo parseado (función SQL `caja_totales`) y registra el
+  resultado en `sync_state.last_run` (campo `caja.validado`).
+- **Validación local del parser**: `npx tsx scripts/validar-sync-caja.mts <dump.json>`
+  con un dump UNFORMATTED de la solapa — chequea contra los valores confirmados en la
+  reconciliación (4.078 filas y −98.251,73 en 17/4–19/6; saldo 445.565,43 al 1/7).
