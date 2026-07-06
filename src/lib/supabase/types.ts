@@ -2,6 +2,8 @@ export type UserRole = 'superusuario' | 'operador' | 'cliente'
 export interface Profile {
   id: string; email: string; nombre: string; rol: UserRole
   activo: boolean; cuenta_cte: string | null; created_at: string; updated_at: string
+  // Permiso individual (superadmin): acceso al módulo de Ganancias, independiente del rol.
+  ve_ganancias?: boolean
 }
 export interface DiarioRow {
   id: string; fecha: string; tipo: string; cuenta_cte: string

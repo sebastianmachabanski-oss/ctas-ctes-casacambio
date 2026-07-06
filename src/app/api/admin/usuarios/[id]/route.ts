@@ -33,6 +33,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (body.activo     !== undefined) updates.activo     = body.activo
   if (body.telefono   !== undefined) updates.telefono   = body.telefono
   if (body.notas      !== undefined) updates.notas      = body.notas
+  if (body.ve_ganancias !== undefined) updates.ve_ganancias = !!body.ve_ganancias
 
   const { error } = await admin.from('profiles').update(updates).eq('id', params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -34,7 +34,11 @@ export default function Sidebar({ profile }: { profile: Profile }) {
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const items = navItems[profile.rol] ?? []
+  const items = [...(navItems[profile.rol] ?? [])]
+  // Ganancias: permiso individual (superadmin), independiente del rol.
+  if (profile.ve_ganancias) {
+    items.splice(items.length - 1, 0, { href: '/dashboard/ganancias', label: 'Ganancias', icon: '💰' })
+  }
 
   async function handleLogout() {
     const supabase = createClient()

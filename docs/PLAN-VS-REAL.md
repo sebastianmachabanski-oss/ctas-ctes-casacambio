@@ -14,7 +14,7 @@ Se actualiza al cerrar cada ítem.
 | 5 | Dinero en calle | 4–6 h | ~0,5 h (6/7/2026) | ✅ En main |
 | 6 | Tablero (situación de caja + clientes + histórico) | 12–15 h | — | Pendiente — mockup en validación con el cliente |
 | 7 | Ganancias (réplica COLO parametrizable) | 5–7 h | — | Pendiente — mockup en validación con el cliente |
-| 8 | Rol superadmin para Ganancias | 2–3 h | — | Pendiente |
+| 8 | Rol superadmin para Ganancias | 2–3 h | ~0,5 h (6/7/2026) | ✅ En main — permiso individual ve_ganancias |
 
 Hitos previos ya completados (fuera de esta tabla): motor de cálculo aislado y
 validado, relevamiento y réplica exacta de COLO, reconciliación Sheet↔Excel

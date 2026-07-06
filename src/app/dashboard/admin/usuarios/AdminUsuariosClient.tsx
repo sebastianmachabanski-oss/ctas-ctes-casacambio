@@ -5,6 +5,7 @@ type Usuario = {
   id: string; email: string; nombre: string; rol: string
   activo: boolean; cuenta_cte: string | null
   telefono: string | null; notas: string | null; created_at: string
+  ve_ganancias?: boolean
 }
 interface Props { usuariosIniciales: Usuario[]; cuentas: string[] }
 
@@ -38,9 +39,12 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
     setError(null); setClaveMsg(null); setModal('nuevo')
   }
 
+  const [veGanancias, setVeGanancias] = useState(false)
+
   function abrirEditar(u: Usuario) {
     setEditando(u)
     setForm({ nombre: u.nombre, email: u.email, telefono: u.telefono ?? '', rol: u.rol, cuenta_cte: u.cuenta_cte ?? '', notas: u.notas ?? '' })
+    setVeGanancias(u.ve_ganancias ?? false)
     setError(null); setClaveMsg(null); setModal('editar')
   }
 
@@ -72,13 +76,14 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
         nombre: form.nombre, rol: form.rol,
         cuenta_cte: form.rol === 'cliente' ? form.cuenta_cte : null,
         telefono: form.telefono || null, notas: form.notas || null,
+        ve_ganancias: form.rol === 'cliente' ? false : veGanancias,
       }),
     })
     const data = await res.json()
     setLoading(false)
     if (!res.ok) { setError(data.error); return }
     setUsuarios(prev => prev.map(u => u.id === editando!.id
-      ? { ...u, nombre: form.nombre, rol: form.rol, cuenta_cte: form.rol === 'cliente' ? form.cuenta_cte : null, telefono: form.telefono || null, notas: form.notas || null }
+      ? { ...u, nombre: form.nombre, rol: form.rol, cuenta_cte: form.rol === 'cliente' ? form.cuenta_cte : null, telefono: form.telefono || null, notas: form.notas || null, ve_ganancias: form.rol === 'cliente' ? false : veGanancias }
       : u))
     setModal(null)
   }
@@ -135,6 +140,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROL_COLORS[u.rol] ?? 'bg-gray-100'}`}>
                     {ROL_LABELS[u.rol] ?? u.rol}
                   </span>
+                  {u.ve_ganancias && <span title="Acceso a Ganancias (superadmin)">💰</span>}
                 </div>
               </div>
               {u.cuenta_cte && <p className="text-xs text-gray-500 mb-1">Cuenta: {u.cuenta_cte}</p>}
@@ -188,6 +194,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROL_COLORS[u.rol] ?? 'bg-gray-100'}`}>
                       {ROL_LABELS[u.rol] ?? u.rol}
                     </span>
+                    {u.ve_ganancias && <span className="ml-1" title="Acceso a Ganancias (superadmin)">💰</span>}
                   </td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{u.cuenta_cte ?? '—'}</td>
                   <td className="px-3 py-3 text-center">
@@ -344,6 +351,18 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                     {cuentas.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
+              )}
+              {form.rol !== 'cliente' && (
+                <label className="flex items-start gap-2.5 p-3 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer">
+                  <input type="checkbox" className="mt-0.5 accent-purple-600"
+                    checked={veGanancias} onChange={e => setVeGanancias(e.target.checked)} />
+                  <span className="text-sm">
+                    <span className="font-medium text-gray-900">💰 Acceso a Ganancias (superadmin)</span>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      Permiso individual, independiente del rol: habilita el módulo de resultados del negocio.
+                    </span>
+                  </span>
+                </label>
               )}
               <div>
                 <label className="label">Notas internas</label>
