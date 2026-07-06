@@ -133,3 +133,23 @@ Puntos de diseño:
 - **Validación local del parser**: `npx tsx scripts/validar-sync-caja.mts <dump.json>`
   con un dump UNFORMATTED de la solapa — chequea contra los valores confirmados en la
   reconciliación (4.078 filas y −98.251,73 en 17/4–19/6; saldo 445.565,43 al 1/7).
+
+### Validación en paralelo del motor de cálculo
+
+Cada corrida que llena `movimientos_caja` recalcula además cada fila con el motor de
+la app (`src/lib/motor-calculo`) y compara las 10 columnas contra lo que calculó la
+planilla. El resumen queda en `sync_state.last_run` → campo `caja.motor`
+(`coincidencia`, `dif`, `error`, ejemplos). Referencia offline:
+`npx tsx scripts/validar-motor-vs-planilla.mts <dump.json>` — corrido el 6/7/2026
+sobre las 33.528 filas reales dio **100,00 % de coincidencia exacta** (tras conservar
+`cot_efectiva`/COTEXT, ver migración `2026-07-06_cot_efectiva.sql`).
+
+Notas de fidelidad descubiertas en esta validación:
+
+- La planilla calcula con **COTEXT**, no con COT: en ~490 filas históricas el operador
+  pisó la fórmula de COTEXT con la tasa efectiva (con decimales) y COT quedó redondeada.
+  Por eso el espejo guarda ambas (`cot` y `cot_efectiva`).
+- Las cotizaciones se parsean **sin redondear** (`parseNumeroPreciso`): redondear a 2
+  decimales rompería cruces como EUR/USD 1,23495.
+- Las filas con OPERACIÓN = `OPERACION?` (pre-armadas para la carga desde la app) se
+  **excluyen** del espejo: no son movimientos reales.

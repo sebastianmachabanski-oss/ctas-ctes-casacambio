@@ -1,6 +1,7 @@
 // Sync CAJA — planilla (Drive/Sheets) → base de datos. Ver docs/SINCRONIZACION.md.
 import { createClient } from "@supabase/supabase-js"
 import * as XLSX from "xlsx"
+import { calcularMovimiento, COLUMNAS_SALIDA } from "../../src/lib/motor-calculo/index"
 
 // Función BACKGROUND (hasta 15 min). Hace el sync real en dos modos:
 //   - full:        recarga completa (borra todo CTA CTE y reinserta todo)
@@ -43,6 +44,16 @@ function parseMonto(val: any): number {
   const n = parseFloat(s)
   if (isNaN(n)) return 0
   return neg ? -n : n
+}
+
+// Como parseMonto pero SIN redondear a 2 decimales: para cotizaciones y porcentajes,
+// donde los decimales finos importan (ej. cruce EUR/USD 1,23495 — redondeado daría 1,23
+// y el cálculo dejaría de coincidir con la planilla).
+function parseNumeroPreciso(val: any): number | null {
+  if (val === null || val === undefined || String(val).trim() === '') return null
+  if (typeof val === 'number' && isFinite(val)) return val
+  const redondeado = parseMonto(val)
+  return redondeado === 0 && String(val).trim() !== '0' ? null : redondeado
 }
 
 function parseFecha(val: any): string | null {
@@ -292,6 +303,7 @@ export function parseMovimientosCaja(rows: any[][]): any[] {
   const iExterno = col('EXTERNO')
   const iMonto   = col('MONTO')
   const iCot     = colExacta('COT')
+  const iCotExt  = colExacta('COTEXT')  // cotización EFECTIVA (la que usa la fórmula; ver migración cot_efectiva)
   const iCosto   = col('COSTO')
   const iDebe    = colExacta('DEBE')
   const iNotas   = col('NOTAS')
@@ -311,6 +323,9 @@ export function parseMovimientosCaja(rows: any[][]): any[] {
     if (!fecha) continue
     const operacion = String(row[iOp] ?? '').trim().toUpperCase()
     if (!operacion) continue
+    // Filas pre-armadas para la carga desde la app (fecha pre-completada, sin datos):
+    // no son movimientos reales. Es el mismo marcador que usa excel-write.
+    if (operacion === 'OPERACION?') continue
 
     const clienteRaw = String(row[iCliente] ?? '').trim()
     const esCtaCte = clienteRaw.toUpperCase() === 'CTA CTE'
@@ -327,8 +342,9 @@ export function parseMovimientosCaja(rows: any[][]): any[] {
       propio:  iPropio  >= 0 && row[iPropio]  ? String(row[iPropio]).trim().toUpperCase()  : null,
       externo: iExterno >= 0 && row[iExterno] ? String(row[iExterno]).trim().toUpperCase() : null,
       monto: parseMonto(row[iMonto]),
-      cot:       iCot   >= 0 && String(row[iCot] ?? '').trim()   !== '' ? parseMonto(row[iCot])   : null,
-      costo_pct: iCosto >= 0 && String(row[iCosto] ?? '').trim() !== '' ? parseMonto(row[iCosto]) : null,
+      cot:          iCot    >= 0 ? parseNumeroPreciso(row[iCot])    : null,
+      cot_efectiva: iCotExt >= 0 ? parseNumeroPreciso(row[iCotExt]) : null,
+      costo_pct:    iCosto  >= 0 ? parseNumeroPreciso(row[iCosto])  : null,
       debe:  iDebe  >= 0 && String(row[iDebe] ?? '').trim()  ? String(row[iDebe]).trim()  : null,
       notas: iNotas >= 0 && String(row[iNotas] ?? '').trim() ? String(row[iNotas]).trim() : null,
       cuenta: iCuenta >= 0 && String(row[iCuenta] ?? '').trim() ? String(row[iCuenta]).trim().toUpperCase() : null,
@@ -339,6 +355,36 @@ export function parseMovimientosCaja(rows: any[][]): any[] {
     movimientos.push(mov)
   }
   return movimientos
+}
+
+// Validación EN PARALELO del motor de cálculo: recalcula cada fila con el motor de la
+// app y la compara contra las 10 columnas que calculó la planilla. No afecta lo que se
+// guarda — es el período de prueba definido en docs/MOTOR-CALCULO.md antes de que el
+// motor reemplace a las fórmulas. El resumen queda en sync_state.last_run (campo motor).
+const CAMPO_MOTOR: Record<string, string> = {
+  'PESOS': 'pesos', 'CHEQUES': 'cheques', 'DOLARES': 'dolares', 'EUROS': 'euros',
+  'REALES': 'reales', 'BANCO': 'banco', 'CC PESOS': 'cc_pesos', 'CC DOLARES': 'cc_dolares',
+  'CC EUROS': 'cc_euros', 'CC REALES': 'cc_reales',
+}
+function validarMotor(movimientos: any[]): any {
+  let ok = 0, dif = 0, error = 0
+  const ejemplos: string[] = []
+  for (const m of movimientos) {
+    try {
+      const r = calcularMovimiento({
+        tipo: m.tipo, operacion: m.operacion, propio: m.propio ?? '', externo: m.externo ?? '',
+        // La planilla calcula con COTEXT (cot_efectiva); COT es lo que tipeó el operador.
+        monto: m.monto, cotizacion: m.cot_efectiva ?? m.cot, costoPorcentaje: m.costo_pct,
+      })
+      const difs = COLUMNAS_SALIDA.filter(c => Math.abs(r.valores[c] - (m[CAMPO_MOTOR[c]] ?? 0)) > 0.011)
+      if (difs.length) {
+        dif++
+        if (ejemplos.length < 5) ejemplos.push(`fila ${m.fila_sheet} ${m.fecha} ${m.operacion}: ${difs.join(',')}`)
+      } else ok++
+    } catch { error++ }
+  }
+  const total = movimientos.length || 1
+  return { ok, dif, error, coincidencia: Math.round((ok / total) * 10000) / 100 + '%', ejemplos }
 }
 
 // Sincroniza `movimientos_caja`. Tolerante: si la tabla todavía no existe (falta correr
@@ -378,12 +424,14 @@ async function syncCaja(
   const difs = Object.entries(esperado)
     .filter(([k, v]) => Math.abs(Number(tot[k] ?? 0) - v) > 0.01)
     .map(([k, v]) => `${k}: db=${tot[k]} esperado=${v}`)
+  const motor = validarMotor(lote)
+  console.log(`🔬 Motor vs planilla: ${motor.coincidencia} (${motor.dif} difs, ${motor.error} errores)`)
   if (difs.length) {
     console.error('❌ Validación movimientos_caja con diferencias:', difs.join(' | '))
-    return { procesados: lote.length, validado: false, diferencias: difs }
+    return { procesados: lote.length, validado: false, diferencias: difs, motor }
   }
   console.log(`✅ movimientos_caja OK: ${lote.length} filas, sumas validadas contra la planilla`)
-  return { procesados: lote.length, validado: true }
+  return { procesados: lote.length, validado: true, motor }
 }
 
 async function upsertCuentas(supabase: any, movimientos: any[]) {
