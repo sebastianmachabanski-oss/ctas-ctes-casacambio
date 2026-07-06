@@ -11,7 +11,7 @@ Se actualiza al cerrar cada ítem.
 | 2 | Validación en paralelo motor vs planilla | 3–4 h | ~0,5 h (6/7/2026) | ✅ En main — 100,00 % de coincidencia s/ 33.528 filas |
 | 3 | Visualizar transacciones | 5–7 h | ~0,75 h (6/7/2026) | ✅ En main |
 | 4 | Editar transacción (sin escritura al Sheet) | 4–6 h | ~0,75 h (6/7/2026) | ✅ En main |
-| 5 | Dinero en calle | 4–6 h | — | Pendiente |
+| 5 | Dinero en calle | 4–6 h | ~0,5 h (6/7/2026) | ✅ En main |
 | 6 | Tablero (situación de caja + clientes + histórico) | 12–15 h | — | Pendiente — mockup en validación con el cliente |
 | 7 | Ganancias (réplica COLO parametrizable) | 5–7 h | — | Pendiente — mockup en validación con el cliente |
 | 8 | Rol superadmin para Ganancias | 2–3 h | — | Pendiente |
