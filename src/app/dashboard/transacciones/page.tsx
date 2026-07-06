@@ -45,6 +45,10 @@ export default async function TransaccionesPage({
 
   let query = supabase.from('movimientos_caja')
     .select('*', { count: 'exact' })
+    // Defensivo: las filas pre-armadas de la planilla (OPERACIÓN = "OPERACION?") no son
+    // movimientos. El sync ya las excluye, pero si la tabla se cargó con una versión
+    // anterior podrían seguir ahí hasta el próximo full.
+    .neq('operacion', 'OPERACION?')
     .gte('fecha', desde)
     .lte('fecha', hasta)
     .order('fecha', { ascending: false })
