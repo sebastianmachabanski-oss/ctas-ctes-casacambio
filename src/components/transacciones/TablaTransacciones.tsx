@@ -62,7 +62,7 @@ function detalleOperacion(m: Movimiento) {
   return `${monedas}${cot}`
 }
 
-export default function TablaTransacciones({ movimientos }: { movimientos: Movimiento[] }) {
+export default function TablaTransacciones({ movimientos, puedeEditar = false }: { movimientos: Movimiento[]; puedeEditar?: boolean }) {
   if (!movimientos.length) {
     return <div className="card p-8 text-center text-gray-500 text-sm">No hay movimientos para los filtros elegidos.</div>
   }
@@ -80,7 +80,7 @@ export default function TablaTransacciones({ movimientos }: { movimientos: Movim
               <th className="px-4 py-3">Detalle</th>
               <th className="px-4 py-3 text-right">Monto</th>
               <th className="px-4 py-3 text-right">Impacto en caja</th>
-              <th className="px-4 py-3"><span className="sr-only">Acciones</span></th>
+              {puedeEditar && <th className="px-4 py-3"><span className="sr-only">Acciones</span></th>}
             </tr>
           </thead>
           <tbody>
@@ -102,11 +102,13 @@ export default function TablaTransacciones({ movimientos }: { movimientos: Movim
                 <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{detalleOperacion(m)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-gray-900 whitespace-nowrap">{nf.format(m.monto)}</td>
                 <td className="px-4 py-2.5 text-right">{<Impactos m={m} />}</td>
-                <td className="px-4 py-2.5 text-right">
-                  <Link href={`/dashboard/transacciones/${m.id}/editar`}
-                    className="text-xs font-medium text-brand-600 hover:text-brand-800 hover:underline"
-                    title="Editar transacción">✏️ Editar</Link>
-                </td>
+                {puedeEditar && (
+                  <td className="px-4 py-2.5 text-right">
+                    <Link href={`/dashboard/transacciones/${m.id}/editar`}
+                      className="text-xs font-medium text-brand-600 hover:text-brand-800 hover:underline"
+                      title="Editar transacción">✏️ Editar</Link>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -136,10 +138,12 @@ export default function TablaTransacciones({ movimientos }: { movimientos: Movim
               <span className="text-sm tabular-nums text-gray-700">Monto: {nf.format(m.monto)}</span>
               <Impactos m={m} />
             </div>
-            <div className="mt-2 text-right">
-              <Link href={`/dashboard/transacciones/${m.id}/editar`}
-                className="text-xs font-medium text-brand-600 hover:underline">✏️ Editar</Link>
-            </div>
+            {puedeEditar && (
+              <div className="mt-2 text-right">
+                <Link href={`/dashboard/transacciones/${m.id}/editar`}
+                  className="text-xs font-medium text-brand-600 hover:underline">✏️ Editar</Link>
+              </div>
+            )}
           </div>
         ))}
       </div>

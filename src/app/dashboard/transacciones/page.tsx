@@ -104,7 +104,7 @@ export default async function TransaccionesPage({
         </div>
       ) : (
         <>
-          <TablaTransacciones movimientos={movimientos} />
+          <TablaTransacciones movimientos={movimientos} puedeEditar={rol === 'superusuario'} />
 
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>

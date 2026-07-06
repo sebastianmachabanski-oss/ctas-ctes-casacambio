@@ -14,8 +14,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const { data: profile } = await supabase.from('profiles').select('rol, nombre').eq('id', user.id).single()
   const rol = (profile as any)?.rol
-  if (rol !== 'superusuario' && rol !== 'operador')
-    return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
+  // Editar es exclusivo del superusuario (el operador solo visualiza).
+  if (rol !== 'superusuario')
+    return NextResponse.json({ error: 'Solo el superusuario puede editar transacciones' }, { status: 403 })
 
   const body = await request.json()
   const { fecha, cliente, operacion, propio, externo, monto, cot, costo_pct, debe, notas } = body
