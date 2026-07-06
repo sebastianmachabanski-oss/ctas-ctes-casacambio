@@ -10,7 +10,7 @@ Se actualiza al cerrar cada ítem.
 | 1 | CAJA completa en la base (sync + migración + validación) | 6–8 h | ~1 h (5-6/7/2026) | ✅ En main |
 | 2 | Validación en paralelo motor vs planilla | 3–4 h | ~0,5 h (6/7/2026) | ✅ En main — 100,00 % de coincidencia s/ 33.528 filas |
 | 3 | Visualizar transacciones | 5–7 h | ~0,75 h (6/7/2026) | ✅ En main |
-| 4 | Editar transacción (sin escritura al Sheet) | 4–6 h | — | Pendiente |
+| 4 | Editar transacción (sin escritura al Sheet) | 4–6 h | ~0,75 h (6/7/2026) | ✅ En main |
 | 5 | Dinero en calle | 4–6 h | — | Pendiente |
 | 6 | Tablero (situación de caja + clientes + histórico) | 12–15 h | — | Pendiente — mockup en validación con el cliente |
 | 7 | Ganancias (réplica COLO parametrizable) | 5–7 h | — | Pendiente — mockup en validación con el cliente |
