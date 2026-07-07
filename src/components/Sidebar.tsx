@@ -9,7 +9,7 @@ const navItems = {
   superusuario: [
     { href: '/dashboard/cuenta-corriente',    label: 'Cuentas Corrientes',  icon: '📋' },
     { href: '/dashboard/nueva-transaccion',   label: 'Nueva transacción',   icon: '💱' },
-    { href: '/dashboard/transacciones',       label: 'Transacciones',       icon: '📒' },
+    { href: '/dashboard/transacciones',       label: 'Transacciones',       icon: '💲' },
     { href: '/dashboard/calle',               label: 'Dinero en calle',     icon: '🚚' },
     { href: '/dashboard/admin/usuarios',      label: 'Usuarios',            icon: '👥' },
     { href: '/dashboard/deudores',            label: 'Saldos Pendientes',   icon: '📊' },
@@ -19,7 +19,7 @@ const navItems = {
   operador: [
     { href: '/dashboard/cuenta-corriente',    label: 'Cuentas Corrientes',  icon: '📋' },
     { href: '/dashboard/nueva-transaccion',   label: 'Nueva transacción',   icon: '💱' },
-    { href: '/dashboard/transacciones',       label: 'Transacciones',       icon: '📒' },
+    { href: '/dashboard/transacciones',       label: 'Transacciones',       icon: '💲' },
     { href: '/dashboard/calle',               label: 'Dinero en calle',     icon: '🚚' },
     { href: '/dashboard/deudores',            label: 'Saldos Pendientes',   icon: '📊' },
     { href: '/dashboard/mi-cuenta',           label: 'Mi cuenta',           icon: '🔑' },
