@@ -149,6 +149,15 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
     const validationError = validate()
     if (validationError) return setError(validationError)
 
+    // Confirmación para montos elevados en pesos: si la operación mueve PESOS por más de
+    // $ 1.000.000, se pide confirmar antes de guardar (evita cargas erróneas de un cero de más).
+    const monto = Number(form.monto)
+    const muevePesos = form.propio.toUpperCase() === 'PESOS' || form.externo.toUpperCase() === 'PESOS'
+    if (muevePesos && monto > 1_000_000) {
+      const fmtArs = new Intl.NumberFormat('es-AR').format(monto)
+      if (!confirm(`El monto es de $ ${fmtArs} (supera $ 1.000.000). ¿Confirmás que es correcto?`)) return
+    }
+
     const payload = {
       ...form,
       monto: Number(form.monto),
@@ -392,7 +401,11 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
             className="input"
             value={form.debe}
             onChange={e => set('debe', e.target.value)}
+            placeholder="Nombre del repartidor que tiene el dinero"
           />
+          <p className="text-xs text-gray-400 mt-1">
+            Cargá el nombre del repartidor que tiene el dinero en la calle. Dejalo vacío si ya está en la caja.
+          </p>
         </div>
       </div>
 
