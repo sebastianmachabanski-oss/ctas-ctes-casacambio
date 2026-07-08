@@ -56,6 +56,17 @@ function Impactos({ m }: { m: Movimiento }) {
   )
 }
 
+// Celda de impacto para una moneda fija: mantiene los valores de cada moneda
+// alineados en su propia columna en la vista de escritorio.
+function ImpactoCelda({ v }: { v: number }) {
+  if (!v) return <span className="text-gray-300">—</span>
+  return (
+    <span className={`inline-block text-xs font-medium tabular-nums px-1.5 py-0.5 rounded ${v > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+      {v < 0 ? `(${nf.format(-v)})` : nf.format(v)}
+    </span>
+  )
+}
+
 function detalleOperacion(m: Movimiento) {
   const monedas = m.externo ? `${m.propio ?? ''} → ${m.externo}` : (m.propio ?? '')
   const cot = m.cot ? ` @ ${nf.format(m.cot)}` : ''
@@ -66,6 +77,10 @@ export default function TablaTransacciones({ movimientos, puedeEditar = false }:
   if (!movimientos.length) {
     return <div className="card p-8 text-center text-gray-500 text-sm">No hay movimientos para los filtros elegidos.</div>
   }
+
+  // Solo las monedas con algún valor en el resultado actual: columnas fijas y alineadas
+  // sin ensanchar la tabla con monedas que no aparecen.
+  const colsImpacto = IMPACTOS.filter(c => movimientos.some(m => ((m[c.key] as number) ?? 0) !== 0))
 
   return (
     <div className="card overflow-hidden">
@@ -79,7 +94,9 @@ export default function TablaTransacciones({ movimientos, puedeEditar = false }:
               <th className="px-4 py-3">Operación</th>
               <th className="px-4 py-3">Detalle</th>
               <th className="px-4 py-3 text-right">Monto</th>
-              <th className="px-4 py-3 text-right">Impacto en caja</th>
+              {colsImpacto.map(c => (
+                <th key={c.key as string} className="px-4 py-3 text-right whitespace-nowrap">{c.sym}</th>
+              ))}
               {puedeEditar && <th className="px-4 py-3"><span className="sr-only">Acciones</span></th>}
             </tr>
           </thead>
@@ -101,7 +118,11 @@ export default function TablaTransacciones({ movimientos, puedeEditar = false }:
                 </td>
                 <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{detalleOperacion(m)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-gray-900 whitespace-nowrap">{nf.format(m.monto)}</td>
-                <td className="px-4 py-2.5 text-right">{<Impactos m={m} />}</td>
+                {colsImpacto.map(c => (
+                  <td key={c.key as string} className="px-4 py-2.5 text-right whitespace-nowrap">
+                    <ImpactoCelda v={(m[c.key] as number) ?? 0} />
+                  </td>
+                ))}
                 {puedeEditar && (
                   <td className="px-4 py-2.5 text-right">
                     <Link href={`/dashboard/transacciones/${m.id}/editar`}

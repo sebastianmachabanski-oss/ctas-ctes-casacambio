@@ -401,7 +401,7 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
             className="input"
             value={form.debe}
             onChange={e => set('debe', e.target.value)}
-            placeholder="Nombre del repartidor que tiene el dinero"
+            placeholder="Nombre del repartidor"
           />
           <p className="text-xs text-gray-400 mt-1">
             Cargá el nombre del repartidor que tiene el dinero en la calle. Dejalo vacío si ya está en la caja.
