@@ -106,10 +106,7 @@ export default async function CuentaCorrientePage({
         )}
       </div>
 
-      <TarjetasSaldos saldos={saldos} cuentaCte={cuentaFiltro} />
-
       <div className="card p-4 md:p-5">
-        <h2 className="text-base font-semibold text-gray-900 mb-4">Filtrar movimientos</h2>
         <FiltrosMovimientos
           tiposOperacion={tiposOp}
           valoresIniciales={{
@@ -122,6 +119,8 @@ export default async function CuentaCorrientePage({
           esSuperusuarioOOperador={esStaff}
         />
       </div>
+
+      <TarjetasSaldos saldos={saldos} cuentaCte={cuentaFiltro} />
 
       <div className="card">
         <div className="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between">
