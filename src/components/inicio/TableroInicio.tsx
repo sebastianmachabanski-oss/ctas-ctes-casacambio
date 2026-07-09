@@ -11,15 +11,30 @@ const cell = (n: number) => n === 0
   ? <td className="zero">—</td>
   : <td className={`num ${n < 0 ? 'neg' : ''}`}>{money(n)}</td>
 
-// Ventanas del gráfico de línea (días hacia atrás desde la última fecha con datos).
-const VENTANAS: [string, number][] = [['7 días', 7], ['30 días', 30], ['90 días', 90], ['1 año', 365]]
+// Filtros de período (como el mockup): días hacia atrás desde la última fecha con datos.
+const PERIODOS: [string, number][] = [['Día', 7], ['Semana', 30], ['Mes', 90], ['Año', 365]]
 
 export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD }: {
   kpis: KPI[]; clientesCaja: Cliente[]; clientesCC: Cliente[]; serieUSD: Punto[]
 }) {
   const [vista, setVista] = useState<'caja' | 'cc'>('caja')
   const [busca, setBusca] = useState('')
+  const [periodo, setPeriodo] = useState('Mes')
   const [ventana, setVentana] = useState(90)
+  const [rango, setRango] = useState(false)
+  const [r1, setR1] = useState('')
+  const [r2, setR2] = useState('')
+
+  function elegirPeriodo(lbl: string, dias: number) {
+    setPeriodo(lbl); setRango(false); setVentana(dias)
+  }
+  function aplicarRango(a: string, b: string) {
+    setR1(a); setR2(b)
+    if (a && b) {
+      const dias = Math.max(2, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000))
+      setVentana(dias); setPeriodo(''); setRango(true)
+    }
+  }
 
   const saldoUSD = kpis.find(k => k.cur === 'Dólares')?.caja ?? 0
 
@@ -34,6 +49,19 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div className="sec-lbl" style={{ margin: 0 }}>
           Situación de caja — ahora <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--muted)' }}>· se actualiza con cada sincronización</span>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          {PERIODOS.map(([lbl, d]) => (
+            <button key={lbl} className={`chip ${periodo === lbl ? 'on' : ''}`} onClick={() => elegirPeriodo(lbl, d)}>{lbl}</button>
+          ))}
+          <button className={`chip ${rango ? 'on' : ''}`} onClick={() => setRango(true)}>Rango…</button>
+          {rango && (
+            <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+              <input className="srch" type="date" value={r1} onChange={e => aplicarRango(e.target.value, r2)} style={{ width: 140, minWidth: 0 }} />
+              <span style={{ color: 'var(--muted)' }}>→</span>
+              <input className="srch" type="date" value={r2} onChange={e => aplicarRango(r1, e.target.value)} style={{ width: 140, minWidth: 0 }} />
+            </span>
+          )}
         </div>
       </div>
 
@@ -93,13 +121,8 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
         {/* Gráficos */}
         <div style={{ display: 'grid', gap: 14, minWidth: 0, gridTemplateRows: 'auto 1fr' }}>
           <section className="card">
-            <div className="card-h" style={{ justifyContent: 'space-between' }}>
-              <h2 className="card-t">Saldo en caja — Dólares</h2>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {VENTANAS.map(([lbl, d]) => (
-                  <button key={d} className={`chip ${ventana === d ? 'on' : ''}`} onClick={() => setVentana(d)}>{lbl}</button>
-                ))}
-              </div>
+            <div className="card-h"><h2 className="card-t">Saldo en caja — Dólares</h2>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{rango ? 'rango elegido' : periodo}</span>
             </div>
             <div className="hero-line"><span className="big num">USD {money(saldoUSD)}</span></div>
             <div className="chart-pad"><LineaSaldo serie={serieUSD} dias={ventana} /></div>
