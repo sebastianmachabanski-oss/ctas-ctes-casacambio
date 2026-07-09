@@ -24,7 +24,7 @@ export default function TarjetasSaldos({ saldos }: Props) {
   const mostrar = conSaldo.length > 0 ? conSaldo : MONEDAS.slice(0, 2)
 
   return (
-    <div className="kpis-caja">
+    <div className="saldos">
       {mostrar.map(m => {
         const v = t[m.key] ?? 0
         const n = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(Math.abs(v))
@@ -32,10 +32,12 @@ export default function TarjetasSaldos({ saldos }: Props) {
         // negativo = a favor del cliente.
         const nota = v > 0 ? 'saldo pendiente' : v < 0 ? 'a favor del cliente' : 'sin movimientos'
         return (
-          <div className="kpi" key={m.key} style={{ borderLeft: `3px solid ${m.color}` }}>
-            <div className="top"><span className="dot" style={{ background: m.color }} /><span className="cur">{m.label}</span></div>
+          <div className="saldo-card" key={m.key} style={{ borderLeft: `3px solid ${m.color}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="dot" style={{ background: m.color }} /><span className="cur">Saldo {m.label}</span>
+            </div>
             <div className="val num">{m.sym} {v < 0 ? `(${n})` : n}</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{nota}</div>
+            <div className="nota">{nota}</div>
           </div>
         )
       })}

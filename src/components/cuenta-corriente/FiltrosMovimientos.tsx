@@ -48,10 +48,10 @@ export default function FiltrosMovimientos({ tiposOperacion, valoresIniciales, c
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Selector de cuenta — solo para admin/operador */}
+      {/* Fila de filtros inline (estilo mockup): Cuenta + Desde + Hasta + Tipo + Buscar */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         {esSuperusuarioOOperador && cuentas && cuentas.length > 0 && (
-          <div className="sm:col-span-2 lg:col-span-4">
+          <div style={{ flex: '1 1 220px', minWidth: 200 }}>
             <label className="label">Cuenta corriente</label>
             <select className="input" value={cuenta} onChange={e => setCuenta(e.target.value)}>
               <option value="">Todas las cuentas</option>
@@ -59,14 +59,13 @@ export default function FiltrosMovimientos({ tiposOperacion, valoresIniciales, c
             </select>
           </div>
         )}
-
         <div>
-          <label className="label" htmlFor="desde">Fecha desde</label>
+          <label className="label" htmlFor="desde">Desde</label>
           <input id="desde" type="date" className="input" value={desde}
             onChange={e => setDesde(e.target.value)} />
         </div>
         <div>
-          <label className="label" htmlFor="hasta">Fecha hasta</label>
+          <label className="label" htmlFor="hasta">Hasta</label>
           <input id="hasta" type="date" className="input" value={hasta}
             onChange={e => setHasta(e.target.value)} />
         </div>
@@ -79,15 +78,9 @@ export default function FiltrosMovimientos({ tiposOperacion, valoresIniciales, c
             <option value="COMPROMISO">{process.env.NEXT_PUBLIC_LABEL_EGRESO ?? 'Egreso'}</option>
           </select>
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-          <div className="flex gap-3 w-full">
-            <button type="submit" className="btn-primary flex-1" disabled={isPending}>
-              Buscar
-            </button>
-            <button type="button" className="btn-secondary" disabled={isPending} onClick={handleLimpiar}>
-              Limpiar
-            </button>
-          </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="submit" className="btn-primary" disabled={isPending}>Buscar</button>
+          <button type="button" className="btn-secondary" disabled={isPending} onClick={handleLimpiar}>Limpiar</button>
         </div>
       </div>
     </form>

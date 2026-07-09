@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
+import Topbar from '@/components/Topbar'
 import BlockBack from '@/components/BlockBack'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -16,9 +17,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="cc-main">
         <header className="cc-topbar">
           <button id="cc-hamb" className="cc-hamb" aria-label="Menú">☰</button>
-          <div>
-            <div className="cc-crumb">Casa de Cambio</div>
-          </div>
+          <Topbar />
         </header>
         <main>{children}</main>
       </div>

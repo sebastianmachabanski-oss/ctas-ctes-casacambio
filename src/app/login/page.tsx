@@ -25,9 +25,9 @@ function LoginForm() {
     <div className="min-h-screen flex items-start justify-center px-4 pt-16"
       style={{
         background:
-          'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.06) 1px, transparent 0) 0 0 / 22px 22px,' +
-          'radial-gradient(1100px 520px at 50% -8%, rgba(37,99,235,0.28), transparent 60%),' +
-          'linear-gradient(180deg, #141d30, #0e1626)',
+          'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.11) 1.3px, transparent 0) 0 0 / 20px 20px,' +
+          'radial-gradient(900px 480px at 50% -6%, rgba(59,130,246,0.38), transparent 62%),' +
+          'linear-gradient(180deg, #17213b, #0b1120)',
       }}>
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">

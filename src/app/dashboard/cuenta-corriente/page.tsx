@@ -93,19 +93,6 @@ export default async function CuentaCorrientePage({
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Cuenta Corriente</h1>
-        {esCliente && profile.cuenta_cte && (
-          <p className="text-gray-500 text-sm mt-1">{profile.cuenta_cte}</p>
-        )}
-        {esStaff && cuentaFiltro && (
-          <p className="text-gray-500 text-sm mt-1">{cuentaFiltro}</p>
-        )}
-        {esStaff && !cuentaFiltro && (
-          <p className="text-gray-500 text-sm mt-1">Todas las cuentas</p>
-        )}
-      </div>
-
       <div className="card p-4 md:p-5">
         <FiltrosMovimientos
           tiposOperacion={tiposOp}
@@ -124,7 +111,9 @@ export default async function CuentaCorrientePage({
 
       <div className="card">
         <div className="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">Movimientos</h2>
+          <h2 className="text-base font-semibold text-gray-900">
+            {cuentaFiltro ? `${cuentaFiltro} — movimientos` : 'Movimientos · todas las cuentas'}
+          </h2>
           <span className="text-sm text-gray-500">{totalMovimientos} registro{totalMovimientos !== 1 ? 's' : ''}</span>
         </div>
         <TablaMovimientos movimientos={movimientos} />
