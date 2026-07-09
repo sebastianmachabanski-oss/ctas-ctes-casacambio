@@ -4,11 +4,12 @@ type Saldo = {
 }
 interface Props { saldos: Saldo[]; cuentaCte: string | null }
 
+// Tarjetas de saldo con el estilo del tablero (KPI: punto de color + valor grande).
 const MONEDAS = [
-  { key: 'saldo_dolares' as const, label: 'Dólares', sym: 'U$S', color: 'bg-red-50 border-red-200 text-red-900' },
-  { key: 'saldo_pesos'   as const, label: 'Pesos',   sym: '$',   color: 'bg-blue-50 border-blue-200 text-blue-900'    },
-  { key: 'saldo_euros'   as const, label: 'Euros',   sym: '€',   color: 'bg-purple-50 border-purple-200 text-purple-900' },
-  { key: 'saldo_reales'  as const, label: 'Reales',  sym: 'R$',  color: 'bg-orange-50 border-orange-200 text-orange-900' },
+  { key: 'saldo_dolares' as const, label: 'Dólares', sym: 'U$S', color: '#16a34a' },
+  { key: 'saldo_pesos'   as const, label: 'Pesos',   sym: '$',   color: '#2563eb' },
+  { key: 'saldo_euros'   as const, label: 'Euros',   sym: '€',   color: '#7c3aed' },
+  { key: 'saldo_reales'  as const, label: 'Reales',  sym: 'R$',  color: '#eab308' },
 ]
 
 export default function TarjetasSaldos({ saldos }: Props) {
@@ -23,20 +24,18 @@ export default function TarjetasSaldos({ saldos }: Props) {
   const mostrar = conSaldo.length > 0 ? conSaldo : MONEDAS.slice(0, 2)
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div className="kpis-caja">
       {mostrar.map(m => {
         const v = t[m.key] ?? 0
         const n = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(Math.abs(v))
+        // Convención de la planilla: saldo positivo = el cliente debe (pendiente);
+        // negativo = a favor del cliente.
+        const nota = v > 0 ? 'saldo pendiente' : v < 0 ? 'a favor del cliente' : 'sin movimientos'
         return (
-          <div key={m.key} className={`card border p-3 md:p-4 ${v > 0 ? 'bg-red-50 border-red-200 text-red-900' : v < 0 ? 'bg-green-50 border-green-200 text-green-900' : m.color}`}>
-            <p className="text-xs font-medium opacity-70 uppercase tracking-wide mb-1">{m.label}</p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xs font-medium opacity-60">{m.sym}</span>
-              <span className="text-xl md:text-2xl font-bold">{n}</span>
-            </div>
-            <p className="text-xs opacity-60 mt-1">
-              {v < 0 ? 'A tu favor' : v > 0 ? 'Saldo pendiente' : 'Sin movimientos'}
-            </p>
+          <div className="kpi" key={m.key} style={{ borderLeft: `3px solid ${m.color}` }}>
+            <div className="top"><span className="dot" style={{ background: m.color }} /><span className="cur">{m.label}</span></div>
+            <div className="val num">{m.sym} {v < 0 ? `(${n})` : n}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{nota}</div>
           </div>
         )
       })}

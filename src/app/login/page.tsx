@@ -22,7 +22,8 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-start justify-center bg-gradient-to-br from-brand-900 to-brand-700 px-4 pt-16">
+    <div className="min-h-screen flex items-start justify-center px-4 pt-16"
+      style={{ background: 'linear-gradient(180deg, #141d30, #0e1626)' }}>
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/10 mb-4">

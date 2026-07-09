@@ -88,7 +88,7 @@ export default function TablaTransacciones({ movimientos, puedeEditar = false }:
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
+            <tr className="text-left text-[11px] uppercase tracking-wide text-gray-400 font-semibold border-b border-gray-200">
               <th className="px-4 py-3">Fecha</th>
               <th className="px-4 py-3">Cliente</th>
               <th className="px-4 py-3">Operación</th>

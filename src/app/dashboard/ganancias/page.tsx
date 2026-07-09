@@ -13,7 +13,10 @@ export default async function GananciasPage() {
   const { data: profileData } = await supabase
     .from('profiles').select('rol, ve_ganancias').eq('id', user.id).single()
   const profile = profileData as { rol: string; ve_ganancias?: boolean } | null
-  if (!profile?.ve_ganancias) redirect('/dashboard')
+
+  // Sin permiso individual: mostramos un aviso de acceso (NO redirigimos a Inicio, que
+  // confundía — parecía que Ganancias mostraba el tablero).
+  const tieneAcceso = !!profile?.ve_ganancias
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
@@ -22,18 +25,29 @@ export default async function GananciasPage() {
         <p className="text-gray-500 text-sm mt-1">Resultados del negocio</p>
       </div>
 
-      <div className="card p-8 text-center space-y-3">
-        <p className="text-4xl">💰</p>
-        <p className="font-semibold text-gray-900">Módulo en construcción</p>
-        <p className="text-sm text-gray-500 max-w-md mx-auto">
-          El cálculo ya está desarrollado y validado contra la planilla (réplica exacta de la
-          solapa COLO, con los supuestos parametrizables). Se conecta a esta pantalla apenas
-          se apruebe el diseño que está en revisión.
-        </p>
-        <p className="text-xs text-gray-400">
-          Tenés acceso a este módulo porque tu usuario tiene el permiso 💰 Ganancias.
-        </p>
-      </div>
+      {tieneAcceso ? (
+        <div className="card p-8 text-center space-y-3">
+          <p className="text-4xl">💰</p>
+          <p className="font-semibold text-gray-900">Módulo en construcción</p>
+          <p className="text-sm text-gray-500 max-w-md mx-auto">
+            El cálculo ya está desarrollado y validado contra la planilla (réplica exacta de la
+            solapa COLO, con los supuestos parametrizables). Se conecta a esta pantalla apenas
+            se apruebe el diseño que está en revisión.
+          </p>
+          <p className="text-xs text-gray-400">
+            Tenés acceso a este módulo porque tu usuario tiene el permiso 💰 Ganancias.
+          </p>
+        </div>
+      ) : (
+        <div className="card p-8 text-center space-y-3">
+          <p className="text-4xl">🔒</p>
+          <p className="font-semibold text-gray-900">Acceso restringido</p>
+          <p className="text-sm text-gray-500 max-w-md mx-auto">
+            El módulo de Ganancias usa un permiso individual (💰) que hoy tu usuario no tiene.
+            Se habilita desde <b>Usuarios</b>, marcando el acceso a Ganancias en el perfil.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

@@ -93,14 +93,14 @@ export default function TablaMovimientos({ movimientos }: { movimientos: DiarioR
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-100">
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Fecha</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Cuenta</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Tipo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Concepto</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Ref.</th>
+            <tr className="border-b border-gray-200 text-[11px] uppercase tracking-wide text-gray-400">
+              <th className="text-left px-4 py-3 font-semibold">Fecha</th>
+              <th className="text-left px-4 py-3 font-semibold">Cuenta</th>
+              <th className="text-left px-4 py-3 font-semibold">Tipo</th>
+              <th className="text-left px-4 py-3 font-semibold">Concepto</th>
+              <th className="text-left px-4 py-3 font-semibold">Ref.</th>
               {cols.map(c => (
-                <th key={c.key} className="text-right px-4 py-3 font-medium text-gray-600">{c.label}</th>
+                <th key={c.key} className="text-right px-4 py-3 font-semibold">{c.label}</th>
               ))}
             </tr>
           </thead>

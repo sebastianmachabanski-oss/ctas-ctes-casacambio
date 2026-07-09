@@ -44,12 +44,13 @@
   .card  { @apply bg-white rounded-xl border shadow-sm; border-color: var(--grid); }
 }
 
-/* ── Barra de scroll fina en tono del sidebar ── */
-* { scrollbar-width: thin; scrollbar-color: #c3ccdc var(--page); }
+/* ── Barra de scroll fina, en navy (mismo tono del sidebar, como el mockup) ── */
+* { scrollbar-width: thin; scrollbar-color: #33436a var(--side-bg2); }
 ::-webkit-scrollbar { width: 11px; height: 11px; }
-::-webkit-scrollbar-track { background: var(--page); }
-::-webkit-scrollbar-thumb { background: #cbd3e1; border-radius: 8px; border: 2px solid var(--page); }
-::-webkit-scrollbar-thumb:hover { background: #b3bdd0; }
+::-webkit-scrollbar-track { background: var(--side-bg2); }
+::-webkit-scrollbar-thumb { background: #33436a; border-radius: 8px; border: 2px solid var(--side-bg2); }
+::-webkit-scrollbar-thumb:hover { background: #425584; }
+.cc-nav::-webkit-scrollbar-track { background: transparent; }
 [hidden] { display: none !important; }
 
 /* ═══════════════ Sidebar (navy, anclable + hamburguesa) ═══════════════ */

@@ -61,18 +61,18 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
       </div>
 
       <div className="card p-5">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Movimientos en base</p>
-            <p className="text-2xl font-bold text-gray-900">{currentTotal.toLocaleString('es-AR')}</p>
+        <div className="kpis-caja" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))' }}>
+          <div className="kpi">
+            <span className="cur">Movimientos en base</span>
+            <div className="val num">{currentTotal.toLocaleString('es-AR')}</div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">Última sincronización</p>
-            <p className="text-sm font-medium text-gray-900">
+          <div className="kpi">
+            <span className="cur">Última sincronización</span>
+            <div className="val" style={{ fontSize: 15 }}>
               {currentSync
                 ? new Date(currentSync).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                 : 'Nunca'}
-            </p>
+            </div>
           </div>
         </div>
 
