@@ -7,21 +7,24 @@ import type { Profile } from '@/lib/supabase/types'
 
 type Item = { href?: string; label: string; icon: string; off?: boolean; section?: string }
 
-// Menú por rol. Habilitadas: Inicio, Cuentas Corrientes, Nueva transacción, Usuarios,
-// Mi cuenta. El resto queda visible pero deshabilitado ("pronto") hasta habilitarlo.
+// Menú por rol.
+// NOTA (validación): temporalmente TODAS las opciones quedan habilitadas para que el
+// cliente pueda recorrer y validar cada pantalla. Una vez validado, volver a poner
+// `off: true` (y quitar el href) en: Transacciones, Dinero en calle, Saldos Pendientes,
+// Ganancias y Sincronizar — que son las que quedan deshabilitadas ("pronto").
 const NAV: Record<string, Item[]> = {
   superusuario: [
     { section: 'Operación', label: '', icon: '' },
     { href: '/dashboard/inicio',            label: 'Inicio',            icon: '📊' },
     { href: '/dashboard/cuenta-corriente',  label: 'Cuentas Corrientes', icon: '📋' },
     { href: '/dashboard/nueva-transaccion', label: 'Nueva transacción', icon: '💱' },
-    { label: 'Transacciones',    icon: '💲', off: true },
-    { label: 'Dinero en calle',  icon: '🚚', off: true },
-    { label: 'Saldos Pendientes', icon: '📈', off: true },
+    { href: '/dashboard/transacciones', label: 'Transacciones',    icon: '💲' },
+    { href: '/dashboard/calle',         label: 'Dinero en calle',  icon: '🚚' },
+    { href: '/dashboard/deudores',      label: 'Saldos Pendientes', icon: '📈' },
     { section: 'Gestión', label: '', icon: '' },
-    { label: 'Ganancias',   icon: '💰', off: true },
-    { href: '/dashboard/admin/usuarios', label: 'Usuarios', icon: '👥' },
-    { label: 'Sincronizar', icon: '🔄', off: true },
+    { href: '/dashboard/ganancias',      label: 'Ganancias', icon: '💰' },
+    { href: '/dashboard/admin/usuarios', label: 'Usuarios',  icon: '👥' },
+    { href: '/dashboard/admin/sync',     label: 'Sincronizar', icon: '🔄' },
     { href: '/dashboard/mi-cuenta', label: 'Mi cuenta', icon: '🔑' },
   ],
   operador: [
@@ -29,9 +32,9 @@ const NAV: Record<string, Item[]> = {
     { href: '/dashboard/inicio',            label: 'Inicio',            icon: '📊' },
     { href: '/dashboard/cuenta-corriente',  label: 'Cuentas Corrientes', icon: '📋' },
     { href: '/dashboard/nueva-transaccion', label: 'Nueva transacción', icon: '💱' },
-    { label: 'Transacciones',    icon: '💲', off: true },
-    { label: 'Dinero en calle',  icon: '🚚', off: true },
-    { label: 'Saldos Pendientes', icon: '📈', off: true },
+    { href: '/dashboard/transacciones', label: 'Transacciones',    icon: '💲' },
+    { href: '/dashboard/calle',         label: 'Dinero en calle',  icon: '🚚' },
+    { href: '/dashboard/deudores',      label: 'Saldos Pendientes', icon: '📈' },
     { section: 'Cuenta', label: '', icon: '' },
     { href: '/dashboard/mi-cuenta', label: 'Mi cuenta', icon: '🔑' },
   ],
