@@ -10,13 +10,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
   if (!profile) redirect('/login')
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div style={{ minHeight: '100vh' }}>
       <Sidebar profile={profile as any} />
       <BlockBack />
-      {/* pt-14 en mobile para compensar el top bar fijo */}
-      <main className="flex-1 overflow-y-auto bg-amber-50 pt-14 md:pt-0">
-        {children}
-      </main>
+      <div className="cc-main">
+        <header className="cc-topbar">
+          <button id="cc-hamb" className="cc-hamb" aria-label="Menú">☰</button>
+          <div>
+            <div className="cc-crumb">Casa de Cambio</div>
+          </div>
+        </header>
+        <main>{children}</main>
+      </div>
     </div>
   )
 }

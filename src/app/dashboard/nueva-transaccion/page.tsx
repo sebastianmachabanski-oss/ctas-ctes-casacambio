@@ -39,7 +39,7 @@ export default async function NuevaTransaccionPage() {
         <p className="text-gray-500 text-sm mt-1">Registrá un movimiento de caja o cuenta corriente</p>
       </div>
 
-      <div className="max-w-3xl">
+      <div className="max-w-5xl">
         <NuevaTransaccionForm clientes={clientes} />
       </div>
     </div>

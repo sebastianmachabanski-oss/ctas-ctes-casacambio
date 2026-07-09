@@ -8,9 +8,16 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Paleta de marca azul (según el mockup de la app). El sidebar usa su propio
+        // navy definido en globals.css; acá vive el azul de acciones y acentos.
         brand: {
-          50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac',
-          500: '#5a8f69', 600: '#4a7c59', 700: '#3d6b4a', 800: '#2d5a3d', 900: '#1a3d28',
+          50: '#eff4ff', 100: '#dbe6fe', 200: '#bfd3fe', 300: '#93b4fd', 400: '#5a8cf9',
+          500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a',
+        },
+        // Tonos del sidebar navy (para usarlos con clases utilitarias si hace falta).
+        side: {
+          900: '#0e1626', 800: '#141d30', 700: '#1e2a44', 600: '#2a3b61', 500: '#33436a',
+          ink: '#c3cee3', dim: '#7787a5',
         },
       },
     },

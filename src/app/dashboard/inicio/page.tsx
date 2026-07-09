@@ -1,0 +1,92 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import TableroInicio from '@/components/inicio/TableroInicio'
+
+// Columnas de "calle" (dinero con repartidor asignado). Regla de la planilla: al total
+// solo suman los valores POSITIVOS.
+const COLS_CALLE = ['pesos', 'cheques', 'dolares', 'euros', 'reales'] as const
+
+async function traerTodo<T>(fetchPage: (from: number, to: number) => Promise<T[]>): Promise<T[]> {
+  const PAGE = 1000
+  const acc: T[] = []
+  for (let from = 0; ; from += PAGE) {
+    const page = await fetchPage(from, from + PAGE - 1)
+    if (!page.length) break
+    acc.push(...page)
+    if (page.length < PAGE) break
+  }
+  return acc
+}
+
+export default async function InicioPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: profileData } = await supabase.from('profiles').select('rol, nombre').eq('id', user.id).single()
+  const profile = profileData as { rol: string; nombre: string } | null
+  if (!profile) redirect('/login')
+  if (profile.rol !== 'superusuario' && profile.rol !== 'operador') redirect('/dashboard/cuenta-corriente')
+
+  // 1) Totales de caja (saldo por moneda = suma de cada columna) + cc por moneda.
+  const { data: totalesData } = await (supabase as any).rpc('caja_totales')
+  const t = (totalesData ?? {}) as Record<string, number>
+
+  // 2) Total en calle por moneda (solo positivos).
+  const calleRows = await traerTodo<Record<string, number>>(async (from, to) => {
+    const { data } = await supabase.from('movimientos_caja')
+      .select('pesos,cheques,dolares,euros,reales')
+      .not('debe', 'is', null)
+      .neq('operacion', 'OPERACION?')
+      .range(from, to)
+    return (data ?? []) as any[]
+  })
+  const calle: Record<string, number> = {}
+  for (const col of COLS_CALLE) calle[col] = calleRows.reduce((s, m) => s + Math.max(0, m[col] ?? 0), 0)
+
+  // 3) Clientes — pestaña Caja (totales por cliente) y pestaña Cta cte (saldos por cuenta).
+  const clientesCaja = await traerTodo<any>(async (from, to) => {
+    const { data } = await supabase.from('caja_clientes')
+      .select('cliente,pesos,dolares,euros,reales')
+      .order('cliente')
+      .range(from, to)
+    return (data ?? []) as any[]
+  })
+  const clientesCC = await traerTodo<any>(async (from, to) => {
+    const { data } = await supabase.from('saldos_cuenta_corriente')
+      .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales')
+      .order('cuenta_cte')
+      .range(from, to)
+    return (data ?? []) as any[]
+  })
+
+  // 4) Serie diaria del saldo en dólares (para el gráfico de línea y los deltas mensuales).
+  const { data: serieData } = await (supabase as any).rpc('caja_saldo_diario', { p_moneda: 'dolares' })
+  const serie = ((serieData ?? []) as any[]).map(r => ({ fecha: r.fecha as string, saldo: Number(r.saldo) }))
+
+  const kpis = [
+    { cur: 'Pesos',   col: '#2563eb', caja: t.pesos ?? 0,   calle: calle.pesos,   cc: t.cc_pesos ?? 0 },
+    { cur: 'Dólares', col: '#16a34a', caja: t.dolares ?? 0, calle: calle.dolares, cc: t.cc_dolares ?? 0 },
+    { cur: 'Euros',   col: '#7c3aed', caja: t.euros ?? 0,   calle: calle.euros,   cc: t.cc_euros ?? 0 },
+    { cur: 'Reales',  col: '#eab308', caja: t.reales ?? 0,  calle: calle.reales,  cc: t.cc_reales ?? 0 },
+    { cur: 'Cheques', col: '#0d9488', caja: t.cheques ?? 0, calle: calle.cheques, cc: null },
+    { cur: 'Banco',   col: '#8a94a6', caja: t.banco ?? 0,   calle: null,          cc: null },
+  ]
+
+  const clientesCajaN = clientesCaja.map(c => ({
+    nombre: c.cliente, pesos: Number(c.pesos) || 0, dolares: Number(c.dolares) || 0,
+    euros: Number(c.euros) || 0, reales: Number(c.reales) || 0,
+  }))
+  const clientesCCN = clientesCC.map(c => ({
+    nombre: c.cuenta_cte, pesos: Number(c.saldo_pesos) || 0, dolares: Number(c.saldo_dolares) || 0,
+    euros: Number(c.saldo_euros) || 0, reales: Number(c.saldo_reales) || 0,
+  }))
+
+  return (
+    <TableroInicio
+      kpis={kpis}
+      clientesCaja={clientesCajaN}
+      clientesCC={clientesCCN}
+      serieUSD={serie}
+    />
+  )
+}
