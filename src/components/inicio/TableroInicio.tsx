@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 type KPI = { cur: string; col: string; caja: number; calle: number | null; cc: number | null }
 type Cliente = { nombre: string; pesos: number; dolares: number; euros: number; reales: number }
@@ -11,32 +12,40 @@ const cell = (n: number) => n === 0
   ? <td className="zero">—</td>
   : <td className={`num ${n < 0 ? 'neg' : ''}`}>{money(n)}</td>
 
-// Filtros de período (como el mockup): días hacia atrás desde la última fecha con datos.
-const PERIODOS: [string, number][] = [['Día', 7], ['Semana', 30], ['Mes', 90], ['Año', 365]]
+// Filtros de período (como el mockup). Navegan por URL: el servidor re-consulta TODOS
+// los reportes (KPIs, clientes) con ese rango; el gráfico ajusta su ventana.
+const PERIODOS: [string, string][] = [['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes'], ['anio', 'Año'], ['', 'Todo']]
+const VENTANA: Record<string, number> = { dia: 3, semana: 7, mes: 30, anio: 365, '': 90 }
 
-export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD }: {
+export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD, periodo, rDesde, rHasta }: {
   kpis: KPI[]; clientesCaja: Cliente[]; clientesCC: Cliente[]; serieUSD: Punto[]
+  periodo: string; rDesde: string; rHasta: string
 }) {
+  const router = useRouter()
   const [vista, setVista] = useState<'caja' | 'cc'>('caja')
   const [busca, setBusca] = useState('')
-  const [periodo, setPeriodo] = useState('Mes')
-  const [ventana, setVentana] = useState(90)
-  const [rango, setRango] = useState(false)
-  const [r1, setR1] = useState('')
-  const [r2, setR2] = useState('')
+  const esRango = !!(rDesde || rHasta)
+  const [rangoOpen, setRangoOpen] = useState(esRango)
+  const [r1, setR1] = useState(rDesde)
+  const [r2, setR2] = useState(rHasta)
 
-  function elegirPeriodo(lbl: string, dias: number) {
-    setPeriodo(lbl); setRango(false); setVentana(dias)
+  const ventana = esRango && rDesde && rHasta
+    ? Math.max(2, Math.round((new Date(rHasta).getTime() - new Date(rDesde).getTime()) / 86400000))
+    : (VENTANA[periodo] ?? 90)
+  const esTodo = !periodo && !esRango
+
+  function elegirPeriodo(id: string) {
+    setRangoOpen(false)
+    router.replace('/dashboard/inicio' + (id ? `?p=${id}` : ''))
   }
   function aplicarRango(a: string, b: string) {
     setR1(a); setR2(b)
-    if (a && b) {
-      const dias = Math.max(2, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000))
-      setVentana(dias); setPeriodo(''); setRango(true)
-    }
+    if (a && b) router.replace(`/dashboard/inicio?desde=${a}&hasta=${b}`)
   }
 
-  const saldoUSD = kpis.find(k => k.cur === 'Dólares')?.caja ?? 0
+  // El hero del gráfico muestra siempre el saldo ACTUAL (último punto de la serie);
+  // los KPIs de arriba responden al período elegido.
+  const saldoUSD = serieUSD.length ? serieUSD[serieUSD.length - 1].saldo : 0
 
   const fuente = vista === 'caja' ? clientesCaja : clientesCC
   const filtrados = useMemo(() => {
@@ -48,14 +57,17 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
     <div className="p-4 md:p-6" style={{ display: 'grid', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div className="sec-lbl" style={{ margin: 0 }}>
-          Situación de caja — ahora <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--muted)' }}>· se actualiza con cada sincronización</span>
+          {esTodo ? 'Situación de caja — ahora' : 'Caja — movimiento del período'}{' '}
+          <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--muted)' }}>
+            {esTodo ? '· se actualiza con cada sincronización' : '· los reportes de abajo responden al período elegido'}
+          </span>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          {PERIODOS.map(([lbl, d]) => (
-            <button key={lbl} className={`chip ${periodo === lbl ? 'on' : ''}`} onClick={() => elegirPeriodo(lbl, d)}>{lbl}</button>
+          {PERIODOS.map(([id, lbl]) => (
+            <button key={lbl} className={`chip ${!esRango && !rangoOpen && periodo === id ? 'on' : ''}`} onClick={() => elegirPeriodo(id)}>{lbl}</button>
           ))}
-          <button className={`chip ${rango ? 'on' : ''}`} onClick={() => setRango(true)}>Rango…</button>
-          {rango && (
+          <button className={`chip ${esRango || rangoOpen ? 'on' : ''}`} onClick={() => setRangoOpen(true)}>Rango…</button>
+          {rangoOpen && (
             <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
               <input className="srch" type="date" value={r1} onChange={e => aplicarRango(e.target.value, r2)} style={{ width: 140, minWidth: 0 }} />
               <span style={{ color: 'var(--muted)' }}>→</span>
@@ -122,7 +134,9 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
         <div style={{ display: 'grid', gap: 14, minWidth: 0, gridTemplateRows: 'auto 1fr' }}>
           <section className="card">
             <div className="card-h"><h2 className="card-t">Saldo en caja — Dólares</h2>
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{rango ? 'rango elegido' : periodo}</span>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                {esRango ? 'rango elegido' : (PERIODOS.find(([id]) => id === periodo)?.[1] ?? 'Todo')}
+              </span>
             </div>
             <div className="hero-line"><span className="big num">USD {money(saldoUSD)}</span></div>
             <div className="chart-pad"><LineaSaldo serie={serieUSD} dias={ventana} /></div>

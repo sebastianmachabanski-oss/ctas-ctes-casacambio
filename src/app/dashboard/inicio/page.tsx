@@ -18,7 +18,22 @@ async function traerTodo<T>(fetchPage: (from: number, to: number) => Promise<T[]
   return acc
 }
 
-export default async function InicioPage() {
+// Período elegido en el tablero → rango de fechas (hoy en huso de Argentina).
+function hoyArgentina(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date())
+}
+function restarDias(fechaISO: string, dias: number): string {
+  const d = new Date(fechaISO + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() - dias)
+  return d.toISOString().slice(0, 10)
+}
+const P_DIAS: Record<string, number> = { dia: 0, semana: 6, mes: 29, anio: 364 }
+
+export default async function InicioPage({
+  searchParams,
+}: {
+  searchParams: { p?: string; desde?: string; hasta?: string }
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -27,8 +42,21 @@ export default async function InicioPage() {
   if (!profile) redirect('/login')
   if (profile.rol !== 'superusuario' && profile.rol !== 'operador') redirect('/dashboard/cuenta-corriente')
 
-  // 1) Totales de caja (saldo por moneda = suma de cada columna) + cc por moneda.
-  const { data: totalesData } = await (supabase as any).rpc('caja_totales')
+  // Rango del período: sin parámetros = TODO el historial (situación actual de caja).
+  // Con p=dia|semana|mes|anio o desde/hasta, TODOS los reportes se consultan con ese rango.
+  const p = searchParams.p ?? ''
+  let desde: string | null = null
+  let hasta: string | null = null
+  if (searchParams.desde || searchParams.hasta) {
+    desde = searchParams.desde || null
+    hasta = searchParams.hasta || null
+  } else if (p in P_DIAS) {
+    hasta = hoyArgentina()
+    desde = restarDias(hasta, P_DIAS[p])
+  }
+
+  // 1) Totales de caja del período (saldo/movimiento por moneda = suma de cada columna).
+  const { data: totalesData } = await (supabase as any).rpc('caja_totales', { p_desde: desde, p_hasta: hasta })
   const t = (totalesData ?? {}) as Record<string, number>
 
   // 2) Total en calle por moneda (solo positivos).
@@ -43,14 +71,22 @@ export default async function InicioPage() {
   const calle: Record<string, number> = {}
   for (const col of COLS_CALLE) calle[col] = calleRows.reduce((s, m) => s + Math.max(0, m[col] ?? 0), 0)
 
-  // 3) Clientes — pestaña Caja (totales por cliente) y pestaña Cta cte (saldos por cuenta).
-  const clientesCaja = await traerTodo<any>(async (from, to) => {
-    const { data } = await supabase.from('caja_clientes')
-      .select('cliente,pesos,dolares,euros,reales')
-      .order('cliente')
-      .range(from, to)
-    return (data ?? []) as any[]
-  })
+  // 3) Clientes — pestaña Caja (totales por cliente EN EL PERÍODO) y pestaña Cta cte.
+  // RPC con rango de fechas; si la migración aún no corrió, cae a la vista sin filtro.
+  let clientesCaja: any[] = []
+  const { data: cajaCliData, error: cajaCliError } = await (supabase as any)
+    .rpc('caja_clientes_periodo', { p_desde: desde, p_hasta: hasta })
+  if (!cajaCliError) {
+    clientesCaja = ((cajaCliData ?? []) as any[]).sort((a, b) => String(a.cliente).localeCompare(String(b.cliente), 'es'))
+  } else {
+    clientesCaja = await traerTodo<any>(async (from, to) => {
+      const { data } = await supabase.from('caja_clientes')
+        .select('cliente,pesos,dolares,euros,reales')
+        .order('cliente')
+        .range(from, to)
+      return (data ?? []) as any[]
+    })
+  }
   const clientesCC = await traerTodo<any>(async (from, to) => {
     const { data } = await supabase.from('saldos_cuenta_corriente')
       .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales')
@@ -87,6 +123,9 @@ export default async function InicioPage() {
       clientesCaja={clientesCajaN}
       clientesCC={clientesCCN}
       serieUSD={serie}
+      periodo={p in P_DIAS ? p : ''}
+      rDesde={searchParams.desde ?? ''}
+      rHasta={searchParams.hasta ?? ''}
     />
   )
 }

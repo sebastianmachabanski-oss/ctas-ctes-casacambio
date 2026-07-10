@@ -19,13 +19,14 @@ function esIngreso(op: string): boolean {
   return o.includes('INGRES') || o === 'DONACION'
 }
 
-// COMPROMISO → Egreso, DONACION → Ingreso
+// COMPROMISO → Egreso, DONACION → Ingreso (tags con los colores del mockup)
 function opLabel(op: string) {
   const labelIngreso = process.env.NEXT_PUBLIC_LABEL_INGRESO ?? 'Ingreso'
   const labelEgreso  = process.env.NEXT_PUBLIC_LABEL_EGRESO  ?? 'Egreso'
-  if (op === 'DONACION')   return { label: labelIngreso, cls: 'bg-green-100 text-green-700' }
-  if (op === 'COMPROMISO') return { label: labelEgreso,  cls: 'bg-red-100 text-red-700' }
-  return { label: op, cls: 'bg-gray-100 text-gray-700' }
+  if (op === 'DONACION')   return { label: labelIngreso, cls: 'tag tag-green' }
+  if (op === 'COMPROMISO') return { label: labelEgreso,  cls: 'tag tag-red' }
+  if (esIngreso(op))       return { label: op, cls: 'tag tag-green' }
+  return { label: op, cls: 'tag tag-gray' }
 }
 
 function MovimientoCard({ m }: { m: DiarioRow }) {
@@ -89,49 +90,39 @@ export default function TablaMovimientos({ movimientos }: { movimientos: DiarioR
         {movimientos.map(m => <MovimientoCard key={m.id} m={m} />)}
       </div>
 
-      {/* Desktop: tabla */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-sm">
+      {/* Desktop: tabla (estilo mockup) */}
+      <div className="hidden md:block tbl-wrap">
+        <table className="cc-tbl">
           <thead>
-            <tr className="border-b border-gray-200 text-[11px] uppercase tracking-wide text-gray-400">
-              <th className="text-left px-4 py-3 font-semibold">Fecha</th>
-              <th className="text-left px-4 py-3 font-semibold">Cuenta</th>
-              <th className="text-left px-4 py-3 font-semibold">Tipo</th>
-              <th className="text-left px-4 py-3 font-semibold">Concepto</th>
-              <th className="text-left px-4 py-3 font-semibold">Ref.</th>
-              {cols.map(c => (
-                <th key={c.key} className="text-right px-4 py-3 font-semibold">{c.label}</th>
-              ))}
+            <tr>
+              <th style={{ textAlign: 'left' }}>Fecha</th>
+              <th style={{ textAlign: 'left' }}>Cuenta</th>
+              <th style={{ textAlign: 'left' }}>Operación</th>
+              <th style={{ textAlign: 'left' }}>Detalle</th>
+              <th style={{ textAlign: 'left' }}>Ref.</th>
+              {cols.map(c => <th key={c.key}>{c.label}</th>)}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody>
             {movimientos.map(m => {
               const { label, cls } = opLabel(m.operacion)
               const ingreso = esIngreso(m.operacion)
               return (
-                <tr key={m.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                <tr key={m.id}>
+                  <td style={{ color: 'var(--muted)', fontWeight: 400 }}>
                     {new Date(m.fecha + 'T12:00:00').toLocaleDateString('es-AR')}
                   </td>
-                  <td className="px-4 py-3 font-medium text-gray-900 max-w-[160px] truncate">
-                    {m.cuenta_cte}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>
-                      {label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{m.concepto ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{m.evento ?? '—'}</td>
+                  <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.cuenta_cte}</td>
+                  <td style={{ textAlign: 'left' }}><span className={cls}>{label}</span></td>
+                  <td style={{ textAlign: 'left', color: 'var(--ink-2)', fontWeight: 400 }}>{m.concepto ?? '—'}</td>
+                  <td style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 400, fontSize: 12 }}>{m.evento ?? '—'}</td>
                   {cols.map(c => {
-                    const text = fmt(m[c.key], c.sym)
+                    const v = m[c.key]
+                    if (!v || v === 0) return <td key={c.key} className="zero">—</td>
+                    const n = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(Math.abs(v))
                     return (
-                      <td key={c.key} className="px-4 py-3 text-right tabular-nums">
-                        {text
-                          ? <span className={ingreso ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                              {ingreso ? '+' : '-'}{text}
-                            </span>
-                          : <span className="text-gray-300">—</span>}
+                      <td key={c.key} className={`num ${ingreso ? '' : 'neg'}`}>
+                        {ingreso ? `${c.sym} ${n}` : `${c.sym} (${n})`}
                       </td>
                     )
                   })}

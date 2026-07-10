@@ -85,26 +85,26 @@ export default function ListaCalle({
       {/* Un bloque por repartidor */}
       {grupos.map(([repartidor, movs]) => (
         <div key={repartidor} className="card overflow-hidden">
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--grid)', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontWeight: 650 }}>🚚 {repartidor}</span>
-            <span style={{ color: 'var(--muted)', fontSize: 12 }}>{movs.length} mov.</span>
+          <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--grid)', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 650, fontSize: 13 }}>🚚 {repartidor}</span>
+            <span style={{ color: 'var(--muted)', fontSize: 11.5 }}>{movs.length} mov.</span>
           </div>
           {movs.map(m => (
-            <div key={m.id} style={{ padding: '11px 16px', borderBottom: '1px solid var(--grid)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div key={m.id} style={{ padding: '9px 16px', borderBottom: '1px solid var(--grid)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 12.5 }}>
               <div style={{ minWidth: 0 }}>
-                <b style={{ fontSize: 13.5 }}>{m.cliente ?? '—'}</b>{' '}
-                <span style={{ color: 'var(--muted)', fontSize: 12 }}>· {fmtFecha(m.fecha)} · {m.operacion}</span>
-                {m.notas && <p style={{ color: 'var(--muted)', fontSize: 12, margin: '2px 0 0' }}>{m.notas}</p>}
+                <span>{m.cliente ?? '—'}</span>{' '}
+                <span style={{ color: 'var(--muted)', fontSize: 11.5 }}>· {fmtFecha(m.fecha)} · {m.operacion}</span>
+                {m.notas && <p style={{ color: 'var(--muted)', fontSize: 11.5, margin: '2px 0 0' }}>{m.notas}</p>}
               </div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {positivos(m).map(x => (
-                  <span key={x.col} className="imp n">{SIMBOLOS[x.col]} {nf.format(x.v)}</span>
+                  <span key={x.col} className="imp n" style={{ fontSize: 11.5 }}>{SIMBOLOS[x.col]} {nf.format(x.v)}</span>
                 ))}
-                {positivos(m).length === 0 && <span style={{ color: 'var(--muted)', fontSize: 12 }}>sin montos positivos</span>}
+                {positivos(m).length === 0 && <span style={{ color: 'var(--muted)', fontSize: 11.5 }}>sin montos positivos</span>}
                 {puedeIngresar && (
                   <button
                     className="btn-primary"
-                    style={{ fontSize: 12, padding: '6px 12px' }}
+                    style={{ fontSize: 11.5, padding: '5px 10px' }}
                     disabled={procesando === m.id}
                     onClick={() => ingresar(m)}>
                     {procesando === m.id ? 'Registrando…' : '✓ Ingresó a caja'}
