@@ -55,11 +55,6 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-2xl">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Sincronización</h1>
-        <p className="text-gray-500 text-sm mt-1">Actualiza los datos desde Google Sheets</p>
-      </div>
-
       <div className="card p-5">
         <div className="kpis-caja" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))' }}>
           <div className="kpi">

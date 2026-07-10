@@ -81,13 +81,6 @@ export default async function TransaccionesPage({
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Transacciones</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Todos los movimientos de la caja, sincronizados desde la planilla
-        </p>
-      </div>
-
       <div className="card p-4 md:p-5">
         <FiltrosTransacciones
           valoresIniciales={{ desde, hasta, cliente, operacion, tipo }}

@@ -36,35 +36,24 @@ export default async function DeudoresPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-5">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Saldos Pendientes</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          {deudores.length} cuenta{deudores.length !== 1 ? 's' : ''} con saldo pendiente
-        </p>
-      </div>
-
-      {/* Resumen totales */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Resumen totales — tarjetas KPI del tablero */}
+      <div className="kpis">
         {[
-          { label: 'Total Dólares', value: totalDolares, sym: 'U$S', color: 'bg-red-50 border-red-200 text-red-900' },
-          { label: 'Total Pesos',   value: totalPesos,   sym: '$',   color: 'bg-orange-50 border-orange-200 text-orange-900' },
-          { label: 'Total Euros',   value: totalEuros,   sym: '€',   color: 'bg-purple-50 border-purple-200 text-purple-900' },
-          { label: 'Total Reales',  value: totalReales,  sym: 'R$',  color: 'bg-yellow-50 border-yellow-200 text-yellow-900' },
+          { label: 'Total Dólares', value: totalDolares, sym: 'U$S', dot: '#16a34a' },
+          { label: 'Total Pesos',   value: totalPesos,   sym: '$',   dot: '#2563eb' },
+          { label: 'Total Euros',   value: totalEuros,   sym: '€',   dot: '#7c3aed' },
+          { label: 'Total Reales',  value: totalReales,  sym: 'R$',  dot: '#eab308' },
         ].filter(t => t.value > 0).map(t => (
-          <div key={t.label} className={`card border p-3 md:p-4 ${t.color}`}>
-            <p className="text-xs font-medium opacity-70 uppercase tracking-wide mb-1">{t.label}</p>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xs font-medium opacity-60">{t.sym}</span>
-              <span className="text-xl md:text-2xl font-bold">
-                {new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(t.value)}
-              </span>
-            </div>
+          <div key={t.label} className="kpi">
+            <div className="top"><span className="dot" style={{ background: t.dot }} /><span className="cur">{t.label}</span></div>
+            <div className="val num">{t.sym} {new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(t.value)}</div>
           </div>
         ))}
       </div>
 
       {/* Tabla */}
       <div className="card overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 font-semibold text-gray-900">Cuentas con saldo pendiente</div>
         {/* Mobile: cards */}
         <div className="md:hidden divide-y divide-gray-100">
           {deudores.map((s: any) => (
@@ -102,13 +91,13 @@ export default async function DeudoresPage() {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left px-4 py-3 font-medium text-gray-600">#</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Cuenta corriente</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600">Dólares</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600">Pesos</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600">Euros</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600">Reales</th>
+              <tr className="border-b border-gray-200 text-[11px] uppercase tracking-wide text-gray-400">
+                <th className="text-left px-4 py-3 font-semibold">#</th>
+                <th className="text-left px-4 py-3 font-semibold">Cuenta corriente</th>
+                <th className="text-right px-4 py-3 font-semibold">Dólares</th>
+                <th className="text-right px-4 py-3 font-semibold">Pesos</th>
+                <th className="text-right px-4 py-3 font-semibold">Euros</th>
+                <th className="text-right px-4 py-3 font-semibold">Reales</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">

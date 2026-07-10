@@ -20,11 +20,6 @@ export default async function GananciasPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Ganancias</h1>
-        <p className="text-gray-500 text-sm mt-1">Resultados del negocio</p>
-      </div>
-
       {tieneAcceso ? (
         <div className="card p-8 text-center space-y-3">
           <p className="text-4xl">💰</p>

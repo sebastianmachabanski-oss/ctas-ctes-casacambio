@@ -117,10 +117,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
   return (
     <div className="p-4 md:p-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Usuarios</h1>
-          <p className="text-gray-500 text-sm mt-1">{usuarios.length} usuarios registrados</p>
-        </div>
+        <p className="text-gray-500 text-sm">{usuarios.length} usuarios registrados</p>
         <button onClick={abrirNuevo} className="btn-primary">+ Nuevo usuario</button>
       </div>
 
@@ -173,13 +170,13 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
         <div className="hidden md:block">
           <table className="w-full text-sm table-fixed">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="text-left px-3 py-3 font-medium text-gray-600 w-[28%]">Nombre</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-600 w-[12%]">Teléfono</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-600 w-[12%]">Rol</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-600 w-[16%]">Cuenta cte.</th>
-                <th className="text-center px-3 py-3 font-medium text-gray-600 w-[8%]">Estado</th>
-                <th className="text-center px-3 py-3 font-medium text-gray-600 w-[24%]">Acciones</th>
+              <tr className="border-b border-gray-200 text-[11px] uppercase tracking-wide text-gray-400">
+                <th className="text-left px-3 py-3 font-semibold w-[28%]">Nombre</th>
+                <th className="text-left px-3 py-3 font-semibold w-[12%]">Teléfono</th>
+                <th className="text-left px-3 py-3 font-semibold w-[12%]">Rol</th>
+                <th className="text-left px-3 py-3 font-semibold w-[16%]">Cuenta cte.</th>
+                <th className="text-center px-3 py-3 font-semibold w-[8%]">Estado</th>
+                <th className="text-center px-3 py-3 font-semibold w-[24%]">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">

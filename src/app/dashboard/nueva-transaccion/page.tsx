@@ -34,11 +34,6 @@ export default async function NuevaTransaccionPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">Nueva transacción</h1>
-        <p className="text-gray-500 text-sm mt-1">Registrá un movimiento de caja o cuenta corriente</p>
-      </div>
-
       <div className="max-w-5xl">
         <NuevaTransaccionForm clientes={clientes} />
       </div>
