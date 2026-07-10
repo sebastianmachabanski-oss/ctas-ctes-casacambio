@@ -34,9 +34,7 @@ export default async function NuevaTransaccionPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <div className="max-w-5xl">
-        <NuevaTransaccionForm clientes={clientes} />
-      </div>
+      <NuevaTransaccionForm clientes={clientes} />
     </div>
   )
 }
