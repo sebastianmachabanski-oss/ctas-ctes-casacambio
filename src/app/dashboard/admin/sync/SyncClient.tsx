@@ -54,21 +54,27 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-2xl">
-      <div className="card p-5">
-        <div className="kpis-caja" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))' }}>
-          <div className="kpi">
-            <span className="cur">Movimientos en base</span>
-            <div className="val num">{currentTotal.toLocaleString('es-AR')}</div>
-          </div>
-          <div className="kpi">
-            <span className="cur">Última sincronización</span>
-            <div className="val" style={{ fontSize: 15 }}>
-              {currentSync
-                ? new Date(currentSync).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                : 'Nunca'}
-            </div>
-          </div>
+    <div className="p-4 md:p-6 space-y-4 max-w-2xl">
+      {/* Estado de la última corrida (estilo mockup) */}
+      <div className="card" style={{ padding: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+          <span className={`tag ${currentSync ? 'tag-green' : 'tag-gray'}`}>{currentSync ? '✓ Sincronizado' : 'Sin corridas'}</span>
+          <span style={{ color: 'var(--muted)', fontSize: 12.5 }}>
+            {currentSync
+              ? new Date(currentSync).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : 'todavía no corrió ninguna sincronización'}
+          </span>
+        </div>
+        <div style={{ color: 'var(--muted)', fontSize: 13 }}>
+          {currentTotal.toLocaleString('es-AR')} movimientos CTA CTE en base · el full completo corre automático cada noche
+        </div>
+      </div>
+
+      {/* Acción */}
+      <div className="card" style={{ padding: 18 }}>
+        <div style={{ fontWeight: 650, marginBottom: 4 }}>Sincronizar ahora</div>
+        <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 12 }}>
+          Trae los últimos 30 días desde la planilla. No borra nada de lo histórico.
         </div>
 
         {resultado && (

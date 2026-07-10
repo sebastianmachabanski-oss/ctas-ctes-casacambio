@@ -178,6 +178,7 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .tag-green { background: var(--pos-bg); color: var(--pos-ink); }
 .tag-red { background: var(--neg-bg); color: var(--neg-ink); }
 .tag-gray { background: var(--grid); color: var(--ink-2); }
+.tag-blue { background: rgba(37,99,235,.12); color: var(--brand-ink); }
 .imp { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
 .imp.p { background: var(--pos-bg); color: var(--pos-ink); }
 .imp.n { background: var(--neg-bg); color: var(--neg-ink); }

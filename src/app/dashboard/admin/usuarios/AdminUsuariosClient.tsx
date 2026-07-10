@@ -10,10 +10,11 @@ type Usuario = {
 interface Props { usuariosIniciales: Usuario[]; cuentas: string[] }
 
 const ROL_LABELS: Record<string, string> = { superusuario: 'Superusuario', operador: 'Operador', cliente: 'Cliente' }
+// Tags de rol con los colores del mockup: superusuario azul, operador gris, cliente verde.
 const ROL_COLORS: Record<string, string> = {
-  superusuario: 'bg-purple-100 text-purple-700',
-  operador: 'bg-blue-100 text-blue-700',
-  cliente: 'bg-gray-100 text-gray-700',
+  superusuario: 'tag tag-blue',
+  operador: 'tag tag-gray',
+  cliente: 'tag tag-green',
 }
 
 function generarEmail(nombre: string) {
@@ -134,7 +135,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                 </div>
                 <div className="flex items-center gap-1.5 ml-2 shrink-0">
                   <span title={u.activo ? 'Activo' : 'Suspendido'} className={`inline-block w-2.5 h-2.5 rounded-full ${u.activo ? 'bg-green-500' : 'bg-red-400'}`} />
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROL_COLORS[u.rol] ?? 'bg-gray-100'}`}>
+                  <span className={ROL_COLORS[u.rol] ?? 'tag tag-gray'}>
                     {ROL_LABELS[u.rol] ?? u.rol}
                   </span>
                   {u.ve_ganancias && <span title="Acceso a Ganancias (superadmin)">💰</span>}
@@ -188,7 +189,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                   </td>
                   <td className="px-3 py-3 text-gray-500 text-xs">{u.telefono ?? '—'}</td>
                   <td className="px-3 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROL_COLORS[u.rol] ?? 'bg-gray-100'}`}>
+                    <span className={ROL_COLORS[u.rol] ?? 'tag tag-gray'}>
                       {ROL_LABELS[u.rol] ?? u.rol}
                     </span>
                     {u.ve_ganancias && <span className="ml-1" title="Acceso a Ganancias (superadmin)">💰</span>}
