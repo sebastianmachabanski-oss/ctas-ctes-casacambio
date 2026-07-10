@@ -22,6 +22,11 @@ const OPERACIONES = ['COMPRA', 'VENTA', 'INGRESAN', 'EGRESAN', 'GASTOS', 'SWITCH
 const nf = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
 const money = (v: number) => v < 0 ? `(${nf.format(-v)})` : nf.format(v)
 const fmtFecha = (f: string) => new Date(f + 'T12:00:00').toLocaleDateString('es-AR')
+const num = (v: any): number => Number(v) || 0
+// "Monto" del movimiento = magnitud del impacto principal (el número grande que se ve en
+// las columnas de moneda), no el campo `monto` de la operación. Es lo que muestra el mockup
+// y sobre lo que opera el filtro "monto ≥".
+const montoPrincipal = (m: Mov): number => Math.max(0, ...IMPACTOS.map(c => Math.abs(num(m[c.key]))))
 function badge(op: string) {
   const o = (op || '').toUpperCase()
   if (['COMPRA', 'INGRESAN', 'SOBRANTE', 'GANANCIA'].includes(o)) return 'tag-green'
@@ -41,7 +46,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const [fMin, setFMin] = useState('')
 
   // Columnas de impacto presentes en la página cargada.
-  const cols = useMemo(() => IMPACTOS.filter(c => movimientos.some(m => (m[c.key] as number ?? 0) !== 0)), [movimientos])
+  const cols = useMemo(() => IMPACTOS.filter(c => movimientos.some(m => num(m[c.key]) !== 0)), [movimientos])
 
   // Filtros por columna: refinan (en vivo) las filas de la página, como el mockup.
   const filtrados = useMemo(() => {
@@ -50,7 +55,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
     return movimientos.filter(m =>
       (m.cliente ?? '').toUpperCase().includes(qc) &&
       (!fOp || m.operacion === fOp) &&
-      Math.abs(m.monto) >= qm)
+      montoPrincipal(m) >= qm)
   }, [movimientos, fCli, fOp, fMin])
 
   // Navegación (rango de fechas y paginación) conservando el estado en la URL.
@@ -118,9 +123,9 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                     {m.debe && <span className="tag tag-gray" style={{ marginLeft: 6, fontWeight: 600 }}>🚚 {m.debe}</span>}
                   </td>
                   <td style={{ textAlign: 'left' }}><span className={`tag ${badge(m.operacion)}`}>{m.operacion}</span></td>
-                  <td className="num">{nf.format(Math.abs(m.monto))}</td>
+                  <td className="num">{nf.format(montoPrincipal(m))}</td>
                   {cols.map(c => {
-                    const v = (m[c.key] as number) ?? 0
+                    const v = num(m[c.key])
                     return <td key={c.key as string}>{v ? <span className={`imp ${v > 0 ? 'p' : 'n'}`}>{money(v)}</span> : <span className="zero">—</span>}</td>
                   })}
                   {puedeEditar && (
