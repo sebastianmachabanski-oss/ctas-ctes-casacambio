@@ -29,8 +29,9 @@ function badge(op: string) {
   return 'tag-gray'
 }
 
-export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total }: {
-  movimientos: Mov[]; puedeEditar: boolean; desde: string; hasta: string; total: number
+export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas }: {
+  movimientos: Mov[]; puedeEditar: boolean; desde: string; hasta: string
+  total: number; pagina: number; totalPaginas: number
 }) {
   const router = useRouter()
   const [d1, setD1] = useState(desde)
@@ -39,25 +40,29 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const [fOp, setFOp] = useState('')
   const [fMin, setFMin] = useState('')
 
-  // Columnas de impacto presentes en el rango cargado.
+  // Columnas de impacto presentes en la página cargada.
   const cols = useMemo(() => IMPACTOS.filter(c => movimientos.some(m => (m[c.key] as number ?? 0) !== 0)), [movimientos])
 
-  // Filtros por columna: refinan (en vivo) las filas del rango cargado, como el mockup.
+  // Filtros por columna: refinan (en vivo) las filas de la página, como el mockup.
   const filtrados = useMemo(() => {
     const qc = fCli.trim().toUpperCase()
-    const qm = Number((fMin || '').replace(/[^\d.-]/g, '')) || 0
+    const qm = Number((fMin || '').replace(/\D/g, '')) || 0   // solo dígitos: "1.000.000" → 1000000
     return movimientos.filter(m =>
       (m.cliente ?? '').toUpperCase().includes(qc) &&
       (!fOp || m.operacion === fOp) &&
       Math.abs(m.monto) >= qm)
   }, [movimientos, fCli, fOp, fMin])
 
-  function buscar() {
-    const p = new URLSearchParams()
-    if (d1) p.set('desde', d1)
-    if (d2) p.set('hasta', d2)
-    router.replace('/dashboard/transacciones?' + p.toString())
+  // Navegación (rango de fechas y paginación) conservando el estado en la URL.
+  function navegar(p: number, d1v = d1, d2v = d2) {
+    const params = new URLSearchParams()
+    if (d1v) params.set('desde', d1v)
+    if (d2v) params.set('hasta', d2v)
+    if (p > 1) params.set('pagina', String(p))
+    const qs = params.toString()
+    router.replace('/dashboard/transacciones' + (qs ? '?' + qs : ''))
   }
+  const buscar = () => navegar(1)  // cambiar el rango vuelve a la página 1
 
   const ncols = 4 + cols.length + (puedeEditar ? 1 : 0)
 
@@ -131,9 +136,19 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
             </tbody>
           </table>
         </div>
-        <div style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <span>{filtrados.length.toLocaleString('es-AR')} de {total.toLocaleString('es-AR')} movimientos{total > movimientos.length ? ` · mostrando ${movimientos.length.toLocaleString('es-AR')} (achicá el rango)` : ''}</span>
-          <span>rango {fmtFecha(desde)} – {fmtFecha(hasta)}</span>
+        <div style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span>
+            {filtrados.length.toLocaleString('es-AR')}
+            {filtrados.length !== movimientos.length ? ` de ${movimientos.length}` : ''} en esta página
+            {' · '}{total.toLocaleString('es-AR')} movimientos en total
+          </span>
+          <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+            <button className="chip" disabled={pagina <= 1} onClick={() => navegar(pagina - 1)}
+              style={{ opacity: pagina <= 1 ? 0.4 : 1, cursor: pagina <= 1 ? 'default' : 'pointer' }}>◄ Anterior</button>
+            <span>página {pagina} de {totalPaginas}</span>
+            <button className="chip" disabled={pagina >= totalPaginas} onClick={() => navegar(pagina + 1)}
+              style={{ opacity: pagina >= totalPaginas ? 0.4 : 1, cursor: pagina >= totalPaginas ? 'default' : 'pointer' }}>Siguiente ►</button>
+          </span>
         </div>
       </div>
     </div>
