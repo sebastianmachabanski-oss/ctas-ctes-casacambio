@@ -168,6 +168,17 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .cc-tbl .zero { color: #c3ccd8; }
 .tbl-wrap { overflow-x: auto; }
 
+/* tags de operación e impacto por moneda (estilo mockup) */
+.tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.tag-green { background: var(--pos-bg); color: var(--pos-ink); }
+.tag-red { background: var(--neg-bg); color: var(--neg-ink); }
+.tag-gray { background: var(--grid); color: var(--ink-2); }
+.imp { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.imp.p { background: var(--pos-bg); color: var(--pos-ink); }
+.imp.n { background: var(--neg-bg); color: var(--neg-ink); }
+/* segunda fila de encabezado: filtros por columna */
+.cc-tbl tr.tx-filtros th { padding-top: 0; padding-bottom: 8px; border-bottom: 1px solid var(--grid); }
+
 .chip { appearance: none; border: 1px solid var(--ring); background: var(--card); color: var(--ink-2); font: inherit; font-size: 12.5px; font-weight: 550; padding: 6px 13px; border-radius: 999px; cursor: pointer; }
 .chip.on { background: var(--ink); color: var(--card); border-color: var(--ink); }
 .banner { border-radius: 11px; padding: 13px 16px; font-size: 13px; line-height: 1.5; }
