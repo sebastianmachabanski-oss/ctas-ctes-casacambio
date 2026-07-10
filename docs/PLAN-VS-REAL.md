@@ -13,7 +13,7 @@ Se actualiza al cerrar cada ítem.
 | 4 | Editar transacción (sin escritura al Sheet) | 4–6 h | ~0,75 h (6/7/2026) | ✅ En main |
 | 5 | Dinero en calle | 4–6 h | ~0,5 h (6/7/2026) | ✅ En main |
 | 6 | Tablero (situación de caja + clientes + histórico) | 12–15 h | ~2,5 h (9/7/2026) | ✅ En main — con datos reales (KPIs, clientes, gráficos, mercado) |
-| 7 | Ganancias (réplica COLO parametrizable) | 5–7 h | — | Pendiente — se hace al final, con motor de cálculo |
+| 7 | Ganancias (réplica COLO parametrizable) | 5–7 h | ~1,5 h (10/7/2026) | ✅ En main — fórmula validada vs planilla (23/6 = $ 2.330.502), config en drawer |
 | 8 | Rol superadmin para Ganancias | 2–3 h | ~0,5 h (6/7/2026) | ✅ En main — permiso individual ve_ganancias |
 
 **Subtotal ítems del backlog original cerrados (1-6, 8): ~6 h reales** (presupuesto ~32–43 h).
