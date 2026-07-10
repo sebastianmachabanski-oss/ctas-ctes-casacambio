@@ -25,8 +25,16 @@ const fmtFecha = (f: string) => new Date(f + 'T12:00:00').toLocaleDateString('es
 const num = (v: any): number => Number(v) || 0
 // "Monto" del movimiento = magnitud del impacto principal (el número grande que se ve en
 // las columnas de moneda), no el campo `monto` de la operación. Es lo que muestra el mockup
-// y sobre lo que opera el filtro "monto ≥".
+// y sobre lo que operan las comparaciones (>, <) del filtro de monto.
 const montoPrincipal = (m: Mov): number => Math.max(0, ...IMPACTOS.map(c => Math.abs(num(m[c.key]))))
+// Número en formato argentino: "1.000.000" → 1000000; "2.000,50" → 2000.5
+function parseNumAr(s: string): number | null {
+  const limpio = s.replace(/[^\d.,]/g, '')
+  if (!limpio) return null
+  const norm = limpio.includes(',') ? limpio.replace(/\./g, '').replace(',', '.') : limpio.replace(/\./g, '')
+  const n = Number(norm)
+  return isFinite(n) ? n : null
+}
 function badge(op: string) {
   const o = (op || '').toUpperCase()
   if (['COMPRA', 'INGRESAN', 'SOBRANTE', 'GANANCIA'].includes(o)) return 'tag-green'
@@ -49,13 +57,33 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const cols = useMemo(() => IMPACTOS.filter(c => movimientos.some(m => num(m[c.key]) !== 0)), [movimientos])
 
   // Filtros por columna: refinan (en vivo) las filas de la página, como el mockup.
+  // Monto: un número solo busca ESE monto exacto (en el importe de la operación o en
+  // cualquier impacto); con operador (>, >=, <, <=) compara contra la magnitud del movimiento.
   const filtrados = useMemo(() => {
     const qc = fCli.trim().toUpperCase()
-    const qm = Number((fMin || '').replace(/\D/g, '')) || 0   // solo dígitos: "1.000.000" → 1000000
+
+    const s = fMin.trim()
+    const op = s.match(/^(>=|<=|>|<|=)/)?.[1] ?? '='
+    const val = parseNumAr(s.replace(/^(>=|<=|>|<|=)\s*/, ''))
+    const filtroMonto = (m: Mov): boolean => {
+      if (!s || val === null) return true
+      const mp = montoPrincipal(m)
+      switch (op) {
+        case '>':  return mp > val
+        case '>=': return mp >= val
+        case '<':  return mp < val
+        case '<=': return mp <= val
+        default: {
+          const valores = [Math.abs(num(m.monto)), ...IMPACTOS.map(c => Math.abs(num(m[c.key])))]
+          return valores.some(v => Math.abs(v - val) < 0.005)
+        }
+      }
+    }
+
     return movimientos.filter(m =>
       (m.cliente ?? '').toUpperCase().includes(qc) &&
       (!fOp || m.operacion === fOp) &&
-      montoPrincipal(m) >= qm)
+      filtroMonto(m))
   }, [movimientos, fCli, fOp, fMin])
 
   // Navegación (rango de fechas y paginación) conservando el estado en la URL.
@@ -109,7 +137,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                     {OPERACIONES.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </th>
-                <th><input className="srch" placeholder="monto ≥" value={fMin} onChange={e => setFMin(e.target.value)} inputMode="numeric" style={{ width: 96, minWidth: 0 }} /></th>
+                <th><input className="srch" placeholder="monto · &gt; &lt;" title="Un número busca ese monto exacto. Con > o < filtra por rango (ej. >1000000)" value={fMin} onChange={e => setFMin(e.target.value)} style={{ width: 110, minWidth: 0 }} /></th>
                 {cols.map(c => <th key={c.key as string}></th>)}
                 {puedeEditar && <th></th>}
               </tr>
