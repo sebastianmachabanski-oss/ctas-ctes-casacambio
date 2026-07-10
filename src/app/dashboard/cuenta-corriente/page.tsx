@@ -79,6 +79,9 @@ export default async function CuentaCorrientePage({
     .gte('fecha', desdeQuery)
     .lte('fecha', hastaQuery)
     .order('fecha', { ascending: false })
+    // Orden secundario estable: dentro de un mismo día, del más nuevo al más viejo.
+    // Necesario para que el saldo acumulado sea determinístico.
+    .order('created_at', { ascending: false })
 
   if (cuentaFiltro) query = query.eq('cuenta_cte', cuentaFiltro)
   if (operacion) query = query.eq('operacion', operacion)
@@ -86,6 +89,51 @@ export default async function CuentaCorrientePage({
   const { data, count } = await query
   const movimientos = (data ?? []) as any[]
   const totalMovimientos = count ?? 0
+
+  // ── Saldo acumulado por fila (como el extracto del mockup) ──
+  // Solo con UNA cuenta elegida y sin filtro de tipo (si no, el acumulado mentiría).
+  // Arranca del saldo previo al rango y acumula cronológicamente cada moneda.
+  let acumulados: Record<string, { p: number; d: number; e: number; r: number }> | undefined
+  let saldoCierra: boolean | null = null
+  if (cuentaFiltro && !operacion) {
+    const prior = { p: 0, d: 0, e: 0, r: 0 }
+    if (desde) {
+      // El usuario acotó el rango: sumar todo lo ANTERIOR para el saldo inicial.
+      const PAGE = 1000
+      for (let from = 0; ; from += PAGE) {
+        const { data: pg } = await supabase.from('diario')
+          .select('cc_pesos, cc_dolares, cc_euros, cc_reales')
+          .eq('tipo', 'CTA CTE').eq('anulado', false)
+          .eq('cuenta_cte', cuentaFiltro)
+          .lt('fecha', desdeQuery)
+          .range(from, from + PAGE - 1)
+        const rows = (pg ?? []) as any[]
+        for (const r of rows) {
+          prior.p += r.cc_pesos ?? 0; prior.d += r.cc_dolares ?? 0
+          prior.e += r.cc_euros ?? 0; prior.r += r.cc_reales ?? 0
+        }
+        if (rows.length < PAGE) break
+      }
+    }
+    // La consulta viene DESC (fecha y created_at): invertida queda cronológica.
+    const run = { ...prior }
+    acumulados = {}
+    for (const m of [...movimientos].reverse()) {
+      run.p += m.cc_pesos ?? 0; run.d += m.cc_dolares ?? 0
+      run.e += m.cc_euros ?? 0; run.r += m.cc_reales ?? 0
+      acumulados[m.id] = { p: run.p, d: run.d, e: run.e, r: run.r }
+    }
+    // Verificación de exactitud: sin filtros de fecha, el acumulado final debe cerrar
+    // EXACTO con el saldo de la cuenta (vista saldos_cuenta_corriente).
+    if (!desde && !hasta) {
+      const s: any = saldos.find((x: any) => x.cuenta_cte === cuentaFiltro)
+      if (s) {
+        const eq = (a: number, b: number | null) => Math.abs(a - (b ?? 0)) < 0.005
+        saldoCierra = eq(run.p, s.saldo_pesos) && eq(run.d, s.saldo_dolares)
+          && eq(run.e, s.saldo_euros) && eq(run.r, s.saldo_reales)
+      }
+    }
+  }
 
   const { data: tiposData } = await supabase
     .from('tipos_operacion').select('codigo, descripcion').eq('activo', true)
@@ -116,7 +164,14 @@ export default async function CuentaCorrientePage({
           </h2>
           <span className="text-sm text-gray-500">{totalMovimientos} registro{totalMovimientos !== 1 ? 's' : ''}</span>
         </div>
-        <TablaMovimientos movimientos={movimientos} />
+        <TablaMovimientos movimientos={movimientos} acumulados={acumulados} />
+        {saldoCierra !== null && (
+          <div style={{ padding: '8px 16px 12px', fontSize: 12, color: saldoCierra ? 'var(--pos-ink)' : 'var(--neg-ink)' }}>
+            {saldoCierra
+              ? '✓ El saldo acumulado cierra exacto con el saldo de la cuenta'
+              : '⚠️ El saldo acumulado no cierra con el saldo de la cuenta — avisar al administrador'}
+          </div>
+        )}
       </div>
     </div>
   )

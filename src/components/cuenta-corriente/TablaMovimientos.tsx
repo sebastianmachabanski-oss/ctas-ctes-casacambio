@@ -67,7 +67,20 @@ function MovimientoCard({ m }: { m: DiarioRow }) {
   )
 }
 
-export default function TablaMovimientos({ movimientos }: { movimientos: DiarioRow[] }) {
+type Acum = { p: number; d: number; e: number; r: number }
+
+// Celda de saldo acumulado: "U$S 4.000,00 · $ 530.000,00" (solo las monedas con
+// movimiento en la cuenta), negativos entre paréntesis, como el extracto del mockup.
+function fmtAcumulado(a: Acum, monedas: [keyof Acum, string][]) {
+  const nf = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 })
+  return monedas
+    .map(([k, sym]) => `${sym} ${a[k] < 0 ? `(${nf.format(-a[k])})` : nf.format(a[k])}`)
+    .join(' · ')
+}
+
+export default function TablaMovimientos({ movimientos, acumulados }: {
+  movimientos: DiarioRow[]; acumulados?: Record<string, Acum>
+}) {
   if (!movimientos.length) {
     return (
       <div className="px-5 py-12 text-center text-gray-400 text-sm">
@@ -82,6 +95,16 @@ export default function TablaMovimientos({ movimientos }: { movimientos: DiarioR
     { key: 'cc_euros'   as const, sym: '€',   label: 'Euros'   },
     { key: 'cc_reales'  as const, sym: 'R$',  label: 'Reales'  },
   ]
+
+  // Monedas a mostrar en el acumulado: las que tienen algún valor distinto de cero
+  // en la cuenta (si ninguna, dólares y pesos por defecto).
+  const TODAS: [keyof Acum, string][] = [['d', 'U$S'], ['p', '$'], ['e', '€'], ['r', 'R$']]
+  const monedasAcum = acumulados
+    ? (() => {
+        const activas = TODAS.filter(([k]) => Object.values(acumulados).some(a => a[k] !== 0))
+        return activas.length ? activas : TODAS.slice(0, 2)
+      })()
+    : []
 
   return (
     <>
@@ -101,6 +124,7 @@ export default function TablaMovimientos({ movimientos }: { movimientos: DiarioR
               <th style={{ textAlign: 'left' }}>Detalle</th>
               <th style={{ textAlign: 'left' }}>Ref.</th>
               {cols.map(c => <th key={c.key}>{c.label}</th>)}
+              {acumulados && <th>Saldo acumulado</th>}
             </tr>
           </thead>
           <tbody>
@@ -126,6 +150,11 @@ export default function TablaMovimientos({ movimientos }: { movimientos: DiarioR
                       </td>
                     )
                   })}
+                  {acumulados && (
+                    <td className="num" style={{ color: 'var(--muted)', fontWeight: 400, whiteSpace: 'nowrap' }}>
+                      {acumulados[m.id] ? fmtAcumulado(acumulados[m.id], monedasAcum) : '—'}
+                    </td>
+                  )}
                 </tr>
               )
             })}
