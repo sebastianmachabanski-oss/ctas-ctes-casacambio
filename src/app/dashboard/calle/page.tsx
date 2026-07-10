@@ -36,16 +36,6 @@ export default async function CallePage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      {rol === 'superusuario' && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
-          <p>
-            ⚠️ Marcar un ingreso acá <b>no borra el DEBE en la planilla</b>: si allá sigue
-            cargado, la próxima sincronización lo vuelve a mostrar. Mientras dure la
-            convivencia, el borrado definitivo se hace en la planilla (como hasta ahora).
-          </p>
-        </div>
-      )}
-
       {error ? (
         <div className="card p-6 text-center text-red-600 text-sm">
           No se pudo cargar el dinero en calle: {error.message}
@@ -56,6 +46,15 @@ export default async function CallePage() {
           totales={totales}
           puedeIngresar={rol === 'superusuario'}
         />
+      )}
+
+      {/* Aviso al pie, como el mockup */}
+      {rol === 'superusuario' && (
+        <div className="banner-warn">
+          ⚠️ Marcar un ingreso acá <b>no borra el DEBE en la planilla</b>: si allá sigue
+          cargado, la próxima sincronización lo vuelve a mostrar. Mientras dure la
+          convivencia, el borrado definitivo se hace en la planilla (como hasta ahora).
+        </div>
       )}
     </div>
   )

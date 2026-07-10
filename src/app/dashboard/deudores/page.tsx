@@ -29,11 +29,6 @@ export default async function DeudoresPage() {
   const totalEuros   = deudores.reduce((acc: number, s: any) => acc + Math.max(0, s.saldo_euros ?? 0), 0)
   const totalReales  = deudores.reduce((acc: number, s: any) => acc + Math.max(0, s.saldo_reales ?? 0), 0)
 
-  function fmt(n: number, sym: string) {
-    if (!n || n === 0) return '—'
-    return `${sym} ${new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(n)}`
-  }
-
   return (
     <div className="p-4 md:p-6 space-y-5">
       {/* Resumen totales — tarjetas KPI del tablero */}
@@ -87,64 +82,43 @@ export default async function DeudoresPage() {
           </div>
         </div>
 
-        {/* Desktop: tabla */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
+        {/* Desktop: tabla (estilo mockup, números planos) */}
+        <div className="hidden md:block tbl-wrap">
+          <table className="cc-tbl">
             <thead>
-              <tr className="border-b border-gray-200 text-[11px] uppercase tracking-wide text-gray-400">
-                <th className="text-left px-4 py-3 font-semibold">#</th>
-                <th className="text-left px-4 py-3 font-semibold">Cuenta corriente</th>
-                <th className="text-right px-4 py-3 font-semibold">Dólares</th>
-                <th className="text-right px-4 py-3 font-semibold">Pesos</th>
-                <th className="text-right px-4 py-3 font-semibold">Euros</th>
-                <th className="text-right px-4 py-3 font-semibold">Reales</th>
+              <tr>
+                <th style={{ textAlign: 'left' }}>#</th>
+                <th style={{ textAlign: 'left' }}>Cuenta corriente</th>
+                <th>Dólares</th>
+                <th>Pesos</th>
+                <th>Euros</th>
+                <th>Reales</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody>
               {deudores.map((s: any, idx: number) => (
-                <tr key={s.cuenta_cte} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
-                  <td className="px-4 py-3 font-medium text-gray-900">{s.cuenta_cte}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {(s.saldo_dolares ?? 0) > 0
-                      ? <span className="text-red-600 font-medium">{fmt(s.saldo_dolares, 'U$S')}</span>
-                      : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {(s.saldo_pesos ?? 0) > 0
-                      ? <span className="text-orange-600 font-medium">{fmt(s.saldo_pesos, '$')}</span>
-                      : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {(s.saldo_euros ?? 0) > 0
-                      ? <span className="text-purple-600 font-medium">{fmt(s.saldo_euros, '€')}</span>
-                      : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {(s.saldo_reales ?? 0) > 0
-                      ? <span className="text-yellow-600 font-medium">{fmt(s.saldo_reales, 'R$')}</span>
-                      : <span className="text-gray-300">—</span>}
-                  </td>
+                <tr key={s.cuenta_cte}>
+                  <td style={{ color: 'var(--muted)', fontWeight: 400 }}>{idx + 1}</td>
+                  <td>{s.cuenta_cte}</td>
+                  {[s.saldo_dolares, s.saldo_pesos, s.saldo_euros, s.saldo_reales].map((v: number | null, i: number) => (
+                    <td key={i} className="num">
+                      {(v ?? 0) > 0
+                        ? new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(v as number)
+                        : <span className="zero">—</span>}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
-            {/* Fila de totales */}
             <tfoot>
-              <tr className="bg-gray-50 border-t-2 border-gray-200">
-                <td className="px-4 py-3"></td>
-                <td className="px-4 py-3 font-bold text-gray-900">TOTAL</td>
-                <td className="px-4 py-3 text-right tabular-nums font-bold text-red-600">
-                  {totalDolares > 0 ? fmt(totalDolares, 'U$S') : '—'}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums font-bold text-orange-600">
-                  {totalPesos > 0 ? fmt(totalPesos, '$') : '—'}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums font-bold text-purple-600">
-                  {totalEuros > 0 ? fmt(totalEuros, '€') : '—'}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums font-bold text-yellow-600">
-                  {totalReales > 0 ? fmt(totalReales, 'R$') : '—'}
-                </td>
+              <tr style={{ borderTop: '2px solid var(--grid)' }}>
+                <td></td>
+                <td style={{ fontWeight: 700 }}>TOTAL</td>
+                {[totalDolares, totalPesos, totalEuros, totalReales].map((v: number, i: number) => (
+                  <td key={i} className="num" style={{ fontWeight: 700 }}>
+                    {v > 0 ? new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 }).format(v) : <span className="zero">—</span>}
+                  </td>
+                ))}
               </tr>
             </tfoot>
           </table>

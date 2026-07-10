@@ -65,18 +65,16 @@ export default function ListaCalle({
   const hayTotales = Object.keys(totales).length > 0
 
   return (
-    <div className="space-y-4">
-      {/* Total general en calle (réplica del recuadro rojo de la planilla) */}
-      <div className="card p-4 md:p-5 border-red-200">
-        <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-2">Total en calle</p>
+    <div style={{ display: 'grid', gap: 14 }}>
+      {/* Total general en calle (réplica del recuadro rojo de la planilla, estilo mockup) */}
+      <div className="card" style={{ padding: '14px 16px', borderColor: 'rgba(220,38,38,.35)' }}>
+        <div className="sec-lbl" style={{ color: 'var(--neg-ink)', marginBottom: 8 }}>Total en calle</div>
         {!hayTotales ? (
           <p className="text-sm text-gray-500">No hay dinero en la calle. 🎉</p>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div style={{ display: 'flex', gap: '8px 22px', flexWrap: 'wrap', alignItems: 'baseline' }}>
             {Object.entries(totales).map(([col, v]) => (
-              <span key={col} className="inline-block text-sm font-semibold tabular-nums px-2.5 py-1 rounded-lg bg-red-50 text-red-700">
-                {SIMBOLOS[col]} {nf.format(v)}
-              </span>
+              <span key={col}><b className="num neg" style={{ fontSize: 16 }}>{SIMBOLOS[col]} {nf.format(v)}</b></span>
             ))}
           </div>
         )}
@@ -87,31 +85,26 @@ export default function ListaCalle({
       {/* Un bloque por repartidor */}
       {grupos.map(([repartidor, movs]) => (
         <div key={repartidor} className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-            <p className="font-semibold text-gray-900">🚚 {repartidor}</p>
-            <span className="text-xs text-gray-500">{movs.length} {movs.length === 1 ? 'movimiento' : 'movimientos'}</span>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--grid)', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontWeight: 650 }}>🚚 {repartidor}</span>
+            <span style={{ color: 'var(--muted)', fontSize: 12 }}>{movs.length} mov.</span>
           </div>
           {movs.map(m => (
-            <div key={m.id} className="px-4 py-3 border-b border-gray-100 last:border-0 flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900">
-                  {m.cliente ?? '—'}
-                  <span className="ml-2 text-xs font-normal text-gray-500">{fmtFecha(m.fecha)} · {m.operacion}</span>
-                </p>
-                {m.notas && <p className="text-xs text-gray-400 mt-0.5 truncate">{m.notas}</p>}
+            <div key={m.id} style={{ padding: '11px 16px', borderBottom: '1px solid var(--grid)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0 }}>
+                <b style={{ fontSize: 13.5 }}>{m.cliente ?? '—'}</b>{' '}
+                <span style={{ color: 'var(--muted)', fontSize: 12 }}>· {fmtFecha(m.fecha)} · {m.operacion}</span>
+                {m.notas && <p style={{ color: 'var(--muted)', fontSize: 12, margin: '2px 0 0' }}>{m.notas}</p>}
               </div>
-              <div className="flex items-center gap-3">
-                <span className="flex flex-wrap gap-1.5">
-                  {positivos(m).map(x => (
-                    <span key={x.col} className="inline-block text-xs font-medium tabular-nums px-1.5 py-0.5 rounded bg-red-50 text-red-700">
-                      {SIMBOLOS[x.col]} {nf.format(x.v)}
-                    </span>
-                  ))}
-                  {positivos(m).length === 0 && <span className="text-xs text-gray-400">sin montos positivos</span>}
-                </span>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                {positivos(m).map(x => (
+                  <span key={x.col} className="imp n">{SIMBOLOS[x.col]} {nf.format(x.v)}</span>
+                ))}
+                {positivos(m).length === 0 && <span style={{ color: 'var(--muted)', fontSize: 12 }}>sin montos positivos</span>}
                 {puedeIngresar && (
                   <button
-                    className="btn-primary text-xs px-3 py-1.5"
+                    className="btn-primary"
+                    style={{ fontSize: 12, padding: '6px 12px' }}
                     disabled={procesando === m.id}
                     onClick={() => ingresar(m)}>
                     {procesando === m.id ? 'Registrando…' : '✓ Ingresó a caja'}
