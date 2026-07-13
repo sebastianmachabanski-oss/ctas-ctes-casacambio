@@ -117,7 +117,11 @@ export async function POST(request: Request) {
     debe: debe && String(debe).trim() ? String(debe).trim() : null,
     notas: notas || null,
     cuenta: impacto.cuenta,
-    ...impacto.valores,
+    // El motor devuelve las claves con los nombres de la PLANILLA ("PESOS", "CC PESOS");
+    // acá se mapean a las columnas de la tabla (pesos, cc_pesos).
+    ...Object.fromEntries(
+      Object.entries(impacto.valores).map(([k, v]) => [k.toLowerCase().replace(/\s+/g, '_'), v])
+    ),
   })
   // Tolerante: diario ya quedó guardado y la planilla se escribe aparte; si esta pata
   // falla (p. ej. falta la policy de INSERT), el movimiento aparece con el próximo sync.
