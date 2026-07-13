@@ -65,7 +65,8 @@ export default async function GananciasPage({
 
   // Período: p=dia|semana|mes|anio con fecha cursor, o rango explícito desde/hasta.
   const hoy = hoyArgentina()
-  const p = ['dia', 'semana', 'mes', 'anio'].includes(searchParams.p ?? '') ? searchParams.p! : 'dia'
+  // Sin período elegido, el default es el MES en curso.
+  const p = ['dia', 'semana', 'mes', 'anio'].includes(searchParams.p ?? '') ? searchParams.p! : 'mes'
   const fecha = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.fecha ?? '') ? searchParams.fecha! : hoy
   const esRango = !!(searchParams.desde && searchParams.hasta)
   const [ini, fin] = esRango ? [searchParams.desde!, searchParams.hasta!] : rangoDe(p, fecha)
