@@ -72,13 +72,24 @@ export default async function InicioPage({
   for (const col of COLS_CALLE) calle[col] = calleRows.reduce((s, m) => s + Math.max(0, m[col] ?? 0), 0)
 
   // 3) Clientes — pestaña Caja (totales por cliente EN EL PERÍODO) y pestaña Cta cte.
-  // RPC con rango de fechas; si la migración aún no corrió, cae a la vista sin filtro.
+  // OJO: Postgrest corta CUALQUIER respuesta (también las RPC) en 1.000 filas y hay más
+  // de 1.000 clientes — hay que paginar con order + range, si no la lista llega
+  // incompleta y clientes enteros "desaparecen" del tablero.
   let clientesCaja: any[] = []
-  const { data: cajaCliData, error: cajaCliError } = await (supabase as any)
-    .rpc('caja_clientes_periodo', { p_desde: desde, p_hasta: hasta })
-  if (!cajaCliError) {
-    clientesCaja = ((cajaCliData ?? []) as any[]).sort((a, b) => String(a.cliente).localeCompare(String(b.cliente), 'es'))
-  } else {
+  let rpcOk = true
+  const PAGE = 1000
+  for (let from = 0; ; from += PAGE) {
+    const { data: pg, error } = await (supabase as any)
+      .rpc('caja_clientes_periodo', { p_desde: desde, p_hasta: hasta })
+      .order('cliente')
+      .range(from, from + PAGE - 1)
+    if (error) { rpcOk = false; break }
+    const rows = (pg ?? []) as any[]
+    clientesCaja.push(...rows)
+    if (rows.length < PAGE) break
+  }
+  if (!rpcOk) {
+    // Si la migración de la RPC aún no corrió, cae a la vista sin filtro de período.
     clientesCaja = await traerTodo<any>(async (from, to) => {
       const { data } = await supabase.from('caja_clientes')
         .select('cliente,pesos,dolares,euros,reales')

@@ -16,19 +16,25 @@ Se actualiza al cerrar cada ítem.
 | 7 | Ganancias (réplica COLO parametrizable) | 5–7 h | ~1,5 h (10/7/2026) | ✅ En main — fórmula validada vs planilla (23/6 = $ 2.330.502), config en drawer |
 | 8 | Rol superadmin para Ganancias | 2–3 h | ~0,5 h (6/7/2026) | ✅ En main — permiso individual ve_ganancias |
 
-**Subtotal ítems del backlog original cerrados (1-6, 8): ~6 h reales** (presupuesto ~32–43 h).
+**Subtotal backlog original (1-8, todos cerrados): ~7,5 h reales** (presupuesto ~41–56 h).
 
 ## Alcance agregado (fuera del backlog original)
 
 | Bloque | Esfuerzo (presupuesto) | Tiempo activo real | Estado |
 |---|---|---|---|
 | Mockups (tablero, ganancia, app completa) + rondas de ajuste con el cliente | — | ~4 h | ✅ Validados |
-| Rediseño de la app a rajatabla del mockup (azul, sidebar anclable, etc.) | 6–8 h | ~2 h | 🔄 En curso — hechos Inicio, login, Cuentas Corrientes; faltan Nueva, Transacciones, Calle, Deudores, Usuarios, Sync, Mi cuenta |
+| Rediseño de la app a rajatabla del mockup (todas las pantallas: shell + Inicio con filtros globales, login, Cuentas Ctes, Nueva, Transacciones con filtros por columna, Calle, Deudores, Usuarios, Sync, Mi cuenta) | 6–8 h | ~6,75 h | ✅ Completado |
 | Diagnóstico y arreglo del sync/datos (proyecto equivocado, migraciones faltantes, columna `cot_efectiva`) | — | ~1,5 h | ✅ Resuelto — no estaba previsto pero bloqueaba los datos |
+| Saldo acumulado en Cuentas Corrientes (extracto por cuenta, con verificación de cierre exacto) | — | ~1 h | ✅ En main |
 
 ## Total acumulado
 
-**≈ 15,5 h de tiempo activo real** al 9/7/2026.
+**≈ 22,5 h de tiempo activo real** al 10/7/2026.
+
+Pendientes de decisión (post-validación del cliente): volver a deshabilitar las 5
+opciones del menú (Transacciones, Calle, Saldos Pendientes, Ganancias, Sincronizar)
+y eventual habilitación del botón Guardar de Nueva transacción (hoy deshabilitado
+por decisión de negocio).
 
 Hitos previos ya completados (fuera de estas tablas): motor de cálculo aislado y
 validado, relevamiento y réplica exacta de COLO, reconciliación Sheet↔Excel
