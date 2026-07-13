@@ -75,6 +75,9 @@ function LoginForm() {
             </button>
           </form>
         </div>
+        <p className="text-center text-sm mt-5" style={{ color: '#8494b3' }}>
+          Si olvidó su contraseña, comuníquese con el administrador del sistema para poder restablecerla.
+        </p>
       </div>
     </div>
   )
