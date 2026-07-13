@@ -30,3 +30,7 @@ Documentación clave: `docs/SINCRONIZACION.md` (sync Sheet→DB), `docs/MOTOR-CA
   ante cualquier cambio correr `npx tsx scripts/validar-motor-calculo.mts`.
 - Editar transacciones en la app NO escribe al Sheet (definido 5/7/2026): mientras
   dure la convivencia, el sync puede pisar esos cambios y es un comportamiento asumido.
+- BORRAR transacciones en la app SÍ limpia la fila en la planilla (definido 11/7/2026):
+  se identifica por contenido y solo se limpia si la coincidencia es única — con cero o
+  varias coincidencias se borra solo de la base y se avisa para el borrado manual.
+  Este circuito (junto con excel-write y el sync) se elimina cuando se retire la planilla.

@@ -55,20 +55,29 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const [fMin, setFMin] = useState('')
   const [borrando, setBorrando] = useState<string | null>(null)
   const [errorBorrar, setErrorBorrar] = useState('')
+  const [avisoPlanilla, setAvisoPlanilla] = useState('')
 
-  // Borrar (solo superusuario): no toca la planilla — si la fila también está allá,
-  // el próximo sync la vuelve a traer. El borrado definitivo se hace en la planilla.
+  // Borrar (solo superusuario): borrado ESPEJADO — elimina del sistema y limpia la fila
+  // en la planilla (solo si se identifica sin ambigüedad; si no, avisa para hacerlo a mano).
   async function borrar(m: Mov) {
     const desc = `${m.cliente ?? '—'} · ${m.operacion} · ${nf.format(montoPrincipal(m))}`
-    if (!confirm(`¿Eliminar el movimiento?\n\n${desc}\n\nOJO: si el movimiento también está en la planilla, la próxima sincronización lo vuelve a traer. El borrado definitivo se hace en la planilla.`)) return
-    setBorrando(m.id); setErrorBorrar('')
+    if (!confirm(`¿Eliminar el movimiento?\n\n${desc}\n\nSe elimina del sistema y se limpia la fila correspondiente en la planilla. Si la fila no se puede identificar con certeza, te avisamos para borrarla a mano.`)) return
+    setBorrando(m.id); setErrorBorrar(''); setAvisoPlanilla('')
     const res = await fetch(`/api/movimientos-caja/${m.id}`, { method: 'DELETE' })
+    const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}))
       setErrorBorrar(data.error ?? `Error ${res.status}`)
       setBorrando(null)
       return
     }
+    // Resultado de la limpieza espejada en la planilla.
+    const AVISOS: Record<string, string> = {
+      no_encontrada: 'Se borró del sistema, pero la fila no se encontró en la planilla (¿ya la habías borrado allá?). Verificalo para que el próximo sync no lo traiga de vuelta.',
+      multiple: `Se borró del sistema, pero hay ${data.candidatas ?? 'varias'} filas iguales en la planilla y no se puede elegir sola: borrá la correcta a mano.`,
+      error: `Se borró del sistema, pero falló la limpieza en la planilla: ${data.warning ?? 'error desconocido'}. Borrala a mano.`,
+      deshabilitado: 'Se borró del sistema. La limpieza automática de la planilla está deshabilitada en este entorno (WRITE_SOURCE).',
+    }
+    if (data.planilla && data.planilla !== 'ok') setAvisoPlanilla(AVISOS[data.planilla] ?? '')
     setBorrando(null)
     router.refresh()
   }
@@ -137,6 +146,9 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
         <div className="banner" style={{ background: 'var(--neg-bg)', border: '1px solid rgba(220,38,38,.3)', color: 'var(--neg-ink)' }}>
           No se pudo eliminar: {errorBorrar}
         </div>
+      )}
+      {avisoPlanilla && (
+        <div className="banner-warn">⚠️ {avisoPlanilla}</div>
       )}
 
       {/* Tabla con filtros por columna */}
