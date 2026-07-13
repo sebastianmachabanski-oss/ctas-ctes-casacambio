@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 type Mov = {
   id: string; fecha: string; cliente: string | null; operacion: string; monto: number
-  tipo: string; debe: string | null
+  tipo: string; debe: string | null; cot: number | null
   pesos: number; cheques: number; dolares: number; euros: number; reales: number; banco: number
   cc_pesos: number; cc_dolares: number; cc_euros: number; cc_reales: number
 }
@@ -20,6 +20,7 @@ const IMPACTOS: { key: keyof Mov; sym: string }[] = [
 const OPERACIONES = ['COMPRA', 'VENTA', 'INGRESAN', 'EGRESAN', 'GASTOS', 'SWITCH', 'ENTRA TT', 'SALE TT', 'SOBRANTE', 'FALTANTE', 'GANANCIA', 'SALDO INICIAL']
 
 const nf = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
+const nfCot = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 4 })
 const money = (v: number) => v < 0 ? `(${nf.format(-v)})` : nf.format(v)
 const fmtFecha = (f: string) => new Date(f + 'T12:00:00').toLocaleDateString('es-AR')
 const num = (v: any): number => Number(v) || 0
@@ -52,6 +53,25 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const [fCli, setFCli] = useState('')
   const [fOp, setFOp] = useState('')
   const [fMin, setFMin] = useState('')
+  const [borrando, setBorrando] = useState<string | null>(null)
+  const [errorBorrar, setErrorBorrar] = useState('')
+
+  // Borrar (solo superusuario): no toca la planilla — si la fila también está allá,
+  // el próximo sync la vuelve a traer. El borrado definitivo se hace en la planilla.
+  async function borrar(m: Mov) {
+    const desc = `${m.cliente ?? '—'} · ${m.operacion} · ${nf.format(montoPrincipal(m))}`
+    if (!confirm(`¿Eliminar el movimiento?\n\n${desc}\n\nOJO: si el movimiento también está en la planilla, la próxima sincronización lo vuelve a traer. El borrado definitivo se hace en la planilla.`)) return
+    setBorrando(m.id); setErrorBorrar('')
+    const res = await fetch(`/api/movimientos-caja/${m.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setErrorBorrar(data.error ?? `Error ${res.status}`)
+      setBorrando(null)
+      return
+    }
+    setBorrando(null)
+    router.refresh()
+  }
 
   // Columnas de impacto presentes en la página cargada.
   const cols = useMemo(() => IMPACTOS.filter(c => movimientos.some(m => num(m[c.key]) !== 0)), [movimientos])
@@ -97,7 +117,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   }
   const buscar = () => navegar(1)  // cambiar el rango vuelve a la página 1
 
-  const ncols = 4 + cols.length + (puedeEditar ? 1 : 0)
+  const ncols = 5 + cols.length + (puedeEditar ? 1 : 0)
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -113,6 +133,12 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
         </div>
       </div>
 
+      {errorBorrar && (
+        <div className="banner" style={{ background: 'var(--neg-bg)', border: '1px solid rgba(220,38,38,.3)', color: 'var(--neg-ink)' }}>
+          No se pudo eliminar: {errorBorrar}
+        </div>
+      )}
+
       {/* Tabla con filtros por columna */}
       <div className="card">
         <div className="tbl-wrap">
@@ -122,6 +148,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 <th>Fecha</th>
                 <th style={{ textAlign: 'left' }}>Cliente</th>
                 <th style={{ textAlign: 'left' }}>Operación</th>
+                <th>Cot.</th>
                 <th>Monto</th>
                 {cols.map(c => <th key={c.key as string}>Imp. {c.sym}</th>)}
                 {puedeEditar && <th></th>}
@@ -137,6 +164,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                     {OPERACIONES.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </th>
+                <th></th>
                 <th><input className="srch" placeholder="monto · &gt; &lt;" title="Un número busca ese monto exacto. Con > o < filtra por rango (ej. >1000000)" value={fMin} onChange={e => setFMin(e.target.value)} style={{ width: 110, minWidth: 0 }} /></th>
                 {cols.map(c => <th key={c.key as string}></th>)}
                 {puedeEditar && <th></th>}
@@ -151,14 +179,20 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                     {m.debe && <span className="tag tag-gray" style={{ marginLeft: 6, fontWeight: 600 }}>🚚 {m.debe}</span>}
                   </td>
                   <td style={{ textAlign: 'left' }}><span className={`tag ${badge(m.operacion)}`}>{m.operacion}</span></td>
+                  <td className="num" style={{ color: 'var(--muted)', fontWeight: 400 }}>{m.cot ? nfCot.format(Number(m.cot)) : <span className="zero">—</span>}</td>
                   <td className="num">{nf.format(montoPrincipal(m))}</td>
                   {cols.map(c => {
                     const v = num(m[c.key])
                     return <td key={c.key as string}>{v ? <span className={`imp ${v > 0 ? 'p' : 'n'}`}>{money(v)}</span> : <span className="zero">—</span>}</td>
                   })}
                   {puedeEditar && (
-                    <td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
                       <Link href={`/dashboard/transacciones/${m.id}/editar`} style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand-ink)' }}>✏️ Editar</Link>
+                      <button onClick={() => borrar(m)} disabled={borrando === m.id}
+                        title="Eliminar movimiento"
+                        style={{ marginLeft: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--neg-ink)', opacity: borrando === m.id ? 0.5 : 1 }}>
+                        🗑️ {borrando === m.id ? '…' : 'Borrar'}
+                      </button>
                     </td>
                   )}
                 </tr>

@@ -75,3 +75,24 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (updError) return NextResponse.json({ error: updError.message }, { status: 500 })
   return NextResponse.json({ ok: true, cuenta: resultado.cuenta, valores: v })
 }
+
+// Elimina un movimiento de caja. Igual que editar: NO toca el Google Sheet — si la fila
+// también existe en la planilla, el próximo sync la vuelve a traer (comportamiento
+// asumido durante la convivencia; el borrado definitivo se hace en la planilla).
+export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+
+  const { data: profile } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
+  if ((profile as any)?.rol !== 'superusuario')
+    return NextResponse.json({ error: 'Solo el superusuario puede eliminar transacciones' }, { status: 403 })
+
+  const { error, count } = await supabase.from('movimientos_caja')
+    .delete({ count: 'exact' })
+    .eq('id', params.id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // count 0 = no existía o la RLS lo impidió (falta la policy de DELETE).
+  if (!count) return NextResponse.json({ error: 'No se pudo eliminar (¿falta la policy de DELETE o ya no existe?)' }, { status: 404 })
+  return NextResponse.json({ ok: true })
+}
