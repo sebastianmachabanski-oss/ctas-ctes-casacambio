@@ -58,6 +58,7 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'idle' | 'supabase' | 'done'>('idle')
+  const [cajaDirecta, setCajaDirecta] = useState(false)
   const [excelOk, setExcelOk] = useState<boolean | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -229,6 +230,7 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
 
       // Supabase ya quedó guardado: mostramos la confirmación de una. La escritura en la
       // planilla sigue en segundo plano y actualiza su propio estado sin bloquear al usuario.
+      setCajaDirecta(data.caja_directa === true)
       setStep('done')
       setLoading(false)
       setExcelOk(null) // null = todavía sincronizando con la planilla
@@ -276,6 +278,13 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
         }`}>
           {excelOk === true && '✓ Registrado en sistema y en la planilla'}
           {excelOk === false && `Sistema ✓ · Planilla ✗: ${warning}`}
+          {excelOk !== null && (
+            <p className="mt-1 text-xs opacity-80">
+              {cajaDirecta
+                ? '✓ Visible al instante en Transacciones e Inicio'
+                : 'ℹ️ Se verá en Transacciones tras la próxima sincronización (falta la policy de escritura directa)'}
+            </p>
+          )}
           {excelOk === null && (
             <span className="flex items-center gap-2">
               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
