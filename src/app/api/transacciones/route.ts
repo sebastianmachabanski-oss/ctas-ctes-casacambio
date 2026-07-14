@@ -45,6 +45,15 @@ export async function POST(request: Request) {
   if (!OPERACIONES_VALIDAS[tipo]?.includes(operacion))
     return NextResponse.json({ error: 'Operación inválida para el tipo seleccionado' }, { status: 400 })
 
+  // CTA CTE exige una cuenta corriente REAL: un nombre que no exista rompe las fórmulas
+  // de la planilla (decisión 11/7/2026). CAJA es texto libre (clientes eventuales).
+  if (tipo === 'CTA CTE') {
+    const { data: cta } = await supabase.from('cuentas_corrientes')
+      .select('nombre').eq('nombre', String(cuenta_cte).trim()).eq('activo', true).maybeSingle()
+    if (!cta)
+      return NextResponse.json({ error: `"${cuenta_cte}" no es una cuenta corriente activa: elegila de la lista` }, { status: 400 })
+  }
+
   // Impacto en caja con el MISMO motor validado contra la planilla. Si la combinación
   // es inválida (ej. GASTOS en otra moneda que PESOS), se rechaza ANTES de guardar nada.
   const errorNegocio = validarOperacion({ operacion, propio })

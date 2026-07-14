@@ -54,7 +54,7 @@ function Required() {
   return <span className="text-red-500 ml-0.5">*</span>
 }
 
-export default function NuevaTransaccionForm({ clientes }: { clientes: string[] }) {
+export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'idle' | 'supabase' | 'done'>('idle')
@@ -78,62 +78,31 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
     notas: '',
   })
 
-  // Buscador del selector de Cliente: texto tipeado + visibilidad del desplegable.
-  // clientesLocal arranca con la lista del server y crece en memoria cuando se da de alta
-  // un cliente nuevo, para que sea buscable en la misma sesión sin esperar al próximo sync.
-  const [clientesLocal, setClientesLocal] = useState(clientes)
+  // Selector de cliente según el Tipo (decisión 11/7/2026):
+  //  - CTA CTE: buscador SOLO sobre las cuentas corrientes reales (sin alta libre —
+  //    un nombre que no exista rompe las fórmulas de la planilla).
+  //  - CAJA: texto libre sin desplegable (clientes eventuales, NO normalizados).
   const [clienteQuery, setClienteQuery] = useState('')
   const [clienteOpen, setClienteOpen] = useState(false)
-  const [clienteGuardando, setClienteGuardando] = useState(false)
-  const clientesFiltrados = clientesLocal
+  const cuentasFiltradas = cuentas
     .filter(c => c.toUpperCase().includes(clienteQuery.trim().toUpperCase()))
     .sort((a, b) => a.localeCompare(b, 'es'))
 
-  function elegirCliente(nombre: string) {
+  function elegirCuenta(nombre: string) {
     set('cuenta_cte', nombre)
     setClienteQuery(nombre)
     setClienteOpen(false)
   }
 
-  // Enter en el buscador de Cliente: si matchea exacto a uno existente, lo selecciona. Si
-  // no existe ningún cliente con ese nombre, pregunta si darlo de alta como cliente nuevo.
-  async function handleClienteKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  // Enter en el buscador: selecciona el match exacto (o el único resultado); nunca
+  // dispara el submit ni da de alta nada.
+  function handleCuentaKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== 'Enter') return
-    e.preventDefault() // no disparar el submit del formulario
-    const query = clienteQuery.trim()
-    if (!query || clienteGuardando) return
-
-    const existente = clientesLocal.find(c => c.toUpperCase() === query.toUpperCase())
-    if (existente) { elegirCliente(existente); return }
-
-    setClienteOpen(false)
-    const confirmado = confirm(`"${query}" no está en la lista de clientes. ¿Querés agregarlo como cliente nuevo?`)
-    if (!confirmado) {
-      // Puede haber sido un error de tipeo: vacía el campo para que elija uno correcto.
-      setClienteQuery('')
-      set('cuenta_cte', '')
-      return
-    }
-
-    setClienteGuardando(true)
-    try {
-      const res = await fetch('/api/clientes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre: query }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        alert('No se pudo agregar el cliente: ' + (data.error ?? 'error desconocido'))
-        return
-      }
-      setClientesLocal(prev => [...prev, data.nombre])
-      elegirCliente(data.nombre)
-    } catch {
-      alert('Error de conexión al agregar el cliente')
-    } finally {
-      setClienteGuardando(false)
-    }
+    e.preventDefault()
+    const query = clienteQuery.trim().toUpperCase()
+    const exacta = cuentas.find(c => c.toUpperCase() === query)
+    if (exacta) { elegirCuenta(exacta); return }
+    if (cuentasFiltradas.length === 1) elegirCuenta(cuentasFiltradas[0])
   }
 
   const operacionesDisponibles = OPERACIONES_POR_TIPO[form.tipo] ?? []
@@ -174,16 +143,22 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
   }
 
   function setTipo(tipo: string) {
-    // Al cambiar el Tipo, la Operación puede dejar de ser válida: la reseteamos a la primera opción.
+    // Al cambiar el Tipo, la Operación puede dejar de ser válida (se resetea a la primera
+    // opción) y el cliente elegido tampoco aplica (cuenta corriente ↔ cliente eventual).
     const opciones = OPERACIONES_POR_TIPO[tipo] ?? []
-    setForm(f => ({ ...f, tipo, operacion: opciones[0] ?? '' }))
+    setForm(f => ({ ...f, tipo, operacion: opciones[0] ?? '', cuenta_cte: '' }))
+    setClienteQuery('')
+    setClienteOpen(false)
   }
 
   function validate(): string | null {
     if (!form.fecha)       return 'La fecha es obligatoria'
     if (!form.tipo)        return 'El tipo de transacción es obligatorio'
     if (!form.col_f)       return 'Op es obligatorio'
-    if (!form.cuenta_cte)  return 'Seleccioná un cliente de la lista'
+    if (!form.cuenta_cte.trim())
+      return form.tipo === 'CTA CTE'
+        ? 'Seleccioná una cuenta corriente de la lista'
+        : 'Ingresá el nombre del cliente'
     if (!form.operacion)   return 'La operación es obligatoria'
     if (!form.propio)      return 'El campo Propio es obligatorio'
     if (!form.externo)     return 'El campo Externo es obligatorio'
@@ -207,6 +182,7 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
 
     const payload = {
       ...form,
+      cuenta_cte: form.cuenta_cte.trim(),
       monto: montoNumero(form.monto),
       cotizacion: form.cotizacion ? Number(form.cotizacion) : null,
       costo_porcentaje: form.costo_porcentaje ? Number(form.costo_porcentaje) : null,
@@ -299,7 +275,7 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
           <button className="btn-secondary" onClick={resetForm}>
             Nueva transacción
           </button>
-          <button className="btn-primary" onClick={() => router.push('/dashboard/cuenta-corriente')}>
+          <button className="btn-primary" onClick={() => router.push('/dashboard/transacciones')}>
             Ver movimientos
           </button>
         </div>
@@ -338,44 +314,59 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
             <option value="T">T</option>
           </select>
         </div>
-        <div className="relative">
-          <label className="label">Cliente<Required /></label>
-          <input
-            type="text"
-            className="input"
-            value={clienteQuery}
-            onChange={e => {
-              setClienteQuery(e.target.value)
-              set('cuenta_cte', '') // obliga a elegir un cliente real de la lista
-              setClienteOpen(true)
-            }}
-            onFocus={() => setClienteOpen(true)}
-            onBlur={() => setTimeout(() => setClienteOpen(false), 150)}
-            onKeyDown={handleClienteKeyDown}
-            placeholder="Buscar cliente…"
-            autoComplete="off"
-            disabled={clienteGuardando}
-            required
-          />
-          {clienteOpen && (
-            <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-              {clientesFiltrados.length > 0 ? clientesFiltrados.map(c => (
-                <li key={c}>
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-                    onMouseDown={e => e.preventDefault()}
-                    onClick={() => elegirCliente(c)}
-                  >
-                    {c}
-                  </button>
-                </li>
-              )) : (
-                <li className="px-3 py-2 text-sm text-gray-400">Sin resultados — Enter para agregarlo como cliente nuevo</li>
-              )}
-            </ul>
-          )}
-        </div>
+        {form.tipo === 'CTA CTE' ? (
+          <div className="relative">
+            <label className="label">Cuenta corriente<Required /></label>
+            <input
+              type="text"
+              className="input"
+              value={clienteQuery}
+              onChange={e => {
+                setClienteQuery(e.target.value)
+                set('cuenta_cte', '') // obliga a elegir una cuenta real de la lista
+                setClienteOpen(true)
+              }}
+              onFocus={() => setClienteOpen(true)}
+              onBlur={() => setTimeout(() => setClienteOpen(false), 150)}
+              onKeyDown={handleCuentaKeyDown}
+              placeholder="Buscar cuenta corriente…"
+              autoComplete="off"
+              required
+            />
+            {clienteOpen && (
+              <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                {cuentasFiltradas.length > 0 ? cuentasFiltradas.map(c => (
+                  <li key={c}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => elegirCuenta(c)}
+                    >
+                      {c}
+                    </button>
+                  </li>
+                )) : (
+                  <li className="px-3 py-2 text-sm text-gray-400">Sin resultados — la cuenta corriente debe existir (se crean desde Usuarios/planilla)</li>
+                )}
+              </ul>
+            )}
+          </div>
+        ) : (
+          <div>
+            <label className="label">Cliente<Required /></label>
+            <input
+              type="text"
+              className="input"
+              value={form.cuenta_cte}
+              onChange={e => set('cuenta_cte', e.target.value)}
+              placeholder="Nombre del cliente"
+              autoComplete="off"
+              required
+            />
+            <p className="text-xs text-gray-400 mt-1">Cliente eventual: se escribe tal cual, sin lista.</p>
+          </div>
+        )}
         <div>
           <label className="label">Operación<Required /></label>
           <select className="input" value={form.operacion} onChange={e => set('operacion', e.target.value)}>
@@ -488,7 +479,7 @@ export default function NuevaTransaccionForm({ clientes }: { clientes: string[] 
       </div>
 
       <div className="flex items-center gap-4 pt-1">
-        <button type="submit" className="btn-primary flex-1"
+        <button type="submit" className="btn-primary"
           disabled={loading || (montoGrande && !confirmoGrande)}>
           {loading ? 'Guardando…' : 'Guardar transacción'}
         </button>
