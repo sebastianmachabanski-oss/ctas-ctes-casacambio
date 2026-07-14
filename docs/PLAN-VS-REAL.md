@@ -26,15 +26,22 @@ Se actualiza al cerrar cada ítem.
 | Rediseño de la app a rajatabla del mockup (todas las pantallas: shell + Inicio con filtros globales, login, Cuentas Ctes, Nueva, Transacciones con filtros por columna, Calle, Deudores, Usuarios, Sync, Mi cuenta) | 6–8 h | ~6,75 h | ✅ Completado |
 | Diagnóstico y arreglo del sync/datos (proyecto equivocado, migraciones faltantes, columna `cot_efectiva`) | — | ~1,5 h | ✅ Resuelto — no estaba previsto pero bloqueaba los datos |
 | Saldo acumulado en Cuentas Corrientes (extracto por cuenta, con verificación de cierre exacto) | — | ~1 h | ✅ En main |
+| Alta operativa desde la app: Guardar habilitado + escritura directa en movimientos_caja (visible al instante) + cliente según tipo (CTA CTE solo cuentas reales / CAJA texto libre) | — | ~2 h | ✅ En main — validado por el cliente |
+| Borrado espejado: eliminar en la app limpia la fila en la planilla copiando una fila pre-armada (fórmulas intactas), con loader y avisos | — | ~1,5 h | ✅ En main — validado por el cliente |
+| Detalles de validación (columna Cot., loaders, login, leyenda contraseña, Ganancias default mes, fix paginación RPC clientes) | — | ~1,5 h | ✅ En main |
 
 ## Total acumulado
 
-**≈ 22,5 h de tiempo activo real** al 10/7/2026.
+**≈ 27,5 h de tiempo activo real** al 11/7/2026.
 
-Pendientes de decisión (post-validación del cliente): volver a deshabilitar las 5
-opciones del menú (Transacciones, Calle, Saldos Pendientes, Ganancias, Sincronizar)
-y eventual habilitación del botón Guardar de Nueva transacción (hoy deshabilitado
-por decisión de negocio).
+Pendientes:
+- **Revisar la regla del monto de alerta** de Nueva transacción (hoy: banner con
+  confirmación cuando la operación mueve PESOS por más de $ 1.000.000, umbral fijo
+  en el código). A definir con el cliente: valor del umbral, si aplica a otras
+  monedas, y si conviene hacerlo configurable en vez de fijo.
+- Decidir si se vuelven a deshabilitar las 5 opciones del menú (Transacciones,
+  Calle, Saldos Pendientes, Ganancias, Sincronizar) o quedan habilitadas — todos
+  los módulos ya están completos y validados.
 
 Hitos previos ya completados (fuera de estas tablas): motor de cálculo aislado y
 validado, relevamiento y réplica exacta de COLO, reconciliación Sheet↔Excel
