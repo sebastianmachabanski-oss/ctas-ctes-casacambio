@@ -34,11 +34,9 @@ Se actualiza al cerrar cada ítem.
 
 **≈ 27,5 h de tiempo activo real** al 11/7/2026.
 
+| Umbral de alerta configurable en USD (app_config + editor inline superusuario; la alerta evalúa siempre el valor en dólares de la operación, convirtiendo pesos/euros/reales con cotización de referencia) | — | ~0,75 h | ✅ En main |
+
 Pendientes:
-- **Revisar la regla del monto de alerta** de Nueva transacción (hoy: banner con
-  confirmación cuando la operación mueve PESOS por más de $ 1.000.000, umbral fijo
-  en el código). A definir con el cliente: valor del umbral, si aplica a otras
-  monedas, y si conviene hacerlo configurable en vez de fijo.
 - Decidir si se vuelven a deshabilitar las 5 opciones del menú (Transacciones,
   Calle, Saldos Pendientes, Ganancias, Sincronizar) o quedan habilitadas — todos
   los módulos ya están completos y validados.

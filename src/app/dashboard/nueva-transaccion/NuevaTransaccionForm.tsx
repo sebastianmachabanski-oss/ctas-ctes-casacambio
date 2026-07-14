@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 
@@ -54,7 +54,11 @@ function Required() {
   return <span className="text-red-500 ml-0.5">*</span>
 }
 
-export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] }) {
+const fmtUsd = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
+
+export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUmbral }: {
+  cuentas: string[]; umbralUsd: number; puedeEditarUmbral: boolean
+}) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<'idle' | 'supabase' | 'done'>('idle')
@@ -108,14 +112,32 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
   const operacionesDisponibles = OPERACIONES_POR_TIPO[form.tipo] ?? []
   const cotizacionRequerida = OPERACIONES_REQUIEREN_COTIZACION.includes(form.operacion)
 
-  // Monto elevado en pesos (> $ 1.000.000): banner con checkbox de confirmación (mockup),
-  // en lugar del popup del navegador.
+  // ── Alerta de monto grande (decisión 11/7/2026): umbral CONFIGURABLE y expresado en
+  // DÓLARES; siempre se evalúa el valor en USD de la operación, venga en la moneda que
+  // venga. Si la operación no mueve dólares, se convierte con la cotización de
+  // referencia online (misma fuente que el tablero). ──
   const [confirmoGrande, setConfirmoGrande] = useState(false)
-  const montoGrande = useMemo(() => {
-    const monto = montoNumero(form.monto)
-    const muevePesos = form.propio.toUpperCase() === 'PESOS' || form.externo.toUpperCase() === 'PESOS'
-    return muevePesos && monto > 1_000_000
-  }, [form.monto, form.propio, form.externo])
+  const [umbral, setUmbral] = useState(umbralUsd)
+  const [rates, setRates] = useState<{ usd: number; eur: number; brl: number } | null>(null)
+
+  useEffect(() => {
+    let cancel = false
+    ;(async () => {
+      try {
+        const signal = AbortSignal.timeout(5000)
+        const [blue, cots] = await Promise.all([
+          fetch('https://dolarapi.com/v1/dolares/blue', { signal }).then(r => r.json()),
+          fetch('https://dolarapi.com/v1/cotizaciones', { signal }).then(r => r.json()),
+        ])
+        const eur = Array.isArray(cots) ? cots.find((c: any) => c.moneda === 'EUR') : null
+        const brl = Array.isArray(cots) ? cots.find((c: any) => c.moneda === 'BRL') : null
+        if (!cancel && blue?.venta) {
+          setRates({ usd: +blue.venta, eur: eur ? +eur.venta : 0, brl: brl ? +brl.venta : 0 })
+        }
+      } catch { /* sin cotización de referencia: la alerta evalúa solo la pata en dólares */ }
+    })()
+    return () => { cancel = true }
+  }, [])
 
   // Previsualización en vivo con el MISMO motor que usa el servidor (validado 100%
   // contra la planilla): el usuario ve el impacto en caja antes de guardar.
@@ -132,11 +154,31 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         costoPorcentaje: form.costo_porcentaje ? Number(form.costo_porcentaje) : null,
       })
       const chips = Object.entries(r.valores).filter(([, v]) => v !== 0)
-      return { tipo: 'ok' as const, cuenta: r.cuenta, chips }
+      return { tipo: 'ok' as const, cuenta: r.cuenta, chips, valores: r.valores as Record<string, number> }
     } catch (e: any) {
       return { tipo: 'error' as const, mensaje: e.message as string }
     }
   }, [form])
+
+  // Valor en USD de la operación: pata en dólares directa, o la pata mayor convertida
+  // con las cotizaciones de referencia (pesos / euros / reales).
+  const usdOperado = useMemo(() => {
+    if (preview.tipo !== 'ok') return 0
+    const v = preview.valores
+    const usd = Math.abs((v['DOLARES'] ?? 0) + (v['CC DOLARES'] ?? 0))
+    if (usd > 0) return usd
+    if (!rates?.usd) return 0
+    const pesos = Math.abs((v['PESOS'] ?? 0) + (v['CC PESOS'] ?? 0))
+    const eur = Math.abs((v['EUROS'] ?? 0) + (v['CC EUROS'] ?? 0))
+    const brl = Math.abs((v['REALES'] ?? 0) + (v['CC REALES'] ?? 0))
+    return Math.max(
+      pesos / rates.usd,
+      rates.eur ? (eur * rates.eur) / rates.usd : 0,
+      rates.brl ? (brl * rates.brl) / rates.usd : 0,
+    )
+  }, [preview, rates])
+
+  const montoGrande = usdOperado > umbral
 
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
@@ -176,9 +218,9 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
     const validationError = validate()
     if (validationError) return setError(validationError)
 
-    // Monto elevado en pesos: exige tildar la confirmación del banner (sin popup).
+    // Operación grande (en USD): exige tildar la confirmación del banner (sin popup).
     if (montoGrande && !confirmoGrande)
-      return setError('El monto supera $ 1.000.000: tildá la confirmación para poder guardar.')
+      return setError(`La operación equivale a más de US$ ${fmtUsd.format(umbral)}: tildá la confirmación para poder guardar.`)
 
     const payload = {
       ...form,
@@ -445,10 +487,10 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         </div>
       </div>
 
-      {/* Banner de monto elevado (mockup): visible solo si mueve pesos por > $ 1.000.000 */}
+      {/* Banner de operación grande: evalúa SIEMPRE el valor en dólares (umbral configurable) */}
       {montoGrande && (
         <div className="banner-warn">
-          ⚠️ <b>Monto elevado.</b> Supera $ 1.000.000.
+          ⚠️ <b>Operación grande.</b> Equivale a <b>US$ {fmtUsd.format(Math.round(usdOperado))}</b> y supera el umbral de US$ {fmtUsd.format(umbral)}.
           <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', marginLeft: 8, cursor: 'pointer' }}>
             <input type="checkbox" checked={confirmoGrande} onChange={e => setConfirmoGrande(e.target.checked)} />
             Confirmo que el monto es correcto
@@ -478,6 +520,9 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         )}
       </div>
 
+      {/* Umbral de alerta (en dólares, configurable por el superusuario sin deploy) */}
+      <UmbralAlerta umbral={umbral} onCambio={setUmbral} puedeEditar={puedeEditarUmbral} />
+
       <div className="flex items-center gap-4 pt-1">
         <button type="submit" className="btn-primary"
           disabled={loading || (montoGrande && !confirmoGrande)}>
@@ -486,5 +531,63 @@ export default function NuevaTransaccionForm({ cuentas }: { cuentas: string[] })
         <p className="text-xs text-gray-400 shrink-0"><Required /> Obligatorio</p>
       </div>
     </form>
+  )
+}
+
+// Línea informativa del umbral de alerta + editor inline (solo superusuario).
+// El valor vive en app_config y se cambia sin deploy.
+function UmbralAlerta({ umbral, onCambio, puedeEditar }: {
+  umbral: number; onCambio: (v: number) => void; puedeEditar: boolean
+}) {
+  const [editando, setEditando] = useState(false)
+  const [valor, setValor] = useState(String(umbral))
+  const [guardando, setGuardando] = useState(false)
+
+  async function guardar() {
+    const usd = Number(valor.replace(/\./g, '').replace(',', '.'))
+    if (!isFinite(usd) || usd <= 0) { alert('El umbral debe ser un número mayor a 0 (en dólares)'); return }
+    setGuardando(true)
+    try {
+      const res = await fetch('/api/config/umbral-alerta', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usd }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert('No se pudo guardar: ' + (data.error ?? 'error desconocido')); return }
+      onCambio(usd)
+      setEditando(false)
+    } catch {
+      alert('Error de conexión al guardar el umbral')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span>
+        Alerta de monto: se pide confirmación cuando la operación equivale a más de{' '}
+        <b style={{ color: 'var(--ink-2)' }}>US$ {fmtUsd.format(umbral)}</b>
+        {' '}(evaluado siempre en dólares).
+      </span>
+      {puedeEditar && !editando && (
+        <button type="button" className="chip" style={{ padding: '3px 10px', fontSize: 11.5 }}
+          onClick={() => { setValor(String(umbral)); setEditando(true) }}>
+          ⚙ cambiar
+        </button>
+      )}
+      {puedeEditar && editando && (
+        <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+          US$
+          <input className="input num" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)}
+            style={{ width: 110, padding: '3px 8px', display: 'inline-block' }} autoFocus />
+          <button type="button" className="btn-primary" style={{ fontSize: 11.5, padding: '4px 10px' }}
+            disabled={guardando} onClick={guardar}>{guardando ? '…' : 'Guardar'}</button>
+          <button type="button" className="chip" style={{ padding: '3px 10px', fontSize: 11.5 }}
+            onClick={() => setEditando(false)}>Cancelar</button>
+        </span>
+      )}
+    </div>
   )
 }

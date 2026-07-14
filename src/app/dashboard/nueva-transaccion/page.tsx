@@ -23,9 +23,17 @@ export default async function NuevaTransaccionPage() {
     .order('nombre')
   const cuentas = (cuentasData ?? []).map((c: any) => c.nombre)
 
+  // Umbral de alerta en DÓLARES (configurable en app_config; tolerante si falta la
+  // migración: usa el valor por defecto).
+  let umbralUsd = 1000
+  const { data: cfg } = await (supabase as any)
+    .from('app_config').select('value').eq('key', 'umbral_alerta_usd').maybeSingle()
+  const cfgUsd = (cfg as any)?.value?.usd
+  if (typeof cfgUsd === 'number' && cfgUsd > 0) umbralUsd = cfgUsd
+
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <NuevaTransaccionForm cuentas={cuentas} />
+      <NuevaTransaccionForm cuentas={cuentas} umbralUsd={umbralUsd} puedeEditarUmbral={rol === 'superusuario'} />
     </div>
   )
 }
