@@ -194,9 +194,39 @@ async function limpiarFilaPlanilla(mov: {
   if (candidatas.length === 0) return { estado: 'no_encontrada' }
   if (candidatas.length > 1) return { estado: 'multiple', candidatas: candidatas.length }
 
-  // Única coincidencia: devolver la fila al estado pre-armado. Solo columnas de ENTRADA
-  // (contiguas, igual que excel-write); las fórmulas de la fila quedan intactas.
   const fila = candidatas[0]
+
+  // Restauración por COPIA (pedido 11/7/2026): se copia ENTERA la primera fila pre-armada
+  // ("OPERACION?") sobre la fila borrada — fórmulas y validaciones incluidas, con las
+  // referencias ajustadas a la fila destino (igual que copiar y pegar a mano). Así la
+  // fila vuelve a tener la lógica EXACTA de la planilla, no solo celdas vacías.
+  let filaModelo = -1
+  for (let i = headerRow; i < (vOperacion?.length ?? 0); i++) {
+    if (String(vOperacion?.[i] ?? '').trim().toUpperCase() === 'OPERACION?') { filaModelo = i + 1; break }
+  }
+  if (filaModelo > 0 && filaModelo !== fila) {
+    const meta = await sheetsFetch(token, '?fields=sheets.properties')
+    const prop = ((meta.sheets ?? []) as any[]).map(s => s.properties).find(p => p?.title === SHEET_NAME)
+    if (!prop) throw new Error(`No se encontró la pestaña "${SHEET_NAME}"`)
+    await sheetsFetch(token, ':batchUpdate', {
+      method: 'POST',
+      body: JSON.stringify({
+        requests: [{
+          copyPaste: {
+            // Sin límites de columna = la fila completa, de punta a punta.
+            source: { sheetId: prop.sheetId, startRowIndex: filaModelo - 1, endRowIndex: filaModelo },
+            destination: { sheetId: prop.sheetId, startRowIndex: fila - 1, endRowIndex: fila },
+            pasteType: 'PASTE_NORMAL',
+            pasteOrientation: 'NORMAL',
+          },
+        }],
+      }),
+    })
+    return { estado: 'ok', fila }
+  }
+
+  // Plan B (no hay ninguna fila pre-armada para copiar): limpiar solo las columnas de
+  // ENTRADA y volver a marcar OPERACION?, dejando las fórmulas de la fila como están.
   const inputIdx = [iFecha, iCliente, iOp, iCaja, iOperacion, iPropio, iExterno, iMonto, iCot, iCostoPct, iDebe, iNotas]
     .filter(i => i >= 0)
   const startCol = Math.min(...inputIdx)

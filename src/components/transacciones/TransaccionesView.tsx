@@ -142,6 +142,19 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
         </div>
       </div>
 
+      {/* Loader del borrado: la limpieza espejada en la planilla tarda unos segundos */}
+      {borrando && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(255,255,255,.65)', backdropFilter: 'blur(2px)', zIndex: 90, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="card" style={{ padding: '22px 30px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+            <svg className="animate-spin" style={{ width: 30, height: 30, color: 'var(--brand)' }} viewBox="0 0 24 24" fill="none">
+              <circle style={{ opacity: 0.2 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path style={{ opacity: 0.8 }} fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
+            <p style={{ fontSize: 13, color: 'var(--ink-2)', margin: 0 }}>Eliminando… también se limpia la fila en la planilla</p>
+          </div>
+        </div>
+      )}
+
       {errorBorrar && (
         <div className="banner" style={{ background: 'var(--neg-bg)', border: '1px solid rgba(220,38,38,.3)', color: 'var(--neg-ink)' }}>
           No se pudo eliminar: {errorBorrar}
