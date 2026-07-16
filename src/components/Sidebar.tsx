@@ -116,7 +116,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
             if (it.section) return <div key={`s${i}`} className="cc-nav-sec">{it.section}</div>
             if (it.off) return (
               <span key={`o${i}`} className="cc-nav-item off">
-                <span className="ic">{it.icon}</span>{it.label}<span className="soon">pronto</span>
+                <span className="ic">{it.icon}</span>{it.label}
               </span>
             )
             const active = it.href === '/dashboard/inicio'
