@@ -53,6 +53,25 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
     return fuente.filter(c => (c.nombre || '').toUpperCase().includes(q))
   }, [fuente, busca])
 
+  // Auto-ajuste del tamaño de letra de los KPIs de caja: si un número no entra en una
+  // línea (ej. negativos de 9+ dígitos), baja la fuente hasta que quepa (mín. 14px).
+  useEffect(() => {
+    const fit = () => {
+      document.querySelectorAll<HTMLElement>('.kpis-caja .val').forEach(el => {
+        el.style.fontSize = ''
+        let size = parseFloat(getComputedStyle(el).fontSize) || 20
+        let guard = 0
+        while (el.scrollWidth > el.clientWidth + 1 && size > 14 && guard++ < 12) {
+          size -= 1
+          el.style.fontSize = size + 'px'
+        }
+      })
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [kpis])
+
   return (
     <div className="p-4 md:p-6" style={{ display: 'grid', gap: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>

@@ -45,13 +45,17 @@
   .card  { @apply bg-white rounded-xl border shadow-sm; border-color: var(--grid); }
 }
 
-/* ── Barra de scroll fina, en navy (mismo tono del sidebar, como el mockup) ── */
-* { scrollbar-width: thin; scrollbar-color: #33436a var(--side-bg2); }
-::-webkit-scrollbar { width: 11px; height: 11px; }
-::-webkit-scrollbar-track { background: var(--side-bg2); }
-::-webkit-scrollbar-thumb { background: #33436a; border-radius: 8px; border: 2px solid var(--side-bg2); }
-::-webkit-scrollbar-thumb:hover { background: #425584; }
-.cc-nav::-webkit-scrollbar-track { background: transparent; }
+/* ── Barra de scroll: pill gris-azulado sobre pista clara (armoniza con el fondo) ── */
+* { scrollbar-width: thin; scrollbar-color: #c2ccde transparent; }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c2ccde; border-radius: 999px; border: 3px solid var(--page); }
+::-webkit-scrollbar-thumb:hover { background: #a3afc7; }
+/* Dentro del sidebar navy: thumb claro translúcido, pista transparente */
+.cc-side, .cc-nav { scrollbar-color: rgba(255,255,255,.22) transparent; }
+.cc-side ::-webkit-scrollbar-thumb, .cc-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-color: transparent; }
+.cc-side ::-webkit-scrollbar-thumb:hover, .cc-nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.34); }
+.cc-side ::-webkit-scrollbar-track, .cc-nav::-webkit-scrollbar-track { background: transparent; }
 [hidden] { display: none !important; }
 
 /* ═══════════════ Sidebar (navy, anclable + hamburguesa) ═══════════════ */
@@ -124,7 +128,7 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .kpi .top { display: flex; align-items: center; gap: 8px; }
 .kpi .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 .kpi .cur { font-size: 10px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
-.kpi .val { font-size: 20px; font-weight: 700; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.kpi .val { font-size: 20px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
 .kpi .sub { border-top: 1px solid var(--grid); padding-top: 8px; display: flex; flex-direction: column; gap: 3px; }
 .kpi .kr { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-2); }
 .kpi .kr b { color: var(--ink); font-weight: 600; }
