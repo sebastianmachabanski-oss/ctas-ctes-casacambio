@@ -8,24 +8,20 @@ import type { Profile } from '@/lib/supabase/types'
 type Item = { href?: string; label: string; icon: string; off?: boolean; section?: string }
 
 // Menú por rol.
-// Habilitadas: Inicio, Cuentas Corrientes, Nueva transacción, Usuarios, Mi cuenta.
-// Deshabilitadas ("pronto") para TODOS los roles (decisión 11/7/2026, tras validar):
-// Transacciones, Dinero en calle, Saldos Pendientes, Ganancias, Sincronizar. Las
-// pantallas siguen existiendo y son accesibles por URL directa; solo se ocultan del menú.
-// Para volver a habilitar cualquiera, reemplazar su `{ off: true }` por `{ href: '...' }`.
+// Todas las opciones están habilitadas (16/7/2026, pedido del cliente).
 const NAV: Record<string, Item[]> = {
   superusuario: [
     { section: 'Operación', label: '', icon: '' },
     { href: '/dashboard/inicio',            label: 'Inicio',            icon: '📊' },
     { href: '/dashboard/cuenta-corriente',  label: 'Cuentas Corrientes', icon: '📋' },
     { href: '/dashboard/nueva-transaccion', label: 'Nueva transacción', icon: '💱' },
-    { label: 'Transacciones',    icon: '💲', off: true },
-    { label: 'Dinero en calle',  icon: '🚚', off: true },
-    { label: 'Saldos Pendientes', icon: '📈', off: true },
+    { href: '/dashboard/transacciones', label: 'Transacciones',    icon: '💲' },
+    { href: '/dashboard/calle',         label: 'Dinero en calle',  icon: '🚚' },
+    { href: '/dashboard/deudores',      label: 'Saldos Pendientes', icon: '📈' },
     { section: 'Gestión', label: '', icon: '' },
-    { label: 'Ganancias',   icon: '💰', off: true },
+    { href: '/dashboard/ganancias',      label: 'Ganancias', icon: '💰' },
     { href: '/dashboard/admin/usuarios', label: 'Usuarios',  icon: '👥' },
-    { label: 'Sincronizar', icon: '🔄', off: true },
+    { href: '/dashboard/admin/sync',     label: 'Sincronizar', icon: '🔄' },
     { href: '/dashboard/mi-cuenta', label: 'Mi cuenta', icon: '🔑' },
   ],
   operador: [
@@ -33,9 +29,9 @@ const NAV: Record<string, Item[]> = {
     { href: '/dashboard/inicio',            label: 'Inicio',            icon: '📊' },
     { href: '/dashboard/cuenta-corriente',  label: 'Cuentas Corrientes', icon: '📋' },
     { href: '/dashboard/nueva-transaccion', label: 'Nueva transacción', icon: '💱' },
-    { label: 'Transacciones',    icon: '💲', off: true },
-    { label: 'Dinero en calle',  icon: '🚚', off: true },
-    { label: 'Saldos Pendientes', icon: '📈', off: true },
+    { href: '/dashboard/transacciones', label: 'Transacciones',    icon: '💲' },
+    { href: '/dashboard/calle',         label: 'Dinero en calle',  icon: '🚚' },
+    { href: '/dashboard/deudores',      label: 'Saldos Pendientes', icon: '📈' },
     { section: 'Cuenta', label: '', icon: '' },
     { href: '/dashboard/mi-cuenta', label: 'Mi cuenta', icon: '🔑' },
   ],
