@@ -84,7 +84,11 @@ export default async function CuentaCorrientePage({
     .order('created_at', { ascending: false })
 
   if (cuentaFiltro) query = query.eq('cuenta_cte', cuentaFiltro)
-  if (operacion) query = query.eq('operacion', operacion)
+  // "Tipo de movimiento" filtra por DIRECCIÓN (ingreso/egreso), no por un código exacto:
+  // los movimientos usan INGRESAN/EGRESAN (planilla y app) y datos viejos DONACION/COMPROMISO.
+  // "INGRES" no es subcadena de "EGRESAN" ni viceversa, así que no se pisan.
+  if (operacion === 'INGRESO') query = query.or('operacion.ilike.*INGRES*,operacion.eq.DONACION')
+  else if (operacion === 'EGRESO') query = query.or('operacion.ilike.*EGRES*,operacion.eq.COMPROMISO')
 
   const { data, count } = await query
   const movimientos = (data ?? []) as any[]

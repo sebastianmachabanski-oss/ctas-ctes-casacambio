@@ -74,8 +74,8 @@ export default function FiltrosMovimientos({ tiposOperacion, valoresIniciales, c
           <select id="operacion" className="input" value={operacion}
             onChange={e => setOperacion(e.target.value)}>
             <option value="">Todos</option>
-            <option value="DONACION">{process.env.NEXT_PUBLIC_LABEL_INGRESO ?? 'Ingreso'}</option>
-            <option value="COMPROMISO">{process.env.NEXT_PUBLIC_LABEL_EGRESO ?? 'Egreso'}</option>
+            <option value="INGRESO">{process.env.NEXT_PUBLIC_LABEL_INGRESO ?? 'Ingreso'}</option>
+            <option value="EGRESO">{process.env.NEXT_PUBLIC_LABEL_EGRESO ?? 'Egreso'}</option>
           </select>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
