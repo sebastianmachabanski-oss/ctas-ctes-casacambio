@@ -132,7 +132,9 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .kpi .sub { border-top: 1px solid var(--grid); padding-top: 8px; display: flex; flex-direction: column; gap: 3px; }
 .kpi .kr { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-2); }
 .kpi .kr b { color: var(--ink); font-weight: 600; }
-/* Fila "Saldo en caja" (arqueo físico): etiqueta azul, valor verde/rojo según signo */
+/* Fila "Saldo en caja" (arqueo físico): fondo gris para destacarla, etiqueta azul,
+   valor verde/rojo según signo */
+.kpi .kr.kr-encaja { background: var(--page); border-radius: 6px; padding: 3px 6px; margin: 1px -2px; }
 .kpi .kr .lbl-encaja { color: var(--brand); font-weight: 600; }
 .kpi .kr b.pos { color: var(--pos-ink); }
 .kpi .kr b.neg { color: var(--neg-ink); }

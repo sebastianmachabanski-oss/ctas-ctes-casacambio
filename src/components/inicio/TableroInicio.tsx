@@ -111,7 +111,7 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
                   {/* Arqueo físico (saldo en moneda − calle): siempre situación ACTUAL,
                       no responde al filtro de período. Es el dato para hacer la caja. */}
                   {k.enCaja !== null && (
-                    <div className="kr">
+                    <div className="kr kr-encaja">
                       <span className="lbl-encaja">Saldo en caja</span>
                       <b className={k.enCaja < 0 ? 'neg' : 'pos'}>{money(k.enCaja)}</b>
                     </div>
