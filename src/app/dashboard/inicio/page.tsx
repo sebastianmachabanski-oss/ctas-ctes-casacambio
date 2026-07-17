@@ -22,12 +22,21 @@ async function traerTodo<T>(fetchPage: (from: number, to: number) => Promise<T[]
 function hoyArgentina(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date())
 }
-function restarDias(fechaISO: string, dias: number): string {
-  const d = new Date(fechaISO + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() - dias)
-  return d.toISOString().slice(0, 10)
+// Períodos de CALENDARIO (pedido 17/7/2026): Día = hoy, Semana = desde el lunes,
+// Mes = desde el 1 del mes en curso, Año = desde el 1/1. Así "Mes" coincide con
+// filtrar los días del mes actual en la planilla (antes eran ventanas móviles de
+// 30/365 días corridos y los totales no cerraban contra el Sheet).
+const PERIODOS = ['dia', 'semana', 'mes', 'anio'] as const
+function inicioPeriodo(p: string, hoy: string): string {
+  if (p === 'semana') {
+    const d = new Date(hoy + 'T12:00:00Z')
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)) // retrocede al lunes
+    return d.toISOString().slice(0, 10)
+  }
+  if (p === 'mes') return hoy.slice(0, 8) + '01'
+  if (p === 'anio') return hoy.slice(0, 5) + '01-01'
+  return hoy // dia
 }
-const P_DIAS: Record<string, number> = { dia: 0, semana: 6, mes: 29, anio: 364 }
 
 export default async function InicioPage({
   searchParams,
@@ -50,9 +59,9 @@ export default async function InicioPage({
   if (searchParams.desde || searchParams.hasta) {
     desde = searchParams.desde || null
     hasta = searchParams.hasta || null
-  } else if (p in P_DIAS) {
+  } else if ((PERIODOS as readonly string[]).includes(p)) {
     hasta = hoyArgentina()
-    desde = restarDias(hasta, P_DIAS[p])
+    desde = inicioPeriodo(p, hasta)
   }
 
   // 1) Totales de caja del período (saldo/movimiento por moneda = suma de cada columna).
@@ -134,7 +143,7 @@ export default async function InicioPage({
       clientesCaja={clientesCajaN}
       clientesCC={clientesCCN}
       serieUSD={serie}
-      periodo={p in P_DIAS ? p : ''}
+      periodo={(PERIODOS as readonly string[]).includes(p) ? p : ''}
       rDesde={searchParams.desde ?? ''}
       rHasta={searchParams.hasta ?? ''}
     />
