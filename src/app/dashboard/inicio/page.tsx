@@ -68,6 +68,15 @@ export default async function InicioPage({
   const { data: totalesData } = await (supabase as any).rpc('caja_totales', { p_desde: desde, p_hasta: hasta })
   const t = (totalesData ?? {}) as Record<string, number>
 
+  // 1b) Totales históricos SIN filtro: el "Saldo en caja" (fila de la planilla:
+  // saldo en moneda menos calle) es el arqueo físico y muestra SIEMPRE la
+  // situación actual, sin importar el período elegido — igual que la fila Calle.
+  let tAll = t
+  if (desde || hasta) {
+    const { data } = await (supabase as any).rpc('caja_totales', { p_desde: null, p_hasta: null })
+    tAll = (data ?? {}) as Record<string, number>
+  }
+
   // 2) Total en calle por moneda (solo positivos).
   const calleRows = await traerTodo<Record<string, number>>(async (from, to) => {
     const { data } = await supabase.from('movimientos_caja')
@@ -119,13 +128,15 @@ export default async function InicioPage({
   const { data: serieData } = await (supabase as any).rpc('caja_saldo_diario', { p_moneda: 'dolares' })
   const serie = ((serieData ?? []) as any[]).map(r => ({ fecha: r.fecha as string, saldo: Number(r.saldo) }))
 
+  // "Saldo en caja" = saldo en moneda (histórico) − calle: el efectivo físico que
+  // debería haber en la caja (fila "Saldo en caja" de la planilla).
   const kpis = [
-    { cur: 'Pesos',   col: '#2563eb', caja: t.pesos ?? 0,   calle: calle.pesos,   cc: t.cc_pesos ?? 0 },
-    { cur: 'Dólares', col: '#16a34a', caja: t.dolares ?? 0, calle: calle.dolares, cc: t.cc_dolares ?? 0 },
-    { cur: 'Euros',   col: '#7c3aed', caja: t.euros ?? 0,   calle: calle.euros,   cc: t.cc_euros ?? 0 },
-    { cur: 'Reales',  col: '#eab308', caja: t.reales ?? 0,  calle: calle.reales,  cc: t.cc_reales ?? 0 },
-    { cur: 'Cheques', col: '#0d9488', caja: t.cheques ?? 0, calle: calle.cheques, cc: null },
-    { cur: 'Banco',   col: '#8a94a6', caja: t.banco ?? 0,   calle: null,          cc: null },
+    { cur: 'Pesos',   col: '#2563eb', caja: t.pesos ?? 0,   calle: calle.pesos,   enCaja: (tAll.pesos ?? 0) - calle.pesos,     cc: t.cc_pesos ?? 0 },
+    { cur: 'Dólares', col: '#16a34a', caja: t.dolares ?? 0, calle: calle.dolares, enCaja: (tAll.dolares ?? 0) - calle.dolares, cc: t.cc_dolares ?? 0 },
+    { cur: 'Euros',   col: '#7c3aed', caja: t.euros ?? 0,   calle: calle.euros,   enCaja: (tAll.euros ?? 0) - calle.euros,     cc: t.cc_euros ?? 0 },
+    { cur: 'Reales',  col: '#eab308', caja: t.reales ?? 0,  calle: calle.reales,  enCaja: (tAll.reales ?? 0) - calle.reales,   cc: t.cc_reales ?? 0 },
+    { cur: 'Cheques', col: '#0d9488', caja: t.cheques ?? 0, calle: calle.cheques, enCaja: (tAll.cheques ?? 0) - calle.cheques, cc: null },
+    { cur: 'Banco',   col: '#8a94a6', caja: t.banco ?? 0,   calle: null,          enCaja: null,                                cc: null },
   ]
 
   const clientesCajaN = clientesCaja.map(c => ({

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-type KPI = { cur: string; col: string; caja: number; calle: number | null; cc: number | null }
+type KPI = { cur: string; col: string; caja: number; calle: number | null; enCaja: number | null; cc: number | null }
 type Cliente = { nombre: string; pesos: number; dolares: number; euros: number; reales: number }
 type Punto = { fecha: string; saldo: number }
 
@@ -108,6 +108,14 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
               ) : (
                 <>
                   {k.calle !== null && <div className="kr"><span>Calle</span><b className={k.calle < 0 ? 'neg' : ''}>{money(k.calle)}</b></div>}
+                  {/* Arqueo físico (saldo en moneda − calle): siempre situación ACTUAL,
+                      no responde al filtro de período. Es el dato para hacer la caja. */}
+                  {k.enCaja !== null && (
+                    <div className="kr">
+                      <span className="lbl-encaja">Saldo en caja</span>
+                      <b className={k.enCaja < 0 ? 'neg' : 'pos'}>{money(k.enCaja)}</b>
+                    </div>
+                  )}
                   {k.cc !== null && <div className="kr"><span>Cta cte</span><b className={k.cc < 0 ? 'neg' : ''}>{money(k.cc)}</b></div>}
                 </>
               )}
