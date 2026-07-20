@@ -153,13 +153,21 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .pos { color: var(--pos-ink); }
 
 /* banda de mercado (fuente externa) */
-.mkt { border: 1.5px dashed rgba(37,99,235,.32); background: rgba(37,99,235,.05); border-radius: 12px; padding: 11px 16px 9px; }
-.mkt-head { display: flex; align-items: baseline; gap: 10px 20px; flex-wrap: wrap; }
-.mkt-title { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--brand-ink); white-space: nowrap; }
-.mkt-row { display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: baseline; flex: 1; justify-content: space-evenly; }
-.mkt-row .it { display: flex; align-items: baseline; gap: 7px; }
-.mkt-row .n { font-size: 12.5px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
-.mkt-row .v { font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Compacta: título en una línea y las cotizaciones en OTRA, en una sola fila. Si no
+   entran, se desplazan con scroll horizontal (como las tarjetas de saldos) en vez de
+   apilarse y comerse la pantalla. */
+.mkt { border: 1.5px dashed rgba(37,99,235,.32); background: rgba(37,99,235,.05); border-radius: 12px; padding: 8px 14px 6px; }
+.mkt-head { display: flex; flex-direction: column; gap: 3px; }
+.mkt-title { font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--brand-ink); white-space: nowrap; }
+.mkt-row {
+  display: flex; gap: 0 16px; align-items: baseline;
+  flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+  padding-bottom: 1px;
+}
+.mkt-row .it { display: flex; align-items: baseline; gap: 6px; flex: 0 0 auto; white-space: nowrap; }
+.mkt-row .n { font-size: 11.5px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+.mkt-row .v { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .mkt-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 6px; border-top: 1px dashed rgba(37,99,235,.32); padding-top: 6px; }
 .mkt-note, .mkt-src { font-size: 10.5px; color: var(--muted); }
 .mkt-src.live::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--pos); margin-right: 5px; vertical-align: 1px; }
