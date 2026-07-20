@@ -3,9 +3,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 
+// USDT es solo-CAJA: no participa de cuentas corrientes (decisión 20/7/2026). Por eso la
+// lista de monedas depende del Tipo — ver monedasDisponibles().
 const MONEDAS = ['PESOS', 'DOLARES', 'EUROS', 'REALES']
+const MONEDAS_CAJA = ['PESOS', 'DOLARES', 'EUROS', 'REALES', 'USDT']
+function monedasDisponibles(tipo: string) { return tipo === 'CAJA' ? MONEDAS_CAJA : MONEDAS }
 const SIMBOLOS: Record<string, string> = {
-  pesos: '$', cheques: 'CH$', dolares: 'U$S', euros: '€', reales: 'R$',
+  pesos: '$', cheques: 'CH$', dolares: 'U$S', euros: '€', reales: 'R$', usdt: 'USDT',
   banco: 'BCO', cc_pesos: 'CC $', cc_dolares: 'CC U$S', cc_euros: 'CC €', cc_reales: 'CC R$',
 }
 const nfPreview = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
@@ -64,6 +68,8 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
   const [step, setStep] = useState<'idle' | 'supabase' | 'done'>('idle')
   const [cajaDirecta, setCajaDirecta] = useState(false)
   const [excelOk, setExcelOk] = useState<boolean | null>(null)
+  // USDT no existe en la planilla: la transacción vive solo en la app (no se escribe al Sheet).
+  const [soloApp, setSoloApp] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -165,7 +171,8 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
   const usdOperado = useMemo(() => {
     if (preview.tipo !== 'ok') return 0
     const v = preview.valores
-    const usd = Math.abs((v['DOLARES'] ?? 0) + (v['CC DOLARES'] ?? 0))
+    // USDT cuenta como dólar (paridad ~1:1) para el umbral de alerta.
+    const usd = Math.abs((v['DOLARES'] ?? 0) + (v['CC DOLARES'] ?? 0)) + Math.abs(v['USDT'] ?? 0)
     if (usd > 0) return usd
     if (!rates?.usd) return 0
     const pesos = Math.abs((v['PESOS'] ?? 0) + (v['CC PESOS'] ?? 0))
@@ -188,7 +195,13 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
     // Al cambiar el Tipo, la Operación puede dejar de ser válida (se resetea a la primera
     // opción) y el cliente elegido tampoco aplica (cuenta corriente ↔ cliente eventual).
     const opciones = OPERACIONES_POR_TIPO[tipo] ?? []
-    setForm(f => ({ ...f, tipo, operacion: opciones[0] ?? '', cuenta_cte: '' }))
+    // USDT solo existe en CAJA: si venía elegido y se pasa a CTA CTE, se resetea a DÓLARES.
+    const permitidas = monedasDisponibles(tipo)
+    setForm(f => ({
+      ...f, tipo, operacion: opciones[0] ?? '', cuenta_cte: '',
+      propio:  permitidas.includes(f.propio)  ? f.propio  : 'DOLARES',
+      externo: permitidas.includes(f.externo) ? f.externo : 'DOLARES',
+    }))
     setClienteQuery('')
     setClienteOpen(false)
   }
@@ -251,8 +264,14 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
       setCajaDirecta(data.caja_directa === true)
       setStep('done')
       setLoading(false)
-      setExcelOk(null) // null = todavía sincronizando con la planilla
 
+      // USDT no va a la planilla (no existe allá): se omite la escritura al Sheet para no
+      // duplicar la pata en pesos/dólares vía el próximo sync.
+      const esUsdt = payload.propio === 'USDT' || payload.externo === 'USDT'
+      setSoloApp(esUsdt)
+      if (esUsdt) return
+
+      setExcelOk(null) // null = todavía sincronizando con la planilla
       fetch('/api/excel-write', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -277,6 +296,7 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
   function resetForm() {
     setStep('idle')
     setExcelOk(null)
+    setSoloApp(false)
     setWarning(null)
     setError(null)
     setForm(f => ({ ...f, monto: '', cotizacion: '', costo_porcentaje: '', debe: '', notas: '' }))
@@ -287,23 +307,32 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
   if (step === 'done') {
     return (
       <div className="card p-6 text-center space-y-4">
-        <div className="text-4xl">{excelOk === false ? '⚠️' : '✅'}</div>
+        <div className="text-4xl">{excelOk === false && !soloApp ? '⚠️' : '✅'}</div>
         <p className="text-gray-800 font-semibold">Transacción guardada</p>
         <div className={`rounded-lg p-3 text-sm text-left ${
-          excelOk === false
+          excelOk === false && !soloApp
             ? 'bg-amber-50 border border-amber-200 text-amber-800'
             : 'bg-green-50 border border-green-200 text-green-800'
         }`}>
-          {excelOk === true && '✓ Registrado en sistema y en la planilla'}
-          {excelOk === false && `Sistema ✓ · Planilla ✗: ${warning}`}
-          {excelOk !== null && (
+          {soloApp && (
+            <>
+              ✓ Registrado en el sistema
+              <p className="mt-1 text-xs opacity-80">
+                USDT no se registra en la planilla (no existe allá): la transacción vive solo en la app.
+                {cajaDirecta ? ' ✓ Visible al instante en Transacciones e Inicio.' : ''}
+              </p>
+            </>
+          )}
+          {!soloApp && excelOk === true && '✓ Registrado en sistema y en la planilla'}
+          {!soloApp && excelOk === false && `Sistema ✓ · Planilla ✗: ${warning}`}
+          {!soloApp && excelOk !== null && (
             <p className="mt-1 text-xs opacity-80">
               {cajaDirecta
                 ? '✓ Visible al instante en Transacciones e Inicio'
                 : 'ℹ️ Se verá en Transacciones tras la próxima sincronización (falta la policy de escritura directa)'}
             </p>
           )}
-          {excelOk === null && (
+          {!soloApp && excelOk === null && (
             <span className="flex items-center gap-2">
               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -418,13 +447,13 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
         <div>
           <label className="label">Moneda propia<Required /></label>
           <select className="input" value={form.propio} onChange={e => set('propio', e.target.value)}>
-            {MONEDAS.map(m => <option key={m} value={m}>{m}</option>)}
+            {monedasDisponibles(form.tipo).map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
         <div>
           <label className="label">Moneda externa<Required /></label>
           <select className="input" value={form.externo} onChange={e => set('externo', e.target.value)}>
-            {MONEDAS.map(m => <option key={m} value={m}>{m}</option>)}
+            {monedasDisponibles(form.tipo).map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
         <div>

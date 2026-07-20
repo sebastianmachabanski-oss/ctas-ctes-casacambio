@@ -30,6 +30,12 @@ Documentación clave: `docs/SINCRONIZACION.md` (sync Sheet→DB), `docs/MOTOR-CA
   ante cualquier cambio correr `npx tsx scripts/validar-motor-calculo.mts`.
 - Editar transacciones en la app NO escribe al Sheet (definido 5/7/2026): mientras
   dure la convivencia, el sync puede pisar esos cambios y es un comportamiento asumido.
+- USDT (definido 20/7/2026): moneda SOLO-app, NO existe en la planilla. Solo opera en CAJA
+  (compra/venta contra pesos y dólares, ingresos/egresos) — sin cuenta corriente ni TT/SWITCH.
+  Se cotiza como el dólar (pesos por USDT; ~1:1 contra dólar físico con spread). Las filas
+  USDT se marcan `movimientos_caja.origen='app'` y el sync NO las toca (si no, se perderían).
+  El alta USDT no se escribe al Sheet (evita duplicar la pata en pesos vía sync). Cuando se
+  retire la planilla, `origen` deja de ser necesario pero no molesta.
 - BORRAR transacciones en la app SÍ limpia la fila en la planilla (definido 11/7/2026):
   se identifica por contenido y solo se limpia si la coincidencia es única — con cero o
   varias coincidencias se borra solo de la base y se avisa para el borrado manual.

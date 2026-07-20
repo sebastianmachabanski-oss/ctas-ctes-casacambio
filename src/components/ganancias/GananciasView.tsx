@@ -7,17 +7,17 @@ import { useRouter } from 'next/navigation'
 // El servidor manda los días agregados; acá se aplica la configuración en vivo.
 
 export type ParAgg = { vC: number; aC: number; vV: number; aV: number; vCcc: number; aCcc: number; vVcc: number; aVcc: number }
-export type DiaAgg = { f: string; usd: ParAgg; eur: ParAgg; brl: ParAgg; g: number; gcc: number }
+export type DiaAgg = { f: string; usd: ParAgg; eur: ParAgg; brl: ParAgg; usdt: ParAgg; g: number; gcc: number }
 
 type Cfg = {
-  ops: Set<string>; par: 'usd' | 'eur' | 'brl'; cc: boolean
+  ops: Set<string>; par: 'usd' | 'eur' | 'brl' | 'usdt'; cc: boolean
   resid: 'fijo' | 'costo' | 'mtm'; margen: number; cierre: number; gastos: boolean
 }
 
 const fmt0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
 const fmt3 = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 const ars = (n: number) => `$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
-const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$' }
+const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$', usdt: 'USDT' }
 
 function addDays(iso: string, n: number): string {
   const d = new Date(iso + 'T12:00:00Z')
@@ -234,6 +234,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
               <option value="usd">Dólares ↔ Pesos</option>
               <option value="eur">Euros ↔ Pesos</option>
               <option value="brl">Reales ↔ Pesos</option>
+              <option value="usdt">USDT ↔ Pesos</option>
             </select>
             <div className="param-what">Qué modifica: <b>sobre qué monedas se mide la ganancia</b>. Cada par tiene su resultado propio, sin mezclarse con los demás.</div>
           </div>
@@ -246,7 +247,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
             <div className="param-what">Qué modifica: <b>si lo comprado/vendido por cuenta corriente suma al volumen</b>. La planilla lo incluye.</div>
           </div>
           <div className="card param">
-            <p className="param-name">{cfg.par === 'usd' ? 'Dólares' : cfg.par === 'eur' ? 'Euros' : 'Reales'} que quedan en stock</p>
+            <p className="param-name">{cfg.par === 'usd' ? 'Dólares' : cfg.par === 'eur' ? 'Euros' : cfg.par === 'brl' ? 'Reales' : 'USDT'} que quedan en stock</p>
             <div className="radio-row">
               <label>
                 <input type="radio" name="gn-resid" checked={cfg.resid === 'fijo'} onChange={() => setC({ resid: 'fijo' })} />

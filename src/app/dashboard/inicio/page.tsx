@@ -4,7 +4,7 @@ import TableroInicio from '@/components/inicio/TableroInicio'
 
 // Columnas de "calle" (dinero con repartidor asignado). Regla de la planilla: al total
 // solo suman los valores POSITIVOS.
-const COLS_CALLE = ['pesos', 'cheques', 'dolares', 'euros', 'reales'] as const
+const COLS_CALLE = ['pesos', 'cheques', 'dolares', 'euros', 'reales', 'usdt'] as const
 
 async function traerTodo<T>(fetchPage: (from: number, to: number) => Promise<T[]>): Promise<T[]> {
   const PAGE = 1000
@@ -127,6 +127,7 @@ export default async function InicioPage({
     { cur: 'Dólares', col: '#16a34a', caja: t.dolares ?? 0, calle: calle.dolares, enCaja: (t.dolares ?? 0) - calle.dolares, cc: t.cc_dolares ?? 0 },
     { cur: 'Euros',   col: '#7c3aed', caja: t.euros ?? 0,   calle: calle.euros,   enCaja: (t.euros ?? 0) - calle.euros,     cc: t.cc_euros ?? 0 },
     { cur: 'Reales',  col: '#eab308', caja: t.reales ?? 0,  calle: calle.reales,  enCaja: (t.reales ?? 0) - calle.reales,   cc: t.cc_reales ?? 0 },
+    { cur: 'USDT',    col: '#26a17b', caja: t.usdt ?? 0,    calle: calle.usdt,    enCaja: (t.usdt ?? 0) - calle.usdt,       cc: null },
     { cur: 'Cheques', col: '#0d9488', caja: t.cheques ?? 0, calle: calle.cheques, enCaja: (t.cheques ?? 0) - calle.cheques, cc: null },
     { cur: 'Banco',   col: '#8a94a6', caja: t.banco ?? 0,   calle: null,          enCaja: null,                              cc: null },
   ]

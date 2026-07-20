@@ -254,7 +254,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   // Los datos del movimiento se leen ANTES de borrarlo (sirven para ubicar la fila allá).
   const { data: movData, error: getError } = await supabase.from('movimientos_caja')
-    .select('fecha, tipo, cliente, operacion, monto, cot')
+    .select('fecha, tipo, cliente, operacion, monto, cot, origen')
     .eq('id', params.id).single()
   if (getError || !movData)
     return NextResponse.json({ error: 'Movimiento no encontrado' }, { status: 404 })
@@ -267,6 +267,10 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   // count 0 = la RLS lo impidió (falta la policy de DELETE).
   if (!count) return NextResponse.json({ error: 'No se pudo eliminar (¿falta la policy de DELETE?)' }, { status: 404 })
 
+  // Las filas 'app' (USDT) no existen en la planilla: no hay nada que limpiar allá.
+  if (mov.origen === 'app') {
+    return NextResponse.json({ ok: true, planilla: 'no_aplica' })
+  }
   // Limpieza espejada en la planilla (best effort: si falla, el movimiento ya salió del
   // sistema y se informa para borrarlo a mano allá).
   if (WRITE_SOURCE !== 'sheets') {

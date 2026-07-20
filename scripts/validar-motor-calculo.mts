@@ -99,5 +99,28 @@ function assertIgual<T>(actual: T, esperado: T, msg: string) {
   assertCasi(calle.PESOS, 5000, 'Calle: PESOS = 5.000')
 }
 
+// ── USDT (moneda solo-app, solo CAJA): se comporta como un segundo dólar ──
+{
+  // COMPRA USDT con PESOS, monto 1000, cot 1510 → paga 1.510.000 pesos, recibe 1000 USDT
+  const r = calcularMovimiento({ tipo: 'CAJA', operacion: 'COMPRA', propio: 'USDT', externo: 'PESOS', monto: 1000, cotizacion: 1510, costoPorcentaje: null })
+  assertCasi(r.valores.USDT, 1000, 'USDT COMPRA/PESOS: USDT = +1.000')
+  assertCasi(r.valores.PESOS, -1_510_000, 'USDT COMPRA/PESOS: PESOS = -1.510.000')
+  assertCasi(r.valores.DOLARES, 0, 'USDT COMPRA/PESOS: DOLARES = 0')
+  assertIgual(r.cuenta, 'CAMBIO DIVISAS', 'USDT COMPRA/PESOS: CUENTA = CAMBIO DIVISAS')
+}
+{
+  // Canje: COMPRA USDT con DÓLARES, monto 1000, cot 0,98 → recibe 1000 USDT, entrega 980 USD
+  const r = calcularMovimiento({ tipo: 'CAJA', operacion: 'COMPRA', propio: 'USDT', externo: 'DOLARES', monto: 1000, cotizacion: 0.98, costoPorcentaje: null })
+  assertCasi(r.valores.USDT, 1000, 'USDT COMPRA/DOLARES: USDT = +1.000')
+  assertCasi(r.valores.DOLARES, -980, 'USDT COMPRA/DOLARES: DOLARES = -980')
+  assertIgual(r.cuenta, 'CAMBIO DIVISAS', 'USDT COMPRA/DOLARES: CUENTA = CAMBIO DIVISAS')
+}
+{
+  // INGRESAN USDT en caja (sin externa): solo suma a la columna USDT
+  const r = calcularMovimiento({ tipo: 'CAJA', operacion: 'INGRESAN', propio: 'USDT', externo: '', monto: 500, cotizacion: null, costoPorcentaje: null })
+  assertCasi(r.valores.USDT, 500, 'USDT INGRESAN: USDT = +500')
+  assertIgual(r.cuenta, 'CAJA', 'USDT INGRESAN: CUENTA = CAJA')
+}
+
 console.log(`\n${ok} OK, ${fail} fallidas`)
 process.exit(fail > 0 ? 1 : 0)

@@ -6,7 +6,7 @@ type Movimiento = {
   cliente: string | null; operacion: string; propio: string | null; externo: string | null
   monto: number; cot: number | null; cot_efectiva: number | null; debe: string | null
   notas: string | null; cuenta: string | null
-  pesos: number; cheques: number; dolares: number; euros: number; reales: number; banco: number
+  pesos: number; cheques: number; dolares: number; euros: number; reales: number; usdt: number; banco: number
   cc_pesos: number; cc_dolares: number; cc_euros: number; cc_reales: number
 }
 
@@ -17,6 +17,7 @@ const IMPACTOS: { key: keyof Movimiento; sym: string }[] = [
   { key: 'dolares',    sym: 'U$S'    },
   { key: 'euros',      sym: '€'      },
   { key: 'reales',     sym: 'R$'     },
+  { key: 'usdt',       sym: 'USDT'   },
   { key: 'banco',      sym: 'BCO'    },
   { key: 'cc_pesos',   sym: 'CC $'   },
   { key: 'cc_dolares', sym: 'CC U$S' },

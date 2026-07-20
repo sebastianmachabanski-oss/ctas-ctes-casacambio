@@ -348,6 +348,10 @@ export function parseMovimientosCaja(rows: any[][]): any[] {
       debe:  iDebe  >= 0 && String(row[iDebe] ?? '').trim()  ? String(row[iDebe]).trim()  : null,
       notas: iNotas >= 0 && String(row[iNotas] ?? '').trim() ? String(row[iNotas]).trim() : null,
       cuenta: iCuenta >= 0 && String(row[iCuenta] ?? '').trim() ? String(row[iCuenta]).trim().toUpperCase() : null,
+      // Procedencia: la planilla no tiene USDT; todo lo que viene del Sheet es 'sheet'
+      // (usdt = 0). Las filas 'app' (USDT) las inserta la app y el sync no las toca.
+      origen: 'sheet',
+      usdt: 0,
     }
     for (const [campo, idx] of Object.entries(iCalc)) {
       mov[campo] = idx >= 0 ? parseMonto(row[idx]) : 0
@@ -363,7 +367,7 @@ export function parseMovimientosCaja(rows: any[][]): any[] {
 // motor reemplace a las fórmulas. El resumen queda en sync_state.last_run (campo motor).
 const CAMPO_MOTOR: Record<string, string> = {
   'PESOS': 'pesos', 'CHEQUES': 'cheques', 'DOLARES': 'dolares', 'EUROS': 'euros',
-  'REALES': 'reales', 'BANCO': 'banco', 'CC PESOS': 'cc_pesos', 'CC DOLARES': 'cc_dolares',
+  'REALES': 'reales', 'USDT': 'usdt', 'BANCO': 'banco', 'CC PESOS': 'cc_pesos', 'CC DOLARES': 'cc_dolares',
   'CC EUROS': 'cc_euros', 'CC REALES': 'cc_reales',
 }
 function validarMotor(movimientos: any[]): any {
@@ -401,11 +405,13 @@ async function syncCaja(
   }
 
   const lote = mode === 'full' ? todos : todos.filter(m => m.fecha >= windowStart)
+  // El sync SOLO gestiona las filas de la planilla (origen='sheet'). Las cargadas en la
+  // app (origen='app', ej. USDT) nunca se borran: no existen en el Sheet y se perderían.
   if (mode === 'full') {
-    const del = await supabase.from('movimientos_caja').delete().not('id', 'is', null)
+    const del = await supabase.from('movimientos_caja').delete().neq('origen', 'app')
     if (del.error) throw new Error('Error vaciando movimientos_caja: ' + del.error.message)
   } else {
-    const del = await supabase.from('movimientos_caja').delete().gte('fecha', windowStart)
+    const del = await supabase.from('movimientos_caja').delete().neq('origen', 'app').gte('fecha', windowStart)
     if (del.error) throw new Error('Error borrando ventana de movimientos_caja: ' + del.error.message)
   }
   await insertEnParalelo(supabase, lote, 'movimientos_caja')

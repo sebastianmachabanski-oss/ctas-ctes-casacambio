@@ -6,6 +6,7 @@ export const maxDuration = 30
 
 function mapMoneda(val: string): string {
   const m = val.trim().toUpperCase()
+  if (m === 'USDT' || m === 'USDT (TETHER)') return 'USDT'
   if (m.includes('DOLAR') || m === 'USD') return 'DOLARES'
   if (m.includes('PESO') || m === 'ARS') return 'PESOS'
   if (m.includes('EURO') || m === 'EUR') return 'EUROS'
@@ -44,6 +45,10 @@ export async function POST(request: Request) {
   }
   if (!OPERACIONES_VALIDAS[tipo]?.includes(operacion))
     return NextResponse.json({ error: 'Operación inválida para el tipo seleccionado' }, { status: 400 })
+
+  // USDT es solo-CAJA (decisión 20/7/2026): no participa de cuentas corrientes.
+  if (tipo === 'CTA CTE' && (mapMoneda(String(propio)) === 'USDT' || mapMoneda(String(externo)) === 'USDT'))
+    return NextResponse.json({ error: 'USDT solo se opera en CAJA, no en cuentas corrientes' }, { status: 400 })
 
   // CTA CTE exige una cuenta corriente REAL: un nombre que no exista rompe las fórmulas
   // de la planilla (decisión 11/7/2026). CAJA es texto libre (clientes eventuales).
@@ -110,8 +115,13 @@ export async function POST(request: Request) {
   // impacto las calcula el motor (validado 100% contra la planilla). Mientras dure la
   // convivencia, el próximo sync full reemplaza esta fila por la copia que venga de la
   // planilla (idéntica si la escritura al Sheet salió bien) — sin duplicados.
+  // USDT no existe en la planilla: si la operación lo toca, la fila es 'app' y el sync
+  // NO la borra (si no, se perdería en la próxima corrida). El resto queda 'sheet', que
+  // es el comportamiento de convivencia actual (el sync la puede reemplazar por la del Sheet).
+  const involucraUsdt = monedaNorm === 'USDT' || mapMoneda(String(externo)) === 'USDT'
   const { error: cajaError } = await supabase.from('movimientos_caja').insert({
     fila_sheet: null,
+    origen: involucraUsdt ? 'app' : 'sheet',
     fecha,
     tipo,
     cliente: cuenta_cte,
