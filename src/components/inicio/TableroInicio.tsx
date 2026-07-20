@@ -223,7 +223,11 @@ function BandaMercado() {
   return (
     <div className="mkt">
       <div className="mkt-head">
-        <span className="mkt-title">📡 Mercado · fuente externa</span>
+        <div className="mkt-titlerow">
+          <span className="mkt-title">📡 Mercado · fuente externa</span>
+          <span className="mkt-note">Cotización de referencia online — no proviene de la planilla ni de la base de datos.</span>
+          <span className={`mkt-src${live ? ' live' : ''}`}>{src}</span>
+        </div>
         <div className="mkt-row">
           {items.map(i => (
             <span className="it" key={i[0]}>
@@ -233,10 +237,6 @@ function BandaMercado() {
             </span>
           ))}
         </div>
-      </div>
-      <div className="mkt-foot">
-        <span className="mkt-note">Cotización de referencia online — no proviene de la planilla ni de la base de datos.</span>
-        <span className={`mkt-src${live ? ' live' : ''}`}>{src}</span>
       </div>
     </div>
   )
