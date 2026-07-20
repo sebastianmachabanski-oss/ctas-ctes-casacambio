@@ -182,7 +182,7 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
 
 /* ── Banda de mercado: cotizaciones online con fallback si no hay red ── */
 function BandaMercado() {
-  const FB: [string, number, number][] = [['Dólar Blue', 1490, 1510], ['Dólar Oficial', 1435, 1475], ['Euro', 1610, 1660], ['Real', 255, 265]]
+  const FB: [string, number, number][] = [['Dólar Blue', 1490, 1510], ['Dólar Oficial', 1435, 1475], ['USDT', 1500, 1525], ['Euro', 1610, 1660], ['Real', 255, 265]]
   const [items, setItems] = useState<[string, number, number][]>(FB)
   const [src, setSrc] = useState('cargando…')
   const [live, setLive] = useState(false)
@@ -203,6 +203,8 @@ function BandaMercado() {
         const its = [
           g(ds, d => d.casa === 'blue', 'Dólar Blue'),
           g(ds, d => d.casa === 'oficial', 'Dólar Oficial'),
+          // dolarapi expone el dólar cripto (casa: 'cripto'), que es la cotización de USDT.
+          g(ds, d => d.casa === 'cripto', 'USDT'),
           g(cs, c => c.moneda === 'EUR', 'Euro'),
           g(cs, c => c.moneda === 'BRL', 'Real'),
         ].filter(Boolean) as [string, number, number][]
