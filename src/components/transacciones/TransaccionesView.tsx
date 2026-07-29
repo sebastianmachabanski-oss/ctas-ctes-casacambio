@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 type Mov = {
   id: string; fecha: string; cliente: string | null; operacion: string; monto: number
   tipo: string; debe: string | null; cot: number | null
+  creado_por: string | null; creado_at: string | null
+  editado_por: string | null; editado_at: string | null
   pesos: number; cheques: number; dolares: number; euros: number; reales: number; usdt: number; banco: number
   cc_pesos: number; cc_dolares: number; cc_euros: number; cc_reales: number
 }
@@ -24,6 +26,11 @@ const nfCot = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 4 })
 const money = (v: number) => v < 0 ? `(${nf.format(-v)})` : nf.format(v)
 const fmtFecha = (f: string) => new Date(f + 'T12:00:00').toLocaleDateString('es-AR')
 const num = (v: any): number => Number(v) || 0
+// Leyenda de las filas que llegaron por sync desde la planilla: NO las cargó una persona
+// en la app, así que se muestran en gris y sin nombre propio (ver src/lib/auditoria.ts).
+const AUTOR_PLANILLA = 'Carga inicial (planilla)'
+const fmtSello = (ts: string | null) =>
+  ts ? new Date(ts).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : ''
 // "Monto" del movimiento = magnitud del impacto principal (el número grande que se ve en
 // las columnas de moneda), no el campo `monto` de la operación. Es lo que muestra el mockup
 // y sobre lo que operan las comparaciones (>, <) del filtro de monto.
@@ -53,6 +60,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const [fCli, setFCli] = useState('')
   const [fOp, setFOp] = useState('')
   const [fMin, setFMin] = useState('')
+  const [fAutor, setFAutor] = useState('')
   const [borrando, setBorrando] = useState<string | null>(null)
   const [errorBorrar, setErrorBorrar] = useState('')
   const [avisoPlanilla, setAvisoPlanilla] = useState('')
@@ -109,11 +117,21 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
       }
     }
 
+    // Autor: busca en quien cargó y en quien editó. "planilla" matchea las importadas.
+    const qa = fAutor.trim().toUpperCase()
+    const filtroAutor = (m: Mov): boolean => {
+      if (!qa) return true
+      const esPlanilla = !m.creado_por || m.creado_por === AUTOR_PLANILLA
+      const autor = esPlanilla ? 'PLANILLA' : (m.creado_por ?? '').toUpperCase()
+      return autor.includes(qa) || (m.editado_por ?? '').toUpperCase().includes(qa)
+    }
+
     return movimientos.filter(m =>
       (m.cliente ?? '').toUpperCase().includes(qc) &&
       (!fOp || m.operacion === fOp) &&
+      filtroAutor(m) &&
       filtroMonto(m))
-  }, [movimientos, fCli, fOp, fMin])
+  }, [movimientos, fCli, fOp, fMin, fAutor])
 
   // Navegación (rango de fechas y paginación) conservando el estado en la URL.
   function navegar(p: number, d1v = d1, d2v = d2) {
@@ -126,7 +144,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   }
   const buscar = () => navegar(1)  // cambiar el rango vuelve a la página 1
 
-  const ncols = 5 + cols.length + (puedeEditar ? 1 : 0)
+  const ncols = 6 + cols.length + (puedeEditar ? 1 : 0)
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -176,6 +194,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 <th>Cot.</th>
                 <th>Monto</th>
                 {cols.map(c => <th key={c.key as string}>Imp. {c.sym}</th>)}
+                <th style={{ textAlign: 'left' }} title="Quién cargó la transacción en la app. Las filas anteriores a la puesta en marcha vienen de la planilla.">Registró</th>
                 {puedeEditar && <th></th>}
               </tr>
               <tr className="tx-filtros">
@@ -192,6 +211,10 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 <th></th>
                 <th><input className="srch" placeholder="monto · &gt; &lt;" title="Un número busca ese monto exacto. Con > o < filtra por rango (ej. >1000000)" value={fMin} onChange={e => setFMin(e.target.value)} style={{ width: 110, minWidth: 0 }} /></th>
                 {cols.map(c => <th key={c.key as string}></th>)}
+                <th style={{ textAlign: 'left' }}>
+                  <input className="srch" placeholder="usuario" value={fAutor}
+                    onChange={e => setFAutor(e.target.value)} style={{ width: 110, minWidth: 0 }} />
+                </th>
                 {puedeEditar && <th></th>}
               </tr>
             </thead>
@@ -210,6 +233,17 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                     const v = num(m[c.key])
                     return <td key={c.key as string}>{v ? <span className={`imp ${v > 0 ? 'p' : 'n'}`}>{money(v)}</span> : <span className="zero">—</span>}</td>
                   })}
+                  <td style={{ textAlign: 'left', whiteSpace: 'nowrap', fontSize: 12 }}>
+                    {!m.creado_por || m.creado_por === AUTOR_PLANILLA ? (
+                      <span style={{ color: 'var(--muted)', fontStyle: 'italic' }} title="Fila importada de la planilla: no la cargó nadie desde la app.">planilla</span>
+                    ) : (
+                      <span title={`Cargó ${m.creado_por}${m.creado_at ? ` el ${fmtSello(m.creado_at)}` : ''}`}>{m.creado_por}</span>
+                    )}
+                    {m.editado_por && (
+                      <span style={{ marginLeft: 5, cursor: 'help' }}
+                        title={`Editado por ${m.editado_por}${m.editado_at ? ` el ${fmtSello(m.editado_at)}` : ''}`}>✏️</span>
+                    )}
+                  </td>
                   {puedeEditar && (
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <Link href={`/dashboard/transacciones/${m.id}/editar`} style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand-ink)' }}>✏️ Editar</Link>
