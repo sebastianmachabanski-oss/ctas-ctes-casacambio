@@ -21,6 +21,7 @@ const NAV: Record<string, Item[]> = {
     { section: 'Gestión', label: '', icon: '' },
     { href: '/dashboard/ganancias',      label: 'Ganancias', icon: '💰' },
     { href: '/dashboard/admin/usuarios', label: 'Usuarios',  icon: '👥' },
+    { href: '/dashboard/admin/auditoria', label: 'Auditoría', icon: '🔎' },
     { href: '/dashboard/admin/sync',     label: 'Sincronizar', icon: '🔄' },
     { href: '/dashboard/mi-cuenta', label: 'Mi cuenta', icon: '🔑' },
   ],
