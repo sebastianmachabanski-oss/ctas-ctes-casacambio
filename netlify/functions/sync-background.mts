@@ -2,6 +2,7 @@
 import { createClient } from "@supabase/supabase-js"
 import * as XLSX from "xlsx"
 import { calcularMovimiento, COLUMNAS_SALIDA } from "../../src/lib/motor-calculo/index"
+import { calcularHuella, AUTOR_PLANILLA } from "../../src/lib/auditoria"
 
 // Función BACKGROUND (hasta 15 min). Hace el sync real en dos modos:
 //   - full:        recarga completa (borra todo CTA CTE y reinserta todo)
@@ -352,6 +353,12 @@ export function parseMovimientosCaja(rows: any[][]): any[] {
       // (usdt = 0). Las filas 'app' (USDT) las inserta la app y el sync no las toca.
       origen: 'sheet',
       usdt: 0,
+      // Estas filas NO las cargó nadie en la app: vienen de la planilla. Se marcan con
+      // una leyenda de sistema, nunca con el nombre de una persona — atribuirle a
+      // alguien 33.000 filas que no cargó invalidaría la auditoría entera.
+      // Si la fila la había cargado un usuario desde la app, más abajo se le restituye
+      // el autor real (restituirAutores).
+      creado_por: AUTOR_PLANILLA,
     }
     for (const [campo, idx] of Object.entries(iCalc)) {
       mov[campo] = idx >= 0 ? parseMonto(row[idx]) : 0
@@ -395,6 +402,48 @@ function validarMotor(movimientos: any[]): any {
 // la migración), avisa y sigue — el resto del sync no se ve afectado.
 // Devuelve un resumen para registrar en sync_state, incluida la validación automática:
 // tras insertar compara conteo y sumas por columna (vía caja_totales) contra lo parseado.
+// Restituye el autor real de las filas que se habían cargado DESDE LA APP.
+//
+// Problema que resuelve: el sync borra y reinserta las filas de la planilla, así que una
+// transacción cargada por un usuario vuelve marcada como carga inicial y el autor se
+// pierde. La auditoría (que el sync no toca) sí lo conserva: se busca por `huella` —
+// identificación por contenido, estable aunque el uuid se regenere — y se reescribe.
+//
+// Best effort: si la fila volvió distinta de la planilla, la huella no coincide y queda
+// la leyenda de carga inicial. Nunca inventa un autor.
+async function restituirAutores(supabase: any, lote: any[]): Promise<number> {
+  const altas = await supabase
+    .from('auditoria')
+    .select('huella, usuario_nombre, ts')
+    .eq('accion', 'alta')
+    .eq('actor', 'usuario')
+    .not('huella', 'is', null)
+  // Si la tabla no existe todavía (migración sin correr), el sync sigue igual.
+  if (altas.error) {
+    console.warn('⚠️  auditoría no disponible, no se restituyen autores:', altas.error.message)
+    return 0
+  }
+  if (!altas.data?.length) return 0
+
+  // huella → autor. Si hubiera más de un alta con la misma huella, gana la más reciente.
+  const porHuella = new Map<string, { nombre: string; ts: string }>()
+  for (const a of altas.data as any[]) {
+    const prev = porHuella.get(a.huella)
+    if (!prev || a.ts > prev.ts) porHuella.set(a.huella, { nombre: a.usuario_nombre, ts: a.ts })
+  }
+
+  let restituidas = 0
+  for (const mov of lote) {
+    const hit = porHuella.get(calcularHuella(mov))
+    if (hit) {
+      mov.creado_por = hit.nombre
+      mov.creado_at = hit.ts
+      restituidas++
+    }
+  }
+  return restituidas
+}
+
 async function syncCaja(
   supabase: any, todos: any[], mode: 'full' | 'incremental', windowStart: string
 ): Promise<any> {
@@ -414,6 +463,9 @@ async function syncCaja(
     const del = await supabase.from('movimientos_caja').delete().neq('origen', 'app').gte('fecha', windowStart)
     if (del.error) throw new Error('Error borrando ventana de movimientos_caja: ' + del.error.message)
   }
+  // Antes de insertar: devolverle el autor a las filas que se cargaron desde la app.
+  const autoresRestituidos = await restituirAutores(supabase, lote)
+
   await insertEnParalelo(supabase, lote, 'movimientos_caja')
 
   // Validación automática de la corrida: lo que quedó en la base debe coincidir EXACTO
@@ -422,7 +474,7 @@ async function syncCaja(
   const { data: tot, error: totError } = await supabase.rpc('caja_totales', { p_desde: desde, p_hasta: null })
   if (totError || !tot) {
     console.warn('⚠️  No se pudo validar (caja_totales):', totError?.message)
-    return { procesados: lote.length, validado: null }
+    return { procesados: lote.length, validado: null, autores_restituidos: autoresRestituidos }
   }
   const columnas = ['pesos','cheques','dolares','euros','reales','banco','cc_pesos','cc_dolares','cc_euros','cc_reales']
   const esperado: Record<string, number> = { filas: lote.length }
@@ -434,10 +486,10 @@ async function syncCaja(
   console.log(`🔬 Motor vs planilla: ${motor.coincidencia} (${motor.dif} difs, ${motor.error} errores)`)
   if (difs.length) {
     console.error('❌ Validación movimientos_caja con diferencias:', difs.join(' | '))
-    return { procesados: lote.length, validado: false, diferencias: difs, motor }
+    return { procesados: lote.length, validado: false, diferencias: difs, motor, autores_restituidos: autoresRestituidos }
   }
   console.log(`✅ movimientos_caja OK: ${lote.length} filas, sumas validadas contra la planilla`)
-  return { procesados: lote.length, validado: true, motor }
+  return { procesados: lote.length, validado: true, motor, autores_restituidos: autoresRestituidos }
 }
 
 async function upsertCuentas(supabase: any, movimientos: any[]) {

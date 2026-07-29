@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calcularMovimiento, validarOperacion, MotorCalculoError } from '@/lib/motor-calculo'
 import { getGoogleToken } from '@/lib/google'
+import {
+  registrarAuditoria, calcularHuella, fotoMovimiento, camposCambiados, describirMovimiento,
+} from '@/lib/auditoria'
 
 // Edita un movimiento de caja. NO escribe en el Google Sheet (decisión 5/7/2026):
 // mientras dure la convivencia, el próximo sync pisa estos cambios — comportamiento
@@ -26,8 +29,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: 'Faltan campos requeridos (fecha, operación, moneda, monto)' }, { status: 400 })
 
   // La fila original define el tipo (CAJA / CTA CTE) — eso no se edita.
+  // Se trae completa (no solo `tipo`) porque es la foto ANTES que va a la auditoría.
   const { data: original, error: getError } = await supabase
-    .from('movimientos_caja').select('tipo').eq('id', params.id).single()
+    .from('movimientos_caja').select('*').eq('id', params.id).single()
   if (getError || !original)
     return NextResponse.json({ error: 'Movimiento no encontrado' }, { status: 404 })
 
@@ -74,6 +78,39 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }).eq('id', params.id)
 
   if (updError) return NextResponse.json({ error: updError.message }, { status: 500 })
+
+  // Auditoría: guarda el antes y el después. `editado_por` en la fila solo conserva al
+  // ÚLTIMO editor (y el sync lo borra); el log guarda la secuencia completa.
+  const antes = fotoMovimiento(original)
+  const despues = fotoMovimiento({
+    fecha,
+    cliente: cliente?.trim() || null,
+    operacion: datos.operacion.trim().toUpperCase(),
+    propio: datos.propio.trim().toUpperCase(),
+    externo: datos.externo.trim().toUpperCase() || null,
+    monto: datos.monto,
+    cot: datos.cotizacion,
+    costo_pct: datos.costoPorcentaje,
+    debe: debe?.trim() || null,
+    notas: notas?.trim() || null,
+    tipo: datos.tipo,
+    cuenta: resultado.cuenta,
+  })
+  await registrarAuditoria(supabase, {
+    accion: 'edicion',
+    usuarioId: user.id,
+    usuarioNombre: (profile as any)?.nombre ?? user.email ?? 'app',
+    usuarioRol: rol,
+    movimientoId: params.id,
+    // La huella del estado ORIGINAL: es la que permite reencontrar el evento después
+    // de que el sync regenere los uuid.
+    huella: calcularHuella(original as any),
+    campos: camposCambiados(antes, despues),
+    resumen: describirMovimiento(despues),
+    datosAntes: antes,
+    datosDespues: despues,
+  })
+
   return NextResponse.json({ ok: true, cuenta: resultado.cuenta, valores: v })
 }
 
@@ -248,13 +285,15 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
-  const { data: profile } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('rol, nombre').eq('id', user.id).single()
   if ((profile as any)?.rol !== 'superusuario')
     return NextResponse.json({ error: 'Solo el superusuario puede eliminar transacciones' }, { status: 403 })
 
   // Los datos del movimiento se leen ANTES de borrarlo (sirven para ubicar la fila allá).
+  // Se trae la fila COMPLETA: es la única copia que va a quedar del movimiento, y es lo
+  // que permite reconstruirlo (o deshacerlo) desde la auditoría.
   const { data: movData, error: getError } = await supabase.from('movimientos_caja')
-    .select('fecha, tipo, cliente, operacion, monto, cot, origen')
+    .select('*')
     .eq('id', params.id).single()
   if (getError || !movData)
     return NextResponse.json({ error: 'Movimiento no encontrado' }, { status: 404 })
@@ -266,6 +305,19 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   // count 0 = la RLS lo impidió (falta la policy de DELETE).
   if (!count) return NextResponse.json({ error: 'No se pudo eliminar (¿falta la policy de DELETE?)' }, { status: 404 })
+
+  // Auditoría del borrado: `datos_antes` lleva la fila ENTERA. Es el caso de uso central
+  // ("¿quién borró esto y qué decía?") y lo que hace reconstruible un borrado por error.
+  await registrarAuditoria(supabase, {
+    accion: 'borrado',
+    usuarioId: user.id,
+    usuarioNombre: (profile as any)?.nombre ?? user.email ?? 'app',
+    usuarioRol: (profile as any)?.rol,
+    movimientoId: params.id,
+    huella: calcularHuella(mov),
+    resumen: describirMovimiento(mov),
+    datosAntes: mov,
+  })
 
   // Las filas 'app' (USDT) no existen en la planilla: no hay nada que limpiar allá.
   if (mov.origen === 'app') {

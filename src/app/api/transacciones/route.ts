@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
+import { registrarAuditoria, calcularHuella, describirMovimiento } from '@/lib/auditoria'
 
 export const maxDuration = 30
 
@@ -136,6 +137,11 @@ export async function POST(request: Request) {
     debe: debe && String(debe).trim() ? String(debe).trim() : null,
     notas: notas || null,
     cuenta: impacto.cuenta,
+    // Autor visible en el listado. Ojo: mientras dure la convivencia, el sync full
+    // reemplaza esta fila por la de la planilla; para que no se pierda el autor, el
+    // sync lo restituye desde la auditoría por huella (ver sync-background.mts).
+    creado_por: (profile as any).nombre ?? user.email,
+    creado_at: new Date().toISOString(),
     // El motor devuelve las claves con los nombres de la PLANILLA ("PESOS", "CC PESOS");
     // acá se mapean a las columnas de la tabla (pesos, cc_pesos).
     ...Object.fromEntries(
@@ -145,6 +151,29 @@ export async function POST(request: Request) {
   // Tolerante: diario ya quedó guardado y la planilla se escribe aparte; si esta pata
   // falla (p. ej. falta la policy de INSERT), el movimiento aparece con el próximo sync.
   if (cajaError) console.error('No se pudo escribir movimientos_caja directo:', cajaError.message)
+
+  // Auditoría del alta. Se ancla por huella (no por uuid): el sync full regenera los
+  // uuid, y es esta huella la que después permite volver a asociar el evento a la fila.
+  const fotoAlta = {
+    fecha, tipo, cliente: cuenta_cte, operacion,
+    propio: propio ? String(propio).trim().toUpperCase() : null,
+    externo: externo ? String(externo).trim().toUpperCase() : null,
+    monto: Number(monto),
+    cot: cotizacion ? Number(cotizacion) : null,
+    costo_pct: costo_porcentaje ? Number(costo_porcentaje) : null,
+    debe: debe && String(debe).trim() ? String(debe).trim() : null,
+    notas: notas || null,
+    cuenta: impacto.cuenta,
+  }
+  await registrarAuditoria(supabase, {
+    accion: 'alta',
+    usuarioId: user.id,
+    usuarioNombre: (profile as any).nombre ?? user.email ?? 'app',
+    usuarioRol: rol,
+    huella: calcularHuella(fotoAlta),
+    resumen: describirMovimiento(fotoAlta),
+    datosDespues: fotoAlta,
+  })
 
   return NextResponse.json({ success: true, caja_directa: !cajaError })
 }
