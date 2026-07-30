@@ -225,7 +225,7 @@ function BandaMercado() {
       <div className="mkt-head">
         <div className="mkt-titlerow">
           <span className="mkt-title">📡 Mercado · fuente externa</span>
-          <span className="mkt-note">Cotización de referencia online — no proviene de la planilla ni de la base de datos.</span>
+          <span className="mkt-note">Cotización de referencia online — no proviene de los datos del sistema.</span>
           <span className={`mkt-src${live ? ' live' : ''}`}>{src}</span>
         </div>
         <div className="mkt-row">

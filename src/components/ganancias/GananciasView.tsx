@@ -2,9 +2,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-// Réplica de la solapa COLO (validada al peso contra la planilla en el mockup):
+// Cálculo de la ganancia del período:
 //   ganancia = calzado × (tasa venta − tasa compra) + valuación del stock + gastos
 // El servidor manda los días agregados; acá se aplica la configuración en vivo.
+//
+// La ganancia es de PERÍODO, no de transacción: nace del calce entre lo comprado y lo
+// vendido, así que una compra no genera ganancia hasta que se vende. Ver docs/GANANCIAS.md.
 
 export type ParAgg = { vC: number; aC: number; vV: number; aV: number; vCcc: number; aCcc: number; vVcc: number; aVcc: number }
 export type DiaAgg = { f: string; usd: ParAgg; eur: ParAgg; brl: ParAgg; usdt: ParAgg; g: number; gcc: number }
@@ -17,6 +20,7 @@ type Cfg = {
 const fmt0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
 const fmt3 = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 const ars = (n: number) => `$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
+const usd = (n: number) => `US$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
 const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$', usdt: 'USDT' }
 
 function addDays(iso: string, n: number): string {
@@ -62,6 +66,28 @@ function calc(dias: DiaAgg[], cfg: Cfg) {
   return { vC, aC, vV, aV, t1, t2, spread, calzado, stock, gResid, g, neto }
 }
 
+/**
+ * Cotización con la que se expresa el resultado en dólares: promedio de TODAS las
+ * operaciones en dólares del período, ponderado por volumen (compras + ventas, caja y
+ * cuenta corriente). Sale de las operaciones reales, no de una cotización externa ni
+ * de la del día de hoy.
+ *
+ * Se toma SIEMPRE del par dólares, sin importar el par elegido en la configuración:
+ * si se usara la del par, con euros seleccionado el panel mostraría euros rotulados
+ * como dólares.
+ *
+ * Devuelve null si en el período no hubo operaciones en dólares de las que derivarla.
+ */
+function cotizacionUsd(dias: DiaAgg[]): number | null {
+  let vol = 0, ars = 0
+  for (const d of dias) {
+    const p = d.usd
+    vol += p.vC + p.vCcc + p.vV + p.vVcc
+    ars += p.aC + p.aCcc + p.aV + p.aVcc
+  }
+  return vol > 0 ? ars / vol : null
+}
+
 const PERIODOS: [string, string][] = [['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes'], ['anio', 'Año']]
 
 export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, hoy }: {
@@ -92,6 +118,10 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
   }, [])
 
   const r = useMemo(() => calc(dias, cfg), [dias, cfg])
+  // Equivalente en dólares del mismo resultado. Por construcción se cumple exacto que
+  // netoUsd × cotUsd = neto en pesos, así que los dos paneles nunca se contradicen.
+  const cotUsd = useMemo(() => cotizacionUsd(dias), [dias])
+  const netoUsd = cotUsd ? r.neto / cotUsd : null
 
   function irPeriodo(p: string) {
     setRangoOpen(false)
@@ -149,21 +179,47 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
       )}
       {esRango && <b style={{ color: 'var(--ink)' }}>{label}</b>}
 
-      {/* Hero */}
-      <div className="card" style={{ padding: 24 }}>
-        <div style={{ color: 'var(--muted)', fontSize: 13.5 }}>{sinDatos ? 'Sin operaciones del par en el período' : lead}</div>
-        <div className={`hero-num num ${r.neto >= 0 ? 'pos' : 'neg'}`}>{ars(Math.round(r.neto))}</div>
-        {!esDefault && (
-          <div style={{ marginTop: 10, display: 'inline-block', fontSize: 12.5, fontWeight: 600, background: 'var(--warn-bg)', color: 'var(--warn-ink)', padding: '5px 11px', borderRadius: 8 }}>
-            Cálculo con configuración modificada
-          </div>
-        )}
-        {esDefault && !sinDatos && (
-          <div style={{ marginTop: 10, display: 'inline-block', fontSize: 12.5, fontWeight: 600, background: 'var(--pos-bg)', color: 'var(--pos-ink)', padding: '5px 11px', borderRadius: 8 }}>
-            ✓ Misma cuenta que la solapa COLO de la planilla
-          </div>
-        )}
+      {/* Resultado: el mismo número en las dos monedas */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 14 }}>
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ color: 'var(--muted)', fontSize: 13.5 }}>{sinDatos ? 'Sin operaciones del par en el período' : lead}</div>
+          <div className={`hero-num num ${r.neto >= 0 ? 'pos' : 'neg'}`}>{ars(Math.round(r.neto))}</div>
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>en pesos</div>
+        </div>
+
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ color: 'var(--muted)', fontSize: 13.5 }}>El mismo resultado, en dólares</div>
+          {netoUsd === null ? (
+            <>
+              <div className="hero-num num" style={{ color: 'var(--muted)' }}>—</div>
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
+                {sinDatos
+                  ? 'sin operaciones en el período'
+                  : 'no hubo operaciones en dólares en el período de las que tomar la cotización'}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={`hero-num num ${netoUsd >= 0 ? 'pos' : 'neg'}`}>{usd(Math.round(netoUsd))}</div>
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
+                convertido a <b>$ {fmt3.format(cotUsd!)}</b> — cotización promedio de las
+                operaciones en dólares del período
+              </div>
+            </>
+          )}
+        </div>
       </div>
+
+      {!esDefault && (
+        <div style={{ display: 'inline-block', fontSize: 12.5, fontWeight: 600, background: 'var(--warn-bg)', color: 'var(--warn-ink)', padding: '5px 11px', borderRadius: 8 }}>
+          Cálculo con configuración modificada
+        </div>
+      )}
+      {esDefault && !sinDatos && (
+        <div style={{ display: 'inline-block', fontSize: 12.5, fontWeight: 600, background: 'var(--pos-bg)', color: 'var(--pos-ink)', padding: '5px 11px', borderRadius: 8 }}>
+          ✓ Cálculo con los supuestos estándar
+        </div>
+      )}
 
       {/* Datos del período */}
       {!sinDatos && (
@@ -189,6 +245,32 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
           ¿Cómo se calcula este número? ›
         </summary>
         <div style={{ borderTop: '1px solid var(--grid)', padding: '6px 18px 14px' }}>
+          {/* Explicación del método, para que el número no sea una caja negra. */}
+          <div style={{ padding: '12px 0 6px', fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55 }}>
+            <p style={{ margin: '0 0 8px' }}>
+              <b>En pesos.</b> La ganancia surge del <b>calce</b> entre lo que compraste y lo que
+              vendiste en el período, no de cada transacción por separado: una compra no genera
+              ganancia hasta que se vende. Se promedian las tasas de compra y de venta —ponderadas
+              por volumen—, la diferencia se multiplica por el volumen que se compró <i>y</i> se
+              vendió, y a eso se le suma la valuación de lo que quedó en stock y se le restan los
+              gastos.
+            </p>
+            <p style={{ margin: '0 0 8px' }}>
+              <b>En dólares.</b> Es el mismo resultado, convertido con la cotización promedio
+              ponderada de las operaciones <b>en dólares</b> del propio período. No se usa una
+              cotización externa ni la del día de hoy: sale de las operaciones reales. Se toma
+              siempre del par dólares aunque estés mirando euros o reales — si no, el panel
+              mostraría euros rotulados como dólares. No es otro cálculo: es el mismo importe
+              en otra moneda, el resultado en pesos dividido por esa cotización. Los dos
+              paneles se muestran redondeados, así que rehacer la multiplicación a mano puede
+              dar una diferencia de unos pesos.
+            </p>
+            <p style={{ margin: 0, color: 'var(--muted)', fontSize: 12.5 }}>
+              Al ser un cálculo de período, el mismo conjunto de operaciones da un número distinto
+              según mires el día, la semana o el mes: las tasas promedio se recalculan sobre el
+              conjunto elegido. Por eso la suma de los días no da el total del mes.
+            </p>
+          </div>
           {sinDatos ? (
             <div style={{ padding: '9px 0', fontSize: 13.5, color: 'var(--muted)' }}>Sin datos para este par en el período.</div>
           ) : ([
@@ -197,8 +279,12 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
             [`<b>${sym} ${fmt0.format(r.stock)}</b> en stock, ${cfg.resid === 'fijo' ? `a margen fijo $ ${fmt3.format(cfg.margen)}` : cfg.resid === 'costo' ? 'valuados al costo' : `valuados a cierre $ ${fmt0.format(cfg.cierre)}`}`, ars(Math.round(r.gResid)), r.gResid > 0 ? 'pos' : ''],
             ['Gastos del período', ars(Math.round(r.g)), r.g < 0 ? 'neg' : ''],
             ['<b>Ganancia neta</b>', ars(Math.round(r.neto)), r.neto >= 0 ? 'pos' : 'neg'],
-          ] as [string, string, string][]).map(([d, a, c], i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderBottom: i < 4 ? '1px solid var(--grid)' : 'none', fontSize: 13.5 }}>
+            ...(cotUsd !== null
+              ? [[`La misma ganancia ÷ <b>$ ${fmt3.format(cotUsd)}</b> (cotización promedio de las operaciones en dólares del período)`,
+                   usd(Math.round(netoUsd!)), netoUsd! >= 0 ? 'pos' : 'neg'] as [string, string, string]]
+              : []),
+          ] as [string, string, string][]).map(([d, a, c], i, arr) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 0', borderBottom: i < arr.length - 1 ? '1px solid var(--grid)' : 'none', fontSize: 13.5 }}>
               <span dangerouslySetInnerHTML={{ __html: d }} />
               <b className={`num ${c}`} style={{ whiteSpace: 'nowrap' }}>{a}</b>
             </div>
@@ -226,7 +312,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
                 <button key={op} className={`chip ${cfg.ops.has(op) ? 'on' : ''}`} onClick={() => toggleOp(op)}>{cap(op.toLowerCase())}</button>
               ))}
             </div>
-            <div className="param-what">Qué modifica: <b>qué movimientos entran al cálculo</b> (el filtro OPERACIÓN de la planilla actual).</div>
+            <div className="param-what">Qué modifica: <b>qué movimientos entran al cálculo</b>.</div>
           </div>
           <div className="card param">
             <p className="param-name">Par de monedas</p>
@@ -244,7 +330,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
               <input type="checkbox" checked={cfg.cc} onChange={e => setC({ cc: e.target.checked })} />
               <span className="track" />Incluir operaciones por cta cte
             </label>
-            <div className="param-what">Qué modifica: <b>si lo comprado/vendido por cuenta corriente suma al volumen</b>. La planilla lo incluye.</div>
+            <div className="param-what">Qué modifica: <b>si lo comprado/vendido por cuenta corriente suma al volumen</b>. Por defecto se incluye.</div>
           </div>
           <div className="card param">
             <p className="param-name">{cfg.par === 'usd' ? 'Dólares' : cfg.par === 'eur' ? 'Euros' : cfg.par === 'brl' ? 'Reales' : 'USDT'} que quedan en stock</p>
@@ -266,7 +352,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
                   onChange={e => setC({ cierre: Number(e.target.value) || 0 })} />
               </label>
             </div>
-            <div className="param-what">Qué modifica: <b>cuánta ganancia se le asigna a lo comprado que todavía no se vendió</b>. La planilla usa el margen fijo 0,050 (celda T4).</div>
+            <div className="param-what">Qué modifica: <b>cuánta ganancia se le asigna a lo comprado que todavía no se vendió</b>. El criterio estándar es el margen fijo de 0,050.</div>
           </div>
           <div className="card param">
             <p className="param-name">Gastos</p>

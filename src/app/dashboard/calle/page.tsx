@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ListaCalle from '@/components/calle/ListaCalle'
+import { PLANILLA_ACTIVA } from '@/lib/planilla'
 
 // Dinero "en la calle": movimientos cuyo campo DEBE tiene un repartidor cargado — plata
 // que todavía no se integró a la caja. Réplica del recuadro rojo "Calle" de la solapa
@@ -48,12 +49,13 @@ export default async function CallePage() {
         />
       )}
 
-      {/* Aviso al pie, como el mockup */}
-      {rol === 'superusuario' && (
+      {/* Aviso de convivencia: describe un efecto REAL de la fuente externa de datos.
+          Desaparece solo cuando se apaga PLANILLA_ACTIVA (ver src/lib/planilla.ts). */}
+      {rol === 'superusuario' && PLANILLA_ACTIVA && (
         <div className="banner-warn">
-          ⚠️ Marcar un ingreso acá <b>no borra el DEBE en la planilla</b>: si allá sigue
-          cargado, la próxima sincronización lo vuelve a mostrar. Mientras dure la
-          convivencia, el borrado definitivo se hace en la planilla (como hasta ahora).
+          ⚠️ Marcar un ingreso acá <b>no borra el DEBE en el origen externo de datos</b>:
+          si allá sigue cargado, la próxima sincronización lo vuelve a mostrar. Hasta que
+          se complete la migración, el borrado definitivo se hace en el origen.
         </div>
       )}
     </div>

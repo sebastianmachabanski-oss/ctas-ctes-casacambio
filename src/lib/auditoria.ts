@@ -8,8 +8,11 @@
 // Regla de oro: NUNCA atribuirle a una persona algo que no hizo. Las filas que vienen
 // de la planilla se registran con actor 'sistema' y la leyenda de carga inicial.
 
-/** Leyenda para las filas que llegaron por sync desde la planilla (no las cargó nadie en la app). */
-export const AUTOR_PLANILLA = 'Carga inicial (planilla)'
+/**
+ * Leyenda de las filas que no cargó ningún usuario en la app: llegaron por la
+ * importación inicial de datos. Se muestra tal cual en la pantalla de Transacciones.
+ */
+export const AUTOR_PLANILLA = 'Carga inicial'
 
 export type AccionAuditoria =
   | 'alta' | 'edicion' | 'borrado' | 'ingreso_calle'

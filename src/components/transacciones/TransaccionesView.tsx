@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { PLANILLA_ACTIVA } from '@/lib/planilla'
 
 type Mov = {
   id: string; fecha: string; cliente: string | null; operacion: string; monto: number
@@ -26,9 +27,9 @@ const nfCot = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 4 })
 const money = (v: number) => v < 0 ? `(${nf.format(-v)})` : nf.format(v)
 const fmtFecha = (f: string) => new Date(f + 'T12:00:00').toLocaleDateString('es-AR')
 const num = (v: any): number => Number(v) || 0
-// Leyenda de las filas que llegaron por sync desde la planilla: NO las cargó una persona
-// en la app, así que se muestran en gris y sin nombre propio (ver src/lib/auditoria.ts).
-const AUTOR_PLANILLA = 'Carga inicial (planilla)'
+// Filas que no cargó ningún usuario (importación inicial de datos): se muestran en gris
+// y sin nombre propio. El prefijo tolera el valor histórico ya guardado en base.
+const esCargaInicial = (autor: string | null) => !autor || autor.startsWith('Carga inicial')
 const fmtSello = (ts: string | null) =>
   ts ? new Date(ts).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' }) : ''
 // "Monto" del movimiento = magnitud del impacto principal (el número grande que se ve en
@@ -65,11 +66,14 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const [errorBorrar, setErrorBorrar] = useState('')
   const [avisoPlanilla, setAvisoPlanilla] = useState('')
 
-  // Borrar (solo superusuario): borrado ESPEJADO — elimina del sistema y limpia la fila
-  // en la planilla (solo si se identifica sin ambigüedad; si no, avisa para hacerlo a mano).
+  // Borrar (solo superusuario): borrado ESPEJADO — elimina del sistema y del origen externo
+  // de datos (solo si se identifica sin ambigüedad; si no, avisa para hacerlo a mano).
   async function borrar(m: Mov) {
     const desc = `${m.cliente ?? '—'} · ${m.operacion} · ${nf.format(montoPrincipal(m))}`
-    if (!confirm(`¿Eliminar el movimiento?\n\n${desc}\n\nSe elimina del sistema y se limpia la fila correspondiente en la planilla. Si la fila no se puede identificar con certeza, te avisamos para borrarla a mano.`)) return
+    const extra = PLANILLA_ACTIVA
+      ? '\n\nSe elimina del sistema y también del origen externo de datos. Si el registro no se puede identificar con certeza allá, te avisamos para borrarlo a mano.'
+      : ''
+    if (!confirm(`¿Eliminar el movimiento?\n\n${desc}${extra}`)) return
     setBorrando(m.id); setErrorBorrar(''); setAvisoPlanilla('')
     const res = await fetch(`/api/movimientos-caja/${m.id}`, { method: 'DELETE' })
     const data = await res.json().catch(() => ({}))
@@ -78,12 +82,12 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
       setBorrando(null)
       return
     }
-    // Resultado de la limpieza espejada en la planilla.
+    // Resultado de la limpieza espejada en el origen externo de datos.
     const AVISOS: Record<string, string> = {
-      no_encontrada: 'Se borró del sistema, pero la fila no se encontró en la planilla (¿ya la habías borrado allá?). Verificalo para que el próximo sync no lo traiga de vuelta.',
-      multiple: `Se borró del sistema, pero hay ${data.candidatas ?? 'varias'} filas iguales en la planilla y no se puede elegir sola: borrá la correcta a mano.`,
-      error: `Se borró del sistema, pero falló la limpieza en la planilla: ${data.warning ?? 'error desconocido'}. Borrala a mano.`,
-      deshabilitado: 'Se borró del sistema. La limpieza automática de la planilla está deshabilitada en este entorno (WRITE_SOURCE).',
+      no_encontrada: 'Se borró del sistema, pero el registro no se encontró en el origen externo (¿ya lo habías borrado allá?). Verificalo para que la próxima sincronización no lo traiga de vuelta.',
+      multiple: `Se borró del sistema, pero hay ${data.candidatas ?? 'varios'} registros iguales en el origen externo y no se puede elegir solo: borrá el correcto a mano.`,
+      error: `Se borró del sistema, pero falló la limpieza en el origen externo: ${data.warning ?? 'error desconocido'}. Borralo a mano.`,
+      deshabilitado: 'Se borró del sistema. La limpieza automática en el origen externo está deshabilitada en este entorno.',
     }
     if (data.planilla && data.planilla !== 'ok') setAvisoPlanilla(AVISOS[data.planilla] ?? '')
     setBorrando(null)
@@ -117,12 +121,11 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
       }
     }
 
-    // Autor: busca en quien cargó y en quien editó. "planilla" matchea las importadas.
+    // Autor: busca en quien cargó y en quien editó. "carga inicial" matchea las importadas.
     const qa = fAutor.trim().toUpperCase()
     const filtroAutor = (m: Mov): boolean => {
       if (!qa) return true
-      const esPlanilla = !m.creado_por || m.creado_por === AUTOR_PLANILLA
-      const autor = esPlanilla ? 'PLANILLA' : (m.creado_por ?? '').toUpperCase()
+      const autor = esCargaInicial(m.creado_por) ? 'CARGA INICIAL' : (m.creado_por ?? '').toUpperCase()
       return autor.includes(qa) || (m.editado_por ?? '').toUpperCase().includes(qa)
     }
 
@@ -168,7 +171,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               <circle style={{ opacity: 0.2 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path style={{ opacity: 0.8 }} fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
             </svg>
-            <p style={{ fontSize: 13, color: 'var(--ink-2)', margin: 0 }}>Eliminando… también se limpia la fila en la planilla</p>
+            <p style={{ fontSize: 13, color: 'var(--ink-2)', margin: 0 }}>Eliminando…{PLANILLA_ACTIVA ? ' también se limpia en el origen externo' : ''}</p>
           </div>
         </div>
       )}
@@ -194,7 +197,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 <th>Cot.</th>
                 <th>Monto</th>
                 {cols.map(c => <th key={c.key as string}>Imp. {c.sym}</th>)}
-                <th style={{ textAlign: 'left' }} title="Quién cargó la transacción en la app. Las filas anteriores a la puesta en marcha vienen de la planilla.">Registró</th>
+                <th style={{ textAlign: 'left' }} title="Quién cargó la transacción. Las operaciones anteriores a la puesta en marcha del sistema figuran como carga inicial.">Registró</th>
                 {puedeEditar && <th></th>}
               </tr>
               <tr className="tx-filtros">
@@ -234,8 +237,8 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                     return <td key={c.key as string}>{v ? <span className={`imp ${v > 0 ? 'p' : 'n'}`}>{money(v)}</span> : <span className="zero">—</span>}</td>
                   })}
                   <td style={{ textAlign: 'left', whiteSpace: 'nowrap', fontSize: 12 }}>
-                    {!m.creado_por || m.creado_por === AUTOR_PLANILLA ? (
-                      <span style={{ color: 'var(--muted)', fontStyle: 'italic' }} title="Fila importada de la planilla: no la cargó nadie desde la app.">planilla</span>
+                    {esCargaInicial(m.creado_por) ? (
+                      <span style={{ color: 'var(--muted)', fontStyle: 'italic' }} title="Operación anterior a la puesta en marcha del sistema: no la cargó ningún usuario.">carga inicial</span>
                     ) : (
                       <span title={`Cargó ${m.creado_por}${m.creado_at ? ` el ${fmtSello(m.creado_at)}` : ''}`}>{m.creado_por}</span>
                     )}

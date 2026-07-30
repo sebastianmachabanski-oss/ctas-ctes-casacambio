@@ -15,7 +15,7 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
   const [currentSync, setCurrentSync] = useState(ultimaSync)
 
   async function handleSync() {
-    if (!confirm('Esto actualizará los movimientos CTA CTE de los últimos 30 días con los datos del Excel. ¿Continuar?')) return
+    if (!confirm('Esto actualizará los movimientos de cuenta corriente de los últimos 30 días con los datos del origen externo. ¿Continuar?')) return
     setLoading(true)
     setError(null)
     setResultado(null)
@@ -74,7 +74,7 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
       <div className="card" style={{ padding: 18 }}>
         <div style={{ fontWeight: 650, marginBottom: 4 }}>Sincronizar ahora</div>
         <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 12 }}>
-          Trae los últimos 30 días desde la planilla. No borra nada de lo histórico.
+          Trae los últimos 30 días desde el origen externo de datos. No borra nada de lo histórico.
         </div>
 
         {resultado && (
@@ -87,7 +87,7 @@ export default function SyncClient({ totalMovimientos, ultimaSync }: Props) {
         {resultado && resultado.monedasIncompletas?.length > 0 && (
           <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
             <p className="font-semibold">⚠️ {resultado.monedasIncompletas.length} fila{resultado.monedasIncompletas.length !== 1 ? 's' : ''} con moneda incompleta</p>
-            <p className="text-xs mb-2">Falta PROPIO o EXTERNO. El Excel ignora estas filas al totalizar el saldo en cuenta corriente — revisalas en la planilla.</p>
+            <p className="text-xs mb-2">Falta PROPIO o EXTERNO. Estas filas no suman al saldo en cuenta corriente — revisalas en el origen de datos.</p>
             <ul className="text-xs space-y-1 max-h-48 overflow-auto">
               {resultado.monedasIncompletas.map((m: any, i: number) => (
                 <li key={i} className="flex flex-wrap gap-x-2">

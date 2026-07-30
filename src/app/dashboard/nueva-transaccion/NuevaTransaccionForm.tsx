@@ -284,7 +284,7 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
         })
         .catch(() => {
           setExcelOk(false)
-          setWarning('Error de conexión al actualizar la planilla')
+          setWarning('Error de conexión al replicar en el origen externo')
         })
     } catch {
       setError('Error de conexión. Verificá tu conexión e intentá de nuevo.')
@@ -318,13 +318,13 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
             <>
               ✓ Registrado en el sistema
               <p className="mt-1 text-xs opacity-80">
-                USDT no se registra en la planilla (no existe allá): la transacción vive solo en la app.
+                USDT existe únicamente en el sistema, no en el origen externo de datos.
                 {cajaDirecta ? ' ✓ Visible al instante en Transacciones e Inicio.' : ''}
               </p>
             </>
           )}
-          {!soloApp && excelOk === true && '✓ Registrado en sistema y en la planilla'}
-          {!soloApp && excelOk === false && `Sistema ✓ · Planilla ✗: ${warning}`}
+          {!soloApp && excelOk === true && '✓ Registrado correctamente'}
+          {!soloApp && excelOk === false && `Registrado en el sistema · no se pudo replicar en el origen externo: ${warning}`}
           {!soloApp && excelOk !== null && (
             <p className="mt-1 text-xs opacity-80">
               {cajaDirecta
@@ -338,7 +338,7 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
-              ✓ Registrado en sistema · sincronizando con la planilla…
+              ✓ Registrado en el sistema · sincronizando…
             </span>
           )}
         </div>
@@ -418,7 +418,7 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
                     </button>
                   </li>
                 )) : (
-                  <li className="px-3 py-2 text-sm text-gray-400">Sin resultados — la cuenta corriente debe existir (se crean desde Usuarios/planilla)</li>
+                  <li className="px-3 py-2 text-sm text-gray-400">Sin resultados — la cuenta corriente debe existir (se crean desde Usuarios)</li>
                 )}
               </ul>
             )}

@@ -1,5 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { PLANILLA_ACTIVA } from '@/lib/planilla'
 import FormEditarTransaccion from '@/components/transacciones/FormEditarTransaccion'
 
 export default async function EditarTransaccionPage({ params }: { params: { id: string } }) {
@@ -23,18 +24,21 @@ export default async function EditarTransaccionPage({ params }: { params: { id: 
         <h1 className="text-xl md:text-2xl font-bold text-gray-900">Editar transacción</h1>
         <p className="text-gray-500 text-sm mt-1">
           {(mov as any).tipo === 'CTA CTE' ? 'Movimiento de cuenta corriente' : 'Movimiento de caja'}
-          {(mov as any).fila_sheet ? ` · fila ${(mov as any).fila_sheet} de la planilla` : ''}
         </p>
       </div>
 
-      <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
-        <p className="font-semibold mb-1">⚠️ Este cambio no se escribe en la planilla</p>
-        <p>
-          Mientras el Google Sheet siga siendo la fuente de verdad, la próxima sincronización
-          va a <b>pisar esta edición</b> con lo que diga la planilla. La pantalla queda lista
-          para cuando la app pase a ser la única fuente de datos.
-        </p>
-      </div>
+      {/* Aviso de convivencia: la sincronización con el origen externo pisa las ediciones.
+          Es un efecto REAL y vigente; desaparece al apagar PLANILLA_ACTIVA. */}
+      {PLANILLA_ACTIVA && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+          <p className="font-semibold mb-1">⚠️ Esta edición puede revertirse</p>
+          <p>
+            Hasta que se complete la migración de datos, la próxima sincronización con el
+            origen externo va a <b>pisar esta edición</b>. Cuando el sistema sea la única
+            fuente de datos, el cambio quedará firme.
+          </p>
+        </div>
+      )}
 
       <FormEditarTransaccion movimiento={mov as any} />
     </div>
