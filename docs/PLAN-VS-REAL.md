@@ -115,7 +115,7 @@ convencer al cliente de abandonar el Excel: hoy se paga mantenimiento de un puen
 existe solo porque hay dos fuentes de verdad.
 
 **Ratio contra presupuesto tradicional.** En la parte medida, los 8 ítems del backlog para
-abandonar la planilla se presupuestaron en 41–56 h y se ejecutaron en 7,5 h (≈ 1:6). Ese
+abandonar la planilla se presupuestaron en 41–56 h y se ejecutaron en 8 h (≈ 1:6). Ese
 ratio aplica a construcción sobre una base ya establecida; **no conviene extrapolarlo a
 ciegas** al bloque 3, donde la depuración iterativa contra datos reales acota mucho la
 ventaja.
@@ -137,7 +137,7 @@ distribuidos en las tablas de arriba.
 | 6 | Tablero de Inicio | 12–15 h | ~2,5 h |
 | 7 | Ganancias (réplica COLO) | 5–7 h | ~1,5 h |
 | 8 | Permiso individual de Ganancias | 2–3 h | ~0,5 h |
-| | **Total backlog** | **41–56 h** | **~7,5 h** |
+| | **Total backlog** | **41–56 h** | **~8 h** |
 
 ---
 
