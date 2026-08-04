@@ -149,7 +149,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
   const sym = SYM[cfg.par]
 
   return (
-    <div className="p-4 md:p-6" style={{ display: 'grid', gap: 14, maxWidth: 760 }}>
+    <div className="p-4 md:p-6" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, maxWidth: 760 }}>
       {/* Filtros de período + configuración */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>

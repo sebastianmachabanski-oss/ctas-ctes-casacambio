@@ -128,6 +128,10 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
   scroll-snap-type: x proximity; scroll-padding-left: 2px;
   padding-bottom: 6px; /* deja aire para la barra de scroll */
   -webkit-overflow-scrolling: touch;
+  /* Imprescindible: sin esto, el ancho del contenido estira la columna que lo contiene
+     y termina scrollando la PÁGINA entera en el teléfono en vez de solo el carrusel.
+     Las grillas de página además fijan grid-template-columns: minmax(0, 1fr). */
+  min-width: 0;
 }
 .kpi {
   flex: 0 0 230px; /* ancho fijo: no se encoge ni se estira */
@@ -156,7 +160,7 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 /* Compacta: título en una línea y las cotizaciones en OTRA, en una sola fila. Si no
    entran, se desplazan con scroll horizontal (como las tarjetas de saldos) en vez de
    apilarse y comerse la pantalla. */
-.mkt { border: 1.5px dashed rgba(37,99,235,.32); background: rgba(37,99,235,.05); border-radius: 12px; padding: 8px 14px 6px; }
+.mkt { border: 1.5px dashed rgba(37,99,235,.32); background: rgba(37,99,235,.05); border-radius: 12px; padding: 8px 14px 6px; min-width: 0; }
 .mkt-head { display: flex; flex-direction: column; gap: 3px; }
 /* Título + nota (aclaración) + fuente en la MISMA línea; la nota se trunca si no entra */
 .mkt-titlerow { display: flex; align-items: baseline; gap: 10px; }

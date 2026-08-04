@@ -102,7 +102,7 @@ export default function AuditoriaView({
   }
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
       <div className="card" style={{ padding: '14px 16px' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div><label className="label">Desde</label><input className="input" type="date" value={d1} onChange={e => setD1(e.target.value)} /></div>

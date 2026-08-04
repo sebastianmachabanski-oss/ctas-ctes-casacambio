@@ -150,7 +150,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const ncols = 6 + cols.length + (puedeEditar ? 1 : 0)
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
       {/* Filtro de rango + aviso de filtros por columna */}
       <div className="card" style={{ padding: '14px 16px' }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>

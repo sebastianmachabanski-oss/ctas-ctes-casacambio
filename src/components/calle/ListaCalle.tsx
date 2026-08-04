@@ -65,7 +65,7 @@ export default function ListaCalle({
   const hayTotales = Object.keys(totales).length > 0
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
       {/* Total general en calle (réplica del recuadro rojo de la planilla, estilo mockup) */}
       <div className="card" style={{ padding: '14px 16px', borderColor: 'rgba(220,38,38,.35)' }}>
         <div className="sec-lbl" style={{ color: 'var(--neg-ink)', marginBottom: 8 }}>Total en calle</div>
