@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<title>Mockup producto</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  .escena {
+    width: 1000px; height: 1180px;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(900px 620px at 50% 8%, rgba(37,99,235,.20), transparent 62%),
+      linear-gradient(160deg, #16213c 0%, #101828 46%, #0a101d 100%);
+    position: relative; overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  /* Trama sutil de fondo */
+  .escena::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+    background-size: 46px 46px;
+    mask-image: radial-gradient(760px 620px at 50% 42%, #000 30%, transparent 78%);
+  }
+  /* Halo detrás del equipo */
+  .escena::after {
+    content: ""; position: absolute; width: 640px; height: 640px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(37,99,235,.30), transparent 68%);
+    filter: blur(46px);
+  }
+
+  .telefono {
+    position: relative; z-index: 2;
+    width: 426px; height: 880px;      /* pantalla 390x844 + bisel de 18 */
+    background: linear-gradient(150deg, #3a4257 0%, #171d2b 34%, #0d1119 72%, #2b3345 100%);
+    border-radius: 62px; padding: 18px;
+    box-shadow:
+      0 2px 3px rgba(255,255,255,.16) inset,
+      0 0 0 1.5px rgba(0,0,0,.7),
+      0 62px 90px -30px rgba(0,0,0,.78),
+      0 26px 48px -22px rgba(0,0,0,.6);
+  }
+  /* Brillo diagonal sobre el vidrio */
+  .telefono::after {
+    content: ""; position: absolute; inset: 18px; border-radius: 46px; pointer-events: none;
+    background: linear-gradient(128deg, rgba(255,255,255,.15) 0%, rgba(255,255,255,.045) 17%, transparent 42%);
+    z-index: 5;
+  }
+
+  .pantalla {
+    position: relative; width: 390px; height: 844px;
+    border-radius: 46px; overflow: hidden; background: #f4f6fb;
+  }
+  .pantalla iframe { width: 390px; height: 844px; border: 0; display: block; }
+
+  /* Isla dinámica */
+  .isla {
+    position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+    width: 122px; height: 34px; border-radius: 20px; background: #05070c; z-index: 6;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.05);
+  }
+  .isla::after {
+    content: ""; position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+    width: 11px; height: 11px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 32%, #24304a, #070a12 68%);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.06);
+  }
+  /* Desvanecido al pie: el contenido sigue hacia abajo, y el corte se lee natural */
+  .fade-pie {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 96px; z-index: 5; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(244,246,251,0) 0%, rgba(244,246,251,.92) 62%, #f4f6fb 100%);
+  }
+  /* Indicador inferior */
+  .barra-home {
+    position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
+    width: 138px; height: 5px; border-radius: 3px; background: rgba(15,23,41,.32); z-index: 6;
+  }
+  /* Botones laterales */
+  .btn-lat { position: absolute; background: linear-gradient(90deg, #2e364a, #171d2b); border-radius: 2px; }
+  .b-vol1 { left: -3px; top: 196px; width: 4px; height: 34px; }
+  .b-vol2 { left: -3px; top: 246px; width: 4px; height: 60px; }
+  .b-vol3 { left: -3px; top: 320px; width: 4px; height: 60px; }
+  .b-power { right: -3px; top: 268px; width: 4px; height: 92px; }
+
+  /* Pie de la escena */
+  .pie {
+    position: absolute; bottom: 54px; left: 0; right: 0; text-align: center; z-index: 3;
+    color: rgba(255,255,255,.5); font-size: 15px; letter-spacing: .16em; text-transform: uppercase; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+  <div class="escena">
+    <div class="telefono">
+      <span class="btn-lat b-vol1"></span>
+      <span class="btn-lat b-vol2"></span>
+      <span class="btn-lat b-vol3"></span>
+      <span class="btn-lat b-power"></span>
+      <div class="pantalla">
+        <iframe src="app-mobile.html" scrolling="no"></iframe>
+        <div class="isla"></div>
+        <div class="barra-home"></div>
+      </div>
+    </div>
+    <div class="pie">Gestión de casa de cambio</div>
+  </div>
+</body></html>

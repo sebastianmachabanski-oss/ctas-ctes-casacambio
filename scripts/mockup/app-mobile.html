@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="app.css">
+<style>
+  html, body { background: var(--page); }
+  /* Barra de estado del sistema operativo (no es parte de la app) */
+  .os-bar {
+    height: 54px; display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 0 26px 8px; background: var(--card);
+    font: 600 15px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink); letter-spacing: .2px;
+  }
+  .os-bar .der { display: flex; align-items: center; gap: 6px; }
+  .cc-topbar { padding-top: 10px; padding-bottom: 10px; }
+  /* En una imagen de producto las barras de scroll son ruido visual */
+  *::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
+  main { padding-bottom: 34px; }
+</style>
+</head>
+<body>
+
+<div class="os-bar">
+  <span>9:41</span>
+  <span class="der">
+    <!-- señal -->
+    <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor">
+      <rect x="0"  y="8" width="3" height="4" rx="1"/>
+      <rect x="5"  y="6" width="3" height="6" rx="1"/>
+      <rect x="10" y="3" width="3" height="9" rx="1"/>
+      <rect x="15" y="0" width="3" height="12" rx="1"/>
+    </svg>
+    <!-- wifi -->
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor">
+      <path d="M8 11.2 5.8 8.6a3.4 3.4 0 0 1 4.4 0L8 11.2Z"/>
+      <path d="M3.6 6.3a6.6 6.6 0 0 1 8.8 0l-1.3 1.5a4.7 4.7 0 0 0-6.2 0L3.6 6.3Z"/>
+      <path d="M1.2 3.7a10 10 0 0 1 13.6 0l-1.3 1.5a8.1 8.1 0 0 0-11 0L1.2 3.7Z"/>
+    </svg>
+    <!-- batería -->
+    <svg width="26" height="13" viewBox="0 0 26 13">
+      <rect x="0.5" y="0.5" width="21" height="12" rx="3.5" fill="none" stroke="currentColor" stroke-opacity=".38"/>
+      <rect x="2" y="2" width="16" height="9" rx="2" fill="currentColor"/>
+      <path d="M23 4.4v4.2a2.6 2.6 0 0 0 0-4.2Z" fill="currentColor" fill-opacity=".45"/>
+    </svg>
+  </span>
+</div>
+
+<header class="cc-topbar">
+  <button class="cc-hamb" aria-label="Menú">☰</button>
+  <div>
+    <div class="cc-crumb">Casa de Cambio</div>
+    <div class="cc-ptitle">Inicio</div>
+  </div>
+  <span class="cc-pill"><span class="d"></span><span class="t">Sincronizado</span></span>
+</header>
+
+<main>
+<div class="p-4 md:p-6" style="display:grid;grid-template-columns:minmax(0, 1fr);gap:16px">
+
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <div class="sec-lbl" style="margin:0">
+      Situación de caja — ahora
+      <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted)">· se actualiza con cada sincronización</span>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button class="chip">Hoy</button>
+      <button class="chip">Semana</button>
+      <button class="chip">Mes</button>
+      <button class="chip on">Todo</button>
+    </div>
+  </div>
+
+  <div class="kpis-caja">
+    <div class="kpi">
+      <div class="top"><span class="dot" style="background:#059669"></span><span class="cur">Dólares</span></div>
+      <div class="val num">445.565,43</div>
+      <div class="sub">
+        <div class="kr"><span>Calle</span><b>2.300,00</b></div>
+        <div class="kr kr-encaja"><span class="lbl-encaja">Saldo en caja</span><b class="pos">443.265,43</b></div>
+        <div class="kr"><span>Cta cte</span><b class="neg">(18.420,00)</b></div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="top"><span class="dot" style="background:#2563eb"></span><span class="cur">Pesos</span></div>
+      <div class="val num">128.493.055</div>
+      <div class="sub">
+        <div class="kr"><span>Calle</span><b>84.000</b></div>
+        <div class="kr kr-encaja"><span class="lbl-encaja">Saldo en caja</span><b class="pos">128.409.055</b></div>
+        <div class="kr"><span>Cta cte</span><b class="neg">(9.482.100)</b></div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="top"><span class="dot" style="background:#d97706"></span><span class="cur">Euros</span></div>
+      <div class="val num">38.910,20</div>
+      <div class="sub">
+        <div class="kr"><span>Calle</span><b>0,00</b></div>
+        <div class="kr kr-encaja"><span class="lbl-encaja">Saldo en caja</span><b class="pos">38.910,20</b></div>
+        <div class="kr"><span>Cta cte</span><b>1.200,00</b></div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="top"><span class="dot" style="background:#16a34a"></span><span class="cur">USDT</span></div>
+      <div class="val num">15.000,00</div>
+      <div class="sub">
+        <div class="kr"><span>Calle</span><b>0,00</b></div>
+        <div class="kr kr-encaja"><span class="lbl-encaja">Saldo en caja</span><b class="pos">15.000,00</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mkt">
+    <div class="mkt-head">
+      <div class="mkt-titlerow">
+        <span class="mkt-title">📡 Mercado</span>
+        <span class="mkt-src live">en vivo · 09:41</span>
+      </div>
+      <div class="mkt-row">
+        <span class="it"><span class="n">Blue</span><span class="v num">$ 1.180</span><span style="color:var(--muted)">/</span><span class="v num">$ 1.210</span></span>
+        <span class="it"><span class="n">Oficial</span><span class="v num">$ 1.045</span><span style="color:var(--muted)">/</span><span class="v num">$ 1.085</span></span>
+        <span class="it"><span class="n">MEP</span><span class="v num">$ 1.152</span><span style="color:var(--muted)">/</span><span class="v num">$ 1.158</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="cc-two">
+    <div class="card">
+      <div class="card-h"><div class="card-t">Saldo en dólares</div></div>
+      <div class="hero-line">
+        <span class="big num">445.565</span>
+        <span class="delta up">▲ 4,2 %</span>
+      </div>
+      <div class="chart-pad">
+        <svg viewBox="0 0 320 96" preserveAspectRatio="none" style="height:96px">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"  stop-color="#2563eb" stop-opacity=".22"/>
+              <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0,74 L40,62 L80,68 L120,40 L160,49 L200,30 L240,36 L280,18 L320,24 L320,96 L0,96 Z" fill="url(#g)"/>
+          <polyline points="0,74 40,62 80,68 120,40 160,49 200,30 240,36 280,18 320,24"
+                    fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><div class="card-t">Clientes del período</div></div>
+      <div class="tbl-wrap">
+        <table class="cc-tbl">
+          <thead><tr><th>Cliente</th><th>Ops.</th><th>Volumen</th></tr></thead>
+          <tbody>
+            <tr><td>MARTÍNEZ, LUIS</td><td>14</td><td>128.400</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+</main>
+
+</body></html>
