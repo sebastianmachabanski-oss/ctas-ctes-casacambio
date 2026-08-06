@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="app.css">
+<style>
+  html, body { background: var(--page); }
+  /* Barra de estado del sistema operativo (no es parte de la app) */
+  .os-bar {
+    height: 54px; display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 0 26px 8px; background: var(--card);
+    font: 600 15px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink); letter-spacing: .2px;
+  }
+  .os-bar .der { display: flex; align-items: center; gap: 6px; }
+  .cc-topbar { padding-top: 10px; padding-bottom: 10px; }
+  /* En una imagen de producto las barras de scroll son ruido visual */
+  *::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
+  main { padding-bottom: 34px; }
+</style>
+</head>
+<body>
+
+<div class="os-bar">
+  <span>9:41</span>
+  <span class="der">
+    <!-- señal -->
+    <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor">
+      <rect x="0"  y="8" width="3" height="4" rx="1"/>
+      <rect x="5"  y="6" width="3" height="6" rx="1"/>
+      <rect x="10" y="3" width="3" height="9" rx="1"/>
+      <rect x="15" y="0" width="3" height="12" rx="1"/>
+    </svg>
+    <!-- wifi -->
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor">
+      <path d="M8 11.2 5.8 8.6a3.4 3.4 0 0 1 4.4 0L8 11.2Z"/>
+      <path d="M3.6 6.3a6.6 6.6 0 0 1 8.8 0l-1.3 1.5a4.7 4.7 0 0 0-6.2 0L3.6 6.3Z"/>
+      <path d="M1.2 3.7a10 10 0 0 1 13.6 0l-1.3 1.5a8.1 8.1 0 0 0-11 0L1.2 3.7Z"/>
+    </svg>
+    <!-- batería -->
+    <svg width="26" height="13" viewBox="0 0 26 13">
+      <rect x="0.5" y="0.5" width="21" height="12" rx="3.5" fill="none" stroke="currentColor" stroke-opacity=".38"/>
+      <rect x="2" y="2" width="16" height="9" rx="2" fill="currentColor"/>
+      <path d="M23 4.4v4.2a2.6 2.6 0 0 0 0-4.2Z" fill="currentColor" fill-opacity=".45"/>
+    </svg>
+  </span>
+</div>
+
+<header class="cc-topbar">
+  <button class="cc-hamb" aria-label="Menú">☰</button>
+  <div>
+    <div class="cc-crumb">Casa de Cambio</div>
+    <div class="cc-ptitle">Ganancias</div>
+  </div>
+  <span class="cc-pill"><span class="d"></span><span class="t">Sincronizado</span></span>
+</header>
+
+<main>
+<div class="p-4 md:p-6" style="display:grid;grid-template-columns:minmax(0, 1fr);gap:14px">
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+    <button class="chip">Día</button><button class="chip">Semana</button>
+    <button class="chip on">Mes</button><button class="chip">Año</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;color:var(--ink-2)">
+    <button class="chip" style="width:30px;padding:5px 0;text-align:center">&lsaquo;</button>
+    <b style="color:var(--ink)">Agosto 2026</b>
+    <button class="chip" style="width:30px;padding:5px 0;text-align:center">&rsaquo;</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px">
+    <div class="card" style="padding:24px">
+      <div style="color:var(--muted);font-size:13.5px">Este mes ganaste</div>
+      <div class="hero-num num pos">$ 2.330.502</div>
+      <div style="margin-top:6px;font-size:12px;color:var(--muted)">en pesos</div>
+    </div>
+    <div class="card" style="padding:24px">
+      <div style="color:var(--muted);font-size:13.5px">El mismo resultado, en dólares</div>
+      <div class="hero-num num pos">US$ 2.180</div>
+      <div style="margin-top:6px;font-size:12px;color:var(--muted)">
+        convertido a <b>$ 1.069,200</b> — cotización promedio de las operaciones en dólares del período
+      </div>
+    </div>
+  </div>
+  <div style="display:inline-block;font-size:12.5px;font-weight:600;background:var(--pos-bg);color:var(--pos-ink);padding:5px 11px;border-radius:8px">
+    &#10003; Cálculo con los supuestos estándar
+  </div>
+  <div class="kpis-caja">
+    <div class="kpi"><span class="cur">Compraste</span><div class="val num" style="font-size:18px">US$ 486.200</div><div style="font-size:12px;color:var(--muted)">a $ 1.062 promedio</div></div>
+    <div class="kpi"><span class="cur">Vendiste</span><div class="val num" style="font-size:18px">US$ 472.900</div><div style="font-size:12px;color:var(--muted)">a $ 1.076 promedio</div></div>
+  </div>
+
+  <div class="card" style="padding:0">
+    <div style="padding:14px 18px;font-size:13.5px;font-weight:600;color:var(--ink-2)">
+      &iquest;C&oacute;mo se calcula este n&uacute;mero? &rsaquo;
+    </div>
+    <div style="border-top:1px solid var(--grid);padding:2px 18px 12px">
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--grid);font-size:13px">
+        <span>Vendiste a <b>$ 1.076</b> y compraste a <b>$ 1.062</b> &rarr; diferencia</span>
+        <b class="num pos" style="white-space:nowrap">$ 14,30</b>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--grid);font-size:13px">
+        <span><b>US$ 472.900</b> comprados y vendidos &times; esa diferencia</span>
+        <b class="num pos" style="white-space:nowrap">$ 2.306.852</b>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:12px;padding:9px 0;font-size:13px">
+        <span><b>Ganancia neta</b></span>
+        <b class="num pos" style="white-space:nowrap">$ 2.330.502</b>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+
+</body></html>

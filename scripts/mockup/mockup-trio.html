@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<title>Mockup producto — trío</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* Fondo TRANSPARENTE a propósito: la imagen se pega sobre cualquier diapositiva. */
+  html, body { background: transparent; }
+
+  .escena {
+    width: 1760px; height: 1180px;
+    display: flex; align-items: center; justify-content: center;
+    perspective: 2600px; perspective-origin: 50% 46%;
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .telefono {
+    position: absolute;
+    width: 426px; height: 880px;
+    background: linear-gradient(150deg, #3a4257 0%, #171d2b 34%, #0d1119 72%, #2b3345 100%);
+    border-radius: 62px; padding: 18px;
+    box-shadow: 0 2px 3px rgba(255,255,255,.16) inset, 0 0 0 1.5px rgba(0,0,0,.72);
+    /* La sombra sigue el contorno redondeado (no una caja) para que se vea bien
+       recortada sobre cualquier fondo de la presentación. */
+    filter: drop-shadow(0 44px 52px rgba(9,14,26,.42)) drop-shadow(0 12px 20px rgba(9,14,26,.3));
+    transform-style: preserve-3d;
+  }
+  .telefono::after {
+    content: ""; position: absolute; inset: 18px; border-radius: 46px; pointer-events: none;
+    background: linear-gradient(128deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,.05) 17%, transparent 42%);
+    z-index: 5;
+  }
+
+  /* Composición en perspectiva: el central al frente, los laterales girados hacia adentro */
+  .izq    { transform: translateX(-452px) translateZ(-190px) rotateY(25deg)  scale(.96); z-index: 1; }
+  .centro { transform: translateZ(0);                                                     z-index: 3; }
+  .der    { transform: translateX(452px)  translateZ(-190px) rotateY(-25deg) scale(.96); z-index: 1; }
+
+  .pantalla {
+    position: relative; width: 390px; height: 844px;
+    border-radius: 46px; overflow: hidden; background: #f4f6fb;
+  }
+  .pantalla iframe { width: 390px; height: 844px; border: 0; display: block; }
+
+  .isla {
+    position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+    width: 122px; height: 34px; border-radius: 20px; background: #05070c; z-index: 6;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.05);
+  }
+  .isla::after {
+    content: ""; position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+    width: 11px; height: 11px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 32%, #24304a, #070a12 68%);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .barra-home {
+    position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
+    width: 138px; height: 5px; border-radius: 3px; background: rgba(15,23,41,.32); z-index: 6;
+  }
+  .btn-lat { position: absolute; background: linear-gradient(90deg, #2e364a, #171d2b); border-radius: 2px; }
+  .b-vol1 { left: -3px; top: 196px; width: 4px; height: 34px; }
+  .b-vol2 { left: -3px; top: 246px; width: 4px; height: 60px; }
+  .b-vol3 { left: -3px; top: 320px; width: 4px; height: 60px; }
+  .b-power { right: -3px; top: 268px; width: 4px; height: 92px; }
+</style>
+</head>
+<body>
+  <div class="escena">
+
+    <div class="telefono izq">
+      <span class="btn-lat b-vol1"></span><span class="btn-lat b-vol2"></span>
+      <span class="btn-lat b-vol3"></span><span class="btn-lat b-power"></span>
+      <div class="pantalla">
+        <iframe src="app-nueva.html" scrolling="no"></iframe>
+        <div class="isla"></div><div class="barra-home"></div>
+      </div>
+    </div>
+
+    <div class="telefono centro">
+      <span class="btn-lat b-vol1"></span><span class="btn-lat b-vol2"></span>
+      <span class="btn-lat b-vol3"></span><span class="btn-lat b-power"></span>
+      <div class="pantalla">
+        <iframe src="app-mobile.html" scrolling="no"></iframe>
+        <div class="isla"></div><div class="barra-home"></div>
+      </div>
+    </div>
+
+    <div class="telefono der">
+      <span class="btn-lat b-vol1"></span><span class="btn-lat b-vol2"></span>
+      <span class="btn-lat b-vol3"></span><span class="btn-lat b-power"></span>
+      <div class="pantalla">
+        <iframe src="app-ganancias.html" scrolling="no"></iframe>
+        <div class="isla"></div><div class="barra-home"></div>
+      </div>
+    </div>
+
+  </div>
+</body></html>

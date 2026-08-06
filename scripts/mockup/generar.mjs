@@ -28,12 +28,25 @@ try {
 copyFileSync(resolve(dirCss, hojas[0]), resolve(aca, 'app.css'))
 
 const navegador = await chromium.launch({ executablePath: CHROME })
-const pagina = await navegador.newPage({ viewport: { width: 1000, height: 1180 }, deviceScaleFactor: 3 })
-await pagina.goto('file://' + resolve(aca, 'mockup.html'), { waitUntil: 'networkidle' })
-await pagina.waitForTimeout(500)
-
 mkdirSync(resolve(raiz, 'docs'), { recursive: true })
-const salida = resolve(raiz, 'docs/producto-telefono.png')
-await pagina.locator('.escena').screenshot({ path: salida })
+
+// Dos piezas:
+//  1. Un teléfono sobre fondo oscuro — imagen suelta, autocontenida.
+//  2. Tres teléfonos en perspectiva con FONDO TRANSPARENTE — para pegar en una
+//     diapositiva sobre cualquier color. `omitBackground` es lo que preserva el alfa;
+//     sin eso el PNG sale con fondo blanco.
+const piezas = [
+  { html: 'mockup.html',      salida: 'docs/producto-telefono.png',       w: 1000, h: 1180, escala: 3,   alfa: false },
+  { html: 'mockup-trio.html', salida: 'docs/producto-telefonos-trio.png', w: 1760, h: 1180, escala: 2.5, alfa: true  },
+]
+
+for (const p of piezas) {
+  const pagina = await navegador.newPage({ viewport: { width: p.w, height: p.h }, deviceScaleFactor: p.escala })
+  await pagina.goto('file://' + resolve(aca, p.html), { waitUntil: 'networkidle' })
+  await pagina.waitForTimeout(600)
+  const destino = resolve(raiz, p.salida)
+  await pagina.locator('.escena').screenshot({ path: destino, omitBackground: p.alfa })
+  await pagina.close()
+  console.log('OK ->', destino)
+}
 await navegador.close()
-console.log('OK ->', salida)
