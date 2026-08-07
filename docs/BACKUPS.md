@@ -134,6 +134,106 @@ pg_dump "postgresql://postgres:CONTRASEÑA@db.PROYECTO.supabase.co:5432/postgres
 
 ---
 
+## Cómo restaurar desde los CSV
+
+Procedimiento para reconstruir la base entera a partir del export CSV. Conviene leerlo
+**antes** de necesitarlo: hay dos trampas que sorprenden si se descubren en el momento.
+
+### Qué hace falta
+
+1. Los **CSV** del backup (las ocho tablas).
+2. El **repositorio**, que es donde vive el esquema. Sin él los CSV son datos sueltos
+   sin estructura donde ponerlos.
+
+### Paso 1 — Base vacía
+
+Un proyecto nuevo de Supabase, o el mismo si lo que se rompió fueron los datos.
+
+### Paso 2 — Esquema
+
+En el **SQL Editor**, correr en este orden:
+
+1. `schema.sql` completo.
+2. Las `migrations/` **en orden cronológico** (el nombre empieza con la fecha):
+
+```
+2026-06-15_diario_delete_policy.sql     2026-07-10_caja_clientes_periodo.sql
+2026-06-24_sync_state.sql               2026-07-11_app_config.sql
+2026-06-30_clientes.sql                 2026-07-11_delete_movimientos_caja.sql
+2026-07-05_movimientos_caja.sql         2026-07-11_insert_movimientos_caja.sql
+2026-07-06_cot_efectiva.sql             2026-07-20_usdt.sql
+2026-07-06_editar_movimientos.sql       2026-07-29_auditoria.sql
+2026-07-06_ve_ganancias.sql
+2026-07-09_tablero_inicio.sql
+```
+
+(`add_cotizacion.sql` es anterior al esquema actual y ya está contemplado en él.)
+
+### Paso 3 — Usuarios ⚠️ TRAMPA 1
+
+**`profiles` NO se puede importar sin más.** Su columna `id` es una clave foránea contra
+`auth.users`: si el usuario no existe en Authentication, la fila se rechaza.
+
+`auth.users` no está en el export CSV (el SQL Editor no llega a ese esquema). Así que:
+
+1. Recrear cada usuario desde la pantalla **Usuarios** de la app. Al crearlos, un trigger
+   les arma solo la fila en `profiles`.
+2. Abrir `profiles.csv` y **usarlo como referencia** para dejar en cada uno el `rol`, el
+   `ve_ganancias` y la `cuenta_cte` que tenían.
+
+Son pocos usuarios: es cuestión de minutos. Pero hay que saberlo, porque si se intenta
+importar `profiles.csv` de una, falla y no queda claro por qué.
+
+### Paso 4 — Importar los CSV, en este orden
+
+Desde **Table Editor** → elegir la tabla → menú **Insert** → *Import data from CSV*.
+
+```
+1. cuentas_corrientes      5. diario
+2. tipos_operacion         6. movimientos_caja
+3. clientes                7. auditoria   (ver TRAMPA 2)
+4. app_config
+```
+
+`movimientos_caja` son ~33.500 filas: puede tardar y, si el navegador se queda, conviene
+partir el CSV en dos o tres archivos.
+
+`sync_state` no hace falta restaurarlo: es la marca de agua del sync y se regenera sola
+en la primera corrida.
+
+### Paso 5 — Auditoría ⚠️ TRAMPA 2
+
+`auditoria.id` es `bigint generated always as identity`: PostgreSQL **rechaza** que le
+impongan un valor, y el CSV lo trae.
+
+Solución: **borrar la columna `id` del CSV** (abrirlo en Excel, eliminar esa columna,
+guardar) antes de importarlo. Los id se regeneran solos y no importa que cambien —
+ninguna otra tabla los referencia; lo que vale es el contenido del registro.
+
+### Paso 6 — Verificar
+
+En el SQL Editor, comparar contra las filas de cada CSV:
+
+```sql
+select 'movimientos_caja' t, count(*) from public.movimientos_caja
+union all select 'diario',             count(*) from public.diario
+union all select 'auditoria',          count(*) from public.auditoria
+union all select 'clientes',           count(*) from public.clientes
+union all select 'cuentas_corrientes', count(*) from public.cuentas_corrientes
+union all select 'tipos_operacion',    count(*) from public.tipos_operacion
+union all select 'app_config',         count(*) from public.app_config
+union all select 'profiles',           count(*) from public.profiles;
+```
+
+Y después entrar a la app: **Inicio** tiene que mostrar los mismos saldos por moneda que
+antes. Es la verificación que de verdad importa.
+
+> **Un backup no probado no es un backup.** Lo ideal es hacer este ejercicio completo una
+> vez, contra un proyecto de Supabase gratuito y descartable, antes de necesitarlo de
+> verdad. Ahí se descubren las sorpresas sin apuro y sin nada en juego.
+
+---
+
 ## Qué es recuperable hoy (convivencia con la planilla)
 
 Mientras el Google Sheet siga siendo la fuente de verdad:
