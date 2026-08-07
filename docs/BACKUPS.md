@@ -13,6 +13,45 @@ reemplace definitivamente a la planilla.
 
 Verificar el plan actual en *Dashboard → Settings → Billing*.
 
+> **Situación actual (7/8/2026): plan Free, y la decisión del negocio es no pasar a
+> Pro.** Es decir: **no hay ningún backup automático**. Todo respaldo es manual y
+> depende de que alguien lo corra. Ver la sección "Sin poder instalar software" más
+> abajo, que es el escenario real de la máquina del negocio.
+
+## Sin poder instalar software (export CSV desde el navegador)
+
+En la máquina del negocio no se puede instalar PostgreSQL, así que `pg_dump` no está
+disponible. La alternativa que **no requiere instalar nada** es el export CSV del
+SQL Editor de Supabase.
+
+Funciona porque **el esquema ya vive en el repositorio** (`schema.sql` +
+`migrations/`): lo único que falta respaldar son los datos.
+
+Correr cada query en *SQL Editor* y bajar el resultado con **Download CSV**:
+
+```sql
+select * from public.profiles;
+select * from public.clientes;
+select * from public.cuentas_corrientes;
+select * from public.tipos_operacion;
+select * from public.app_config;
+select * from public.auditoria;
+select * from public.sync_state;
+select * from public.movimientos_caja where origen = 'app';
+```
+
+Son exactamente las tablas que ningún sync reconstruye. `diario` y el resto de
+`movimientos_caja` no hacen falta: vuelven enteros con una corrida *full*.
+
+Alternativa de una sola descarga: una query con `json_build_object` que arme un único
+JSON con las ocho tablas. Si el editor trunca el resultado por tamaño, volver a las
+queries sueltas.
+
+**Qué se pierde respecto del dump**: restaurar es más manual — hay que recrear el
+esquema desde `schema.sql` + `migrations/` y después importar los CSV. No se pierden
+datos, que es lo que importa. Cuando haya una máquina donde se pueda instalar
+PostgreSQL, hacer el `pg_dump` completo y guardarlo como línea de base.
+
 ## Export manual/programado a medio físico
 
 Supabase es PostgreSQL estándar: el backup completo (esquema + datos) se hace con
@@ -62,6 +101,11 @@ En ese momento el backup deja de ser opcional. Esquema recomendado:
 
 1. **Plan Pro** (backups automáticos diarios) como primera línea.
 2. **`pg_dump` periódico a disco físico** como segunda copia fuera de la nube.
+
+> ⚠️ Con la decisión actual de quedarse en Free, el punto 1 no existe. Mientras la
+> planilla siga siendo la fuente de verdad no es grave: un *full* reconstruye casi
+> todo. Pero el día que la planilla se retire, el único respaldo sería el manual —
+> hay que resolver antes el punto 2 (una máquina con PostgreSQL) o el 3.
 3. Opcional a desarrollar: función programada que suba el dump a una carpeta de
    Drive del negocio con la misma cuenta de servicio que ya usa el sync — tercera
    copia sin intervención manual.
