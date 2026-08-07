@@ -3,6 +3,56 @@
 Qué se respalda, cómo exportar a un medio físico y qué cambia el día que la app
 reemplace definitivamente a la planilla.
 
+## Estado al 7/8/2026 y qué quedó pendiente
+
+**Hecho:** se bajaron los **8 CSV** con todos los datos (`movimientos_caja`, `diario`,
+`auditoria`, `profiles`, `clientes`, `cuentas_corrientes`, `tipos_operacion`,
+`app_config`). Guardados fuera del repositorio. Los datos del negocio están cubiertos.
+
+**Pendiente:** el `pg_dump` completo, que es la **única vía que también respalda
+`auth.users`** (las credenciales de acceso). Queda para hacerlo **desde otra máquina o
+red**, por lo que sigue.
+
+### Qué ya se probó y falló — no repetirlo
+
+Intentado desde la máquina de trabajo (Windows corporativa), sin éxito:
+
+| Se probó | Resultado |
+|---|---|
+| `pg_dump` por Session pooler, puerto 5432 | `password authentication failed` |
+| Contraseña reseteada y verificada con `echo %PGPASSWORD%` | el valor era correcto |
+| `set PGCHANNELBINDING=disable` (por ser pg_dump 18, muy nuevo) | sin cambios |
+| `psql` para aislar credencial de herramienta | también falló |
+| Conexión directa `db.<ref>.supabase.co` | no conecta (es IPv6) |
+
+**Sospecha principal: restricción de red corporativa.** La máquina es de una empresa y
+esas redes suelen bloquear el puerto 5432 saliente. Por eso el próximo intento conviene
+hacerlo desde una red doméstica.
+
+### Datos confirmados contra el Dashboard (no hay que volver a buscarlos)
+
+```
+Host    : aws-1-us-east-2.pooler.supabase.com
+Puerto  : 5432          (Session pooler)
+Usuario : postgres.qsvjbafbjlexaeliqmfd
+Base    : postgres
+```
+
+La contraseña es la de la base (Settings → Database), **no** la de la cuenta de Supabase.
+Conviene generarla **solo con letras y números**: los símbolos `%`, `^`, `&` los rompe la
+consola de Windows.
+
+`pg_dump` ya está disponible como **binarios portables 18.4** descomprimidos (no requiere
+instalación ni permisos de administrador).
+
+### Además, cuando haya una máquina que sirva
+
+Vale la pena hacer una **restauración de prueba completa** contra un proyecto de Supabase
+gratuito y descartable, siguiendo la sección "Cómo restaurar desde los CSV". Es la única
+forma de confirmar que el backup sirve, y conviene descubrir las sorpresas sin apuro.
+
+---
+
 ## Qué cubre Supabase según el plan
 
 | Plan | Backups automáticos |
