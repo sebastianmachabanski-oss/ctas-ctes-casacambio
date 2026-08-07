@@ -8,3 +8,6 @@ out/
 # Salidas del análisis del Excel (contienen datos reales de clientes — no commitear)
 scripts/analisis-excel.json
 scripts/pivots.json
+
+# Backups de datos generados localmente (contienen datos reales del negocio)
+backups/

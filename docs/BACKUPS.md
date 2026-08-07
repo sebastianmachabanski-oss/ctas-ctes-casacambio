@@ -52,6 +52,54 @@ esquema desde `schema.sql` + `migrations/` y después importar los CSV. No se pi
 datos, que es lo que importa. Cuando haya una máquina donde se pueda instalar
 PostgreSQL, hacer el `pg_dump` completo y guardarlo como línea de base.
 
+> Para el dump completo no hace falta *instalar* PostgreSQL: alcanza con el ZIP de
+> **binarios sueltos** de
+> [enterprisedb.com/download-postgresql-binaries](https://www.enterprisedb.com/download-postgresql-binaries),
+> que se descomprime en una carpeta (`C:\pgsql`) y se usa directo —
+> `C:\pgsql\bin\pg_dump.exe ...`. No toca el sistema, no pide permisos de
+> administrador y se puede borrar o llevar en un pendrive.
+
+### Versión automatizada: script del proyecto
+
+Bajar ocho CSV a mano cada vez es tedioso y fácil de olvidar. `scripts/backup-datos.mjs`
+hace exactamente lo mismo, de una: usa `@supabase/supabase-js`, que **ya es dependencia
+del proyecto**, así que no hay nada nuevo que instalar. Necesita el repositorio y Node
+(no sirve en una máquina donde solo haya un navegador — para ese caso están los CSV de
+arriba).
+
+```
+node scripts/backup-datos.mjs
+```
+
+En Windows, doble clic en **`scripts/backup-datos.bat`** (instala las dependencias si
+faltan). Genera `backups/backup-AAAA-MM-DD_HH-mm/` con un `.ndjson` por tabla y un
+`manifiesto.json`.
+
+Dos cosas que el camino manual no da:
+
+- **Verifica lo que baja.** Compara las filas escritas contra el conteo real de cada
+  tabla y termina con error si no coinciden. Pagina de a 1.000 porque Postgrest corta
+  ahí — el mismo motivo por el que hubo que paginar la RPC de clientes en Inicio.
+- **Trae la vuelta.** `scripts/restaurar-datos.mjs` carga los datos respetando el orden
+  de dependencias entre tablas:
+
+```
+node scripts/restaurar-datos.mjs backups/backup-AAAA-MM-DD_HH-mm             # prueba en seco
+node scripts/restaurar-datos.mjs backups/backup-AAAA-MM-DD_HH-mm --confirmar
+```
+
+  Sin `--confirmar` no escribe nada: valida los archivos y muestra qué haría. El esquema
+  tiene que existir antes (aplicar `schema.sql` y las `migrations/`).
+
+A diferencia de la lista de ocho tablas de arriba, el script respalda **todas** las
+tablas, incluidas `diario` y `movimientos_caja` completas. Hoy son reconstruibles con un
+*full*, pero el día que se retire la planilla dejan de serlo, y así el backup ya las
+cubre sin cambiar nada.
+
+**Limitación de las dos vías sin `pg_dump`**: no respaldan `auth.users` (las
+credenciales de acceso), solo los perfiles en `public.profiles`. Si se perdiera el
+proyecto entero habría que recrear los usuarios a mano.
+
 ## Export manual/programado a medio físico
 
 Supabase es PostgreSQL estándar: el backup completo (esquema + datos) se hace con
@@ -70,14 +118,21 @@ pg_dump "postgresql://postgres:CONTRASEÑA@db.PROYECTO.supabase.co:5432/postgres
 - El `.dump` se restaura con `pg_restore` en cualquier Postgres (incluso otro
   proyecto de Supabase): `pg_restore --dbname="postgresql://..." archivo.dump`.
 - `pg_dump`/`pg_restore` vienen con el instalador estándar de PostgreSQL
-  (en Windows también con pgAdmin). Alternativa: `supabase db dump` con la CLI oficial.
+  (en Windows también con pgAdmin).
 - El dump **no filtra tablas**: cubre todo el esquema `public`, incluidas las tablas
   que se agreguen en el futuro sin tocar este documento.
+
+> ⚠️ **`supabase db dump` no sirve como atajo: exige Docker.** La CLI oficial parece
+> una alternativa a instalar PostgreSQL, pero corre `pg_dump` dentro de un contenedor.
+> Verificado ejecutándola: falla con `LegacyDockerRunError: failed to connect to the
+> docker API`. En Windows implica Docker Desktop (WSL2, virtualización, varios GB) —
+> más pesado que instalar PostgreSQL, no menos.
 - Programarlo (tarea semanal en la máquina del negocio) y copiar el archivo a un
-  disco externo. Para tablas sueltas alcanza el export CSV del SQL Editor, pero
-  como estrategia de backup vale el dump completo.
+  disco externo.
 - **Un backup no probado no es un backup**: hacer al menos una restauración de
   prueba a un proyecto vacío.
+
+---
 
 ## Qué es recuperable hoy (convivencia con la planilla)
 
