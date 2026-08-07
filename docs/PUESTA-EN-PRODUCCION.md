@@ -32,8 +32,16 @@ Hacer los tres. No saltear ninguno.
 
 ### 1.1. Dump completo de Supabase (esquema + datos)
 Cubre lo NO reconstruible desde la planilla: `profiles`, `clientes`,
-`cuentas_corrientes`, `tipos_operacion`, `app_config`, `sync_state` y **las filas USDT
-(`origen='app'`)**.
+`cuentas_corrientes`, `tipos_operacion`, `app_config`, `auditoria`, `sync_state` y
+**las filas USDT (`origen='app'`)**.
+
+> ⚠️ `auditoria` (registro de quién hizo qué, migración `2026-07-29_auditoria.sql`) es
+> la única tabla que **ningún sync reconstruye**: vive aparte precisamente para que el
+> full no la pise. Un dump anterior al 29/7/2026 no la contiene, porque la tabla
+> todavía no existía.
+
+En Windows conviene correr **`scripts/backup-db.bat`**, que hace este mismo `pg_dump`
+pidiendo la cadena de conexión. El comando de abajo es el equivalente manual.
 
 ```bash
 pg_dump "postgresql://postgres.qsvjbafbjlexaeliqmfd:CONTRASEÑA@aws-1-us-east-2.pooler.supabase.com:5432/postgres" \
