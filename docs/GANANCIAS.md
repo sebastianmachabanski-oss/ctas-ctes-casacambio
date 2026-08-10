@@ -78,9 +78,17 @@ movimiento son canjes, así que **esos paneles muestran solo la porción operada
 pesos**; los importes involucrados son chicos frente a los dólares, pero conviene tenerlo
 presente antes de leer el panel de euros como "la ganancia en euros del mes".
 
-También se verificó que **ninguna operación queda afuera por ser de cuenta corriente**:
-la pata de cta cte se acumula por separado (`vCcc`/`vVcc`) y se suma cuando la
-configuración lo pide.
+**Pendiente de verificar: la pata de cuenta corriente.** Por código, la cta cte se
+acumula por separado (`vCcc`/`vVcc`) y se suma cuando la configuración lo pide. Pero una
+fila de CTA CTE con operación COMPRA/VENTA impacta `dolares` contra `cc_pesos` —patas
+cruzadas— y la agregación exige que ambas estén en la misma pata, así que quedaría
+afuera. El mes medido **no tuvo ninguna operación de cta cte**, por lo que el caso no
+pudo comprobarse contra datos reales. Antes de dar el módulo por validado hay que repetir
+la medición sobre un período que sí tenga compras o ventas en cuenta corriente.
+
+Lo mismo vale para los pares **cheques** y **USDT**: al 10/8/2026 no existe en toda la
+base ni una sola COMPRA o VENTA con esas monedas, así que ambos paneles están sin
+contrastar contra datos reales.
 
 ---
 
