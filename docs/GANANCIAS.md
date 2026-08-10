@@ -47,8 +47,40 @@ corriente:
 | `vV` | volumen vendido |
 | `aV` | pesos recibidos por esas ventas |
 
-Cada par (dólares, euros, reales, USDT) se acumula por separado y **nunca se mezclan**:
-se elige uno en la configuración y ese es el resultado.
+Cada par (dólares, euros, reales, USDT, cheques) se acumula por separado y **nunca se
+mezclan**: se elige uno en la configuración y ese es el resultado.
+
+### Qué queda afuera: los canjes moneda contra moneda
+
+La condición es que la fila tenga **volumen y pesos** en la misma pata. Una operación
+que cambia una moneda por otra sin pasar por pesos —comprar dólares pagando con euros,
+cambiar cheques por dólares— tiene la columna `pesos` en cero, así que **no entra en el
+cálculo de ningún par**.
+
+No es un olvido: la fórmula mide el margen *contra pesos* (`t2 − t1` está expresado en
+pesos por unidad). En un canje no hay tasa en pesos que comparar, y forzar una la
+inventaría. Es la misma limitación que tiene la solapa COLO de la planilla, que este
+módulo replica. La contracara es que esas operaciones tampoco mueven el **stock** que ve
+la pantalla (`stock = |vC − vV|`), porque el stock se deriva de las mismas cantidades
+acumuladas.
+
+Medición sobre un mes real de producción, para dimensionar el efecto:
+
+| Moneda | Volumen que entra | Volumen excluido | % excluido |
+|---|---:|---:|---:|
+| Dólares | 4.844.586,25 | 75.373,53 | 1,5 % |
+| Euros | 24.060,00 | 59.820,00 | 71,3 % |
+| Reales | 2.340,00 | 15.315,00 | 86,7 % |
+
+En dólares —que concentran más del 98 % del margen calzado— la exclusión es marginal y
+el resultado de la pantalla es representativo. En euros y reales la mayor parte del
+movimiento son canjes, así que **esos paneles muestran solo la porción operada contra
+pesos**; los importes involucrados son chicos frente a los dólares, pero conviene tenerlo
+presente antes de leer el panel de euros como "la ganancia en euros del mes".
+
+También se verificó que **ninguna operación queda afuera por ser de cuenta corriente**:
+la pata de cta cte se acumula por separado (`vCcc`/`vVcc`) y se suma cuando la
+configuración lo pide.
 
 ---
 
