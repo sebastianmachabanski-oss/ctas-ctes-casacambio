@@ -10,10 +10,10 @@ import { useRouter } from 'next/navigation'
 // vendido, así que una compra no genera ganancia hasta que se vende. Ver docs/GANANCIAS.md.
 
 export type ParAgg = { vC: number; aC: number; vV: number; aV: number; vCcc: number; aCcc: number; vVcc: number; aVcc: number }
-export type DiaAgg = { f: string; usd: ParAgg; eur: ParAgg; brl: ParAgg; usdt: ParAgg; g: number; gcc: number }
+export type DiaAgg = { f: string; usd: ParAgg; eur: ParAgg; brl: ParAgg; usdt: ParAgg; chq: ParAgg; g: number; gcc: number }
 
 type Cfg = {
-  ops: Set<string>; par: 'usd' | 'eur' | 'brl' | 'usdt'; cc: boolean
+  ops: Set<string>; par: 'usd' | 'eur' | 'brl' | 'usdt' | 'chq'; cc: boolean
   resid: 'fijo' | 'costo' | 'mtm'; margen: number; cierre: number; gastos: boolean
 }
 
@@ -21,7 +21,8 @@ const fmt0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
 const fmt3 = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 const ars = (n: number) => `$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
 const usd = (n: number) => `US$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
-const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$', usdt: 'USDT' }
+const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$', usdt: 'USDT', chq: 'CH$' }
+const NOMBRE_PAR: Record<string, string> = { usd: 'Dólares', eur: 'Euros', brl: 'Reales', usdt: 'USDT', chq: 'Cheques' }
 
 function addDays(iso: string, n: number): string {
   const d = new Date(iso + 'T12:00:00Z')
@@ -321,6 +322,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
               <option value="eur">Euros ↔ Pesos</option>
               <option value="brl">Reales ↔ Pesos</option>
               <option value="usdt">USDT ↔ Pesos</option>
+              <option value="chq">Cheques ↔ Pesos</option>
             </select>
             <div className="param-what">Qué modifica: <b>sobre qué monedas se mide la ganancia</b>. Cada par tiene su resultado propio, sin mezclarse con los demás.</div>
           </div>
@@ -333,7 +335,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
             <div className="param-what">Qué modifica: <b>si lo comprado/vendido por cuenta corriente suma al volumen</b>. Por defecto se incluye.</div>
           </div>
           <div className="card param">
-            <p className="param-name">{cfg.par === 'usd' ? 'Dólares' : cfg.par === 'eur' ? 'Euros' : cfg.par === 'brl' ? 'Reales' : 'USDT'} que quedan en stock</p>
+            <p className="param-name">{NOMBRE_PAR[cfg.par]} que quedan en stock</p>
             <div className="radio-row">
               <label>
                 <input type="radio" name="gn-resid" checked={cfg.resid === 'fijo'} onChange={() => setC({ resid: 'fijo' })} />

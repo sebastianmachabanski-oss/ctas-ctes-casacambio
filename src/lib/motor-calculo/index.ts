@@ -105,6 +105,20 @@ export function calcularMovimiento(data: DatosTransaccion): ResultadoCalculo {
   const costoPct = data.costoPorcentaje ?? 0
   const factorCosto = 1 + costoPct * ex
 
+  // Red de seguridad: si la columna calculada no existe en COLUMNAS_SALIDA, el importe
+  // no se asignaría a ninguna columna y DESAPARECERÍA sin aviso. Pasa con las
+  // combinaciones que generan "CC CHEQUES" o "CC USDT" (moneda propia + SWITCH/TT en
+  // cuenta corriente): ninguna de las dos existe como columna, ni en la planilla ni acá.
+  // Mejor cortar con un error explícito que guardar un movimiento en cero.
+  for (const col of [monedaPropiaCol, monedaExternaCol]) {
+    if (col && !(COLUMNAS_SALIDA as readonly string[]).includes(col)) {
+      throw new MotorCalculoError(
+        `La combinación pedida necesita la columna "${col}", que no existe. ` +
+        `${col.replace('CC ', '')} no opera en cuenta corriente con esta operación.`
+      )
+    }
+  }
+
   const valores = Object.fromEntries(COLUMNAS_SALIDA.map(col => {
     if (col === monedaPropiaCol) return [col, pr * data.monto]
     if (col === monedaExternaCol) return [col, ex * cotAjustada * factorCosto * data.monto]

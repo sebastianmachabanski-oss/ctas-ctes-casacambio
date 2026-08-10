@@ -3,10 +3,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 
+// CHEQUES opera igual que el resto, en CAJA y en cuenta corriente: el cheque entra en la
+// columna CHEQUES y la contrapartida en CC PESOS / CC DOLARES (así lo hace la planilla).
 // USDT es solo-CAJA: no participa de cuentas corrientes (decisión 20/7/2026). Por eso la
 // lista de monedas depende del Tipo — ver monedasDisponibles().
-const MONEDAS = ['PESOS', 'DOLARES', 'EUROS', 'REALES']
-const MONEDAS_CAJA = ['PESOS', 'DOLARES', 'EUROS', 'REALES', 'USDT']
+const MONEDAS = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES']
+const MONEDAS_CAJA = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT']
 function monedasDisponibles(tipo: string) { return tipo === 'CAJA' ? MONEDAS_CAJA : MONEDAS }
 const SIMBOLOS: Record<string, string> = {
   pesos: '$', cheques: 'CH$', dolares: 'U$S', euros: '€', reales: 'R$', usdt: 'USDT',

@@ -76,7 +76,7 @@ export default async function GananciasPage({
   const filas: any[] = []
   for (let from = 0; ; from += PAGE) {
     const { data: pg } = await supabase.from('movimientos_caja')
-      .select('fecha,operacion,pesos,dolares,euros,reales,usdt,cc_pesos,cc_dolares,cc_euros,cc_reales')
+      .select('fecha,operacion,pesos,cheques,dolares,euros,reales,usdt,cc_pesos,cc_dolares,cc_euros,cc_reales')
       .in('operacion', ['COMPRA', 'VENTA', 'GASTOS'])
       .gte('fecha', ini)
       .lte('fecha', fin)
@@ -87,16 +87,17 @@ export default async function GananciasPage({
     if (rows.length < PAGE) break
   }
 
-  // USDT solo opera en caja (no tiene columna cc_usdt): la pata CC queda siempre en 0.
-  // Solo cuenta el spread USDT↔PESOS; los canjes USDT↔DÓLARES no dejan margen en pesos.
-  const PARES: ['usd' | 'eur' | 'brl' | 'usdt', string, string][] = [
+  // USDT y CHEQUES solo tienen columna de caja (no hay cc_usdt ni cc_cheques): la pata CC
+  // queda siempre en 0. En cuenta corriente el cheque igual se registra en la columna
+  // CHEQUES y la contrapartida en CC PESOS, así que el margen se mide igual.
+  const PARES: ['usd' | 'eur' | 'brl' | 'usdt' | 'chq', string, string][] = [
     ['usd', 'dolares', 'cc_dolares'], ['eur', 'euros', 'cc_euros'], ['brl', 'reales', 'cc_reales'],
-    ['usdt', 'usdt', 'cc_usdt'],
+    ['usdt', 'usdt', 'cc_usdt'], ['chq', 'cheques', 'cc_cheques'],
   ]
   const porDia = new Map<string, DiaAgg>()
   const diaDe = (f: string): DiaAgg => {
     let d = porDia.get(f)
-    if (!d) { d = { f, usd: parVacio(), eur: parVacio(), brl: parVacio(), usdt: parVacio(), g: 0, gcc: 0 }; porDia.set(f, d) }
+    if (!d) { d = { f, usd: parVacio(), eur: parVacio(), brl: parVacio(), usdt: parVacio(), chq: parVacio(), g: 0, gcc: 0 }; porDia.set(f, d) }
     return d
   }
   for (const m of filas) {
