@@ -134,6 +134,31 @@ valor. Tres criterios, configurables en el drawer:
 | **Al costo** | `0` | Postura conservadora: sin ganancia hasta vender |
 | **A precio de cierre** | `stock x (cierre - t1)` si sobran compras; `stock x (t2 - cierre)` si sobran ventas | Valuación a mercado |
 
+Los supuestos **son propios de cada par** (`SUPUESTOS_PAR` en `GananciasView.tsx`) y se
+reponen al cambiar de moneda: arrastrar los de la anterior daría un número sin sentido.
+
+#### Cheques: valuación a valor nominal
+
+El cliente reconoce la ganancia del descuento de documentos **en el momento del
+descuento** (definido 11/8/2026), no cuando el cheque se cobra. Ese criterio se obtiene
+valuando la cartera a **valor nominal**: es el criterio "a precio de cierre" con
+`cierre = 1,00`, un peso por cada peso de valor nominal.
+
+Verificado sobre el caso de un cheque de 1.000.000 tomado a 0,95:
+
+| Escenario | Margen fijo 0,050 | Cierre 1.500 (default divisas) | **Nominal 1,00** |
+|---|---:|---:|---:|
+| Descuento y cobro en el mismo período | 50.000 | 50.000 | **50.000** |
+| Período del descuento, sin cobrar aún | 50.000 | 1.499.050.000 | **50.000** |
+| Período del cobro, descontado antes | 50.000 | −1.499.000.000 | **0** |
+| Descuento sin cobro nunca registrado | 50.000 | 1.499.050.000 | **50.000** |
+
+Solo el criterio nominal da bien las cuatro filas: reconoce los 50.000 en el período del
+descuento y deja el período del cobro en cero, sin duplicar. El margen fijo acierta acá
+únicamente por coincidencia —0,050 por peso nominal *es* un descuento del 5 %—; con un
+descuento del 3 % seguiría informando 50.000 cuando la ganancia real es 30.000. Y heredar
+el default de divisas produciría cifras absurdas, de ahí que los supuestos sean por par.
+
 ### Gastos
 
 Solo existen en **pesos** (regla del dominio) y entran con su signo, restando. Se pueden
