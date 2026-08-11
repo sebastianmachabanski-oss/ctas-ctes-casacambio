@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { esAdmin } from '@/lib/roles'
 
 // Estado de la sincronización, para que el botón de la app haga polling y confirme
 // cuándo terminó: `updatedAt` cambia cuando una corrida escribió en base; `total` es
@@ -10,7 +11,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { data: profile } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
-  if (!profile || (profile as any).rol !== 'superusuario')
+  if (!profile || !esAdmin((profile as any).rol))
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   // sync_state tiene RLS sin políticas de usuario; hay que usar el service role para leerla.

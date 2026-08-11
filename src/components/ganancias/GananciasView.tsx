@@ -24,6 +24,22 @@ const usd = (n: number) => `US$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.for
 const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$', usdt: 'USDT', chq: 'CH$' }
 const NOMBRE_PAR: Record<string, string> = { usd: 'Dólares', eur: 'Euros', brl: 'Reales', usdt: 'USDT', chq: 'Cheques' }
 
+// Supuestos de valuación del stock, por par. En divisas el estándar del negocio es el
+// margen fijo. CHEQUES es distinto: la ganancia del descuento de documentos se reconoce
+// EN EL MOMENTO DEL DESCUENTO (criterio del cliente, 11/8/2026), no cuando el cheque se
+// cobra. Eso se obtiene valuando la cartera a VALOR NOMINAL —"cotización de cierre" = 1
+// peso por peso de cheque—: la diferencia entre el nominal y lo pagado cae como ganancia
+// en el período en que se tomó el documento, y el período del cobro queda en cero, sin
+// duplicar. Heredar el default de divisas sería desastroso: con cierre 1.500, un millón
+// de cheques en cartera mostraría más de 1.499 millones de ganancia inexistente.
+const SUPUESTOS_PAR: Record<Cfg['par'], Pick<Cfg, 'resid' | 'margen' | 'cierre'>> = {
+  usd:  { resid: 'fijo', margen: 0.05, cierre: 1500 },
+  eur:  { resid: 'fijo', margen: 0.05, cierre: 1500 },
+  brl:  { resid: 'fijo', margen: 0.05, cierre: 1500 },
+  usdt: { resid: 'fijo', margen: 0.05, cierre: 1500 },
+  chq:  { resid: 'mtm',  margen: 0.05, cierre: 1 },
+}
+
 function addDays(iso: string, n: number): string {
   const d = new Date(iso + 'T12:00:00Z')
   d.setUTCDate(d.getUTCDate() + n)
@@ -148,6 +164,9 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
     : labelPeriodo(periodo, fecha)
   const sinDatos = r.vC === 0 && r.vV === 0 && r.g === 0
   const sym = SYM[cfg.par]
+  // Los cheques se valúan contra su valor nominal (1), no contra una cotización de
+  // mercado: el rótulo y el paso del campo cambian para que se lea como lo que es.
+  const esChq = cfg.par === 'chq'
 
   return (
     <div className="p-4 md:p-6" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, maxWidth: 760 }}>
@@ -277,7 +296,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
           ) : ([
             [`Vendiste a <b>$ ${fmt3.format(r.t2)}</b> promedio y compraste a <b>$ ${fmt3.format(r.t1)}</b> → diferencia`, `$ ${fmt3.format(r.spread)}`, r.spread >= 0 ? 'pos' : 'neg'],
             [`<b>${sym} ${fmt0.format(r.calzado)}</b> comprados y vendidos × esa diferencia`, ars(Math.round(r.calzado * r.spread)), r.calzado * r.spread >= 0 ? 'pos' : 'neg'],
-            [`<b>${sym} ${fmt0.format(r.stock)}</b> en stock, ${cfg.resid === 'fijo' ? `a margen fijo $ ${fmt3.format(cfg.margen)}` : cfg.resid === 'costo' ? 'valuados al costo' : `valuados a cierre $ ${fmt0.format(cfg.cierre)}`}`, ars(Math.round(r.gResid)), r.gResid > 0 ? 'pos' : ''],
+            [`<b>${sym} ${fmt0.format(r.stock)}</b> en ${esChq ? 'cartera' : 'stock'}, ${cfg.resid === 'fijo' ? `a margen fijo $ ${fmt3.format(cfg.margen)}` : cfg.resid === 'costo' ? 'valuados al costo' : esChq ? `valuados a nominal $ ${fmt3.format(cfg.cierre)}` : `valuados a cierre $ ${fmt0.format(cfg.cierre)}`}`, ars(Math.round(r.gResid)), r.gResid > 0 ? 'pos' : ''],
             ['Gastos del período', ars(Math.round(r.g)), r.g < 0 ? 'neg' : ''],
             ['<b>Ganancia neta</b>', ars(Math.round(r.neto)), r.neto >= 0 ? 'pos' : 'neg'],
             ...(cotUsd !== null
@@ -317,7 +336,13 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
           </div>
           <div className="card param">
             <p className="param-name">Par de monedas</p>
-            <select className="input" style={{ maxWidth: '100%' }} value={cfg.par} onChange={e => setC({ par: e.target.value as Cfg['par'] })}>
+            <select className="input" style={{ maxWidth: '100%' }} value={cfg.par}
+              onChange={e => {
+                // Al cambiar de par se reponen sus supuestos de valuación: cada moneda
+                // tiene el suyo y arrastrar el de la anterior daría un número sin sentido.
+                const par = e.target.value as Cfg['par']
+                setC({ par, ...SUPUESTOS_PAR[par] })
+              }}>
               <option value="usd">Dólares ↔ Pesos</option>
               <option value="eur">Euros ↔ Pesos</option>
               <option value="brl">Reales ↔ Pesos</option>
@@ -349,12 +374,14 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
               </label>
               <label>
                 <input type="radio" name="gn-resid" checked={cfg.resid === 'mtm'} onChange={() => setC({ resid: 'mtm' })} />
-                A cotización de cierre
-                <input className="inline-num num" type="number" value={cfg.cierre} step={1} min={0}
+                {esChq ? 'A valor nominal' : 'A cotización de cierre'}
+                <input className="inline-num num" type="number" value={cfg.cierre} step={esChq ? 0.01 : 1} min={0}
                   onChange={e => setC({ cierre: Number(e.target.value) || 0 })} />
               </label>
             </div>
-            <div className="param-what">Qué modifica: <b>cuánta ganancia se le asigna a lo comprado que todavía no se vendió</b>. El criterio estándar es el margen fijo de 0,050.</div>
+            <div className="param-what">Qué modifica: <b>cuánta ganancia se le asigna a lo comprado que todavía no se vendió</b>. {esChq
+              ? 'En cheques el criterio es valuar la cartera a valor nominal (1,00): así la diferencia contra lo pagado se reconoce como ganancia en el momento del descuento.'
+              : 'El criterio estándar es el margen fijo de 0,050.'}</div>
           </div>
           <div className="card param">
             <p className="param-name">Gastos</p>

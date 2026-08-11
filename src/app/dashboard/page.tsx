@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { esStaff } from '@/lib/roles'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -9,6 +10,6 @@ export default async function DashboardPage() {
   if (!profile) redirect('/login')
   // Staff arranca en el tablero de Inicio; el cliente en su cuenta corriente.
   const rol = (profile as any).rol
-  if (rol === 'superusuario' || rol === 'operador') redirect('/dashboard/inicio')
+  if (esStaff(rol)) redirect('/dashboard/inicio')
   redirect('/dashboard/cuenta-corriente')
 }

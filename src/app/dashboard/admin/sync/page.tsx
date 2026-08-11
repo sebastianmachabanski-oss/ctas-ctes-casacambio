@@ -1,13 +1,14 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SyncClient from './SyncClient'
+import { esAdmin } from '@/lib/roles'
 
 export default async function SyncPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
   const { data: profile } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
-  if (!profile || (profile as any).rol !== 'superusuario') redirect('/dashboard')
+  if (!profile || !esAdmin((profile as any).rol)) redirect('/dashboard')
 
   // Último estado del diario
   const { count } = await supabase.from('diario')

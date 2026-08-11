@@ -7,10 +7,14 @@ import type { Profile } from '@/lib/supabase/types'
 
 type Item = { href?: string; label: string; icon: string; off?: boolean; section?: string }
 
-// Menú por rol.
+// Menú por rol (ver src/lib/roles.ts para el modelo completo).
 // Todas las opciones están habilitadas (16/7/2026, pedido del cliente).
+//
+// La diferencia entre superadmin y administrador es una sola línea: Ganancias. Se deja
+// escrito el menú completo de cada uno en vez de derivarlo con condicionales, para que
+// se pueda leer de un vistazo qué ve cada rol.
 const NAV: Record<string, Item[]> = {
-  superusuario: [
+  superadmin: [
     { section: 'Operación', label: '', icon: '' },
     { href: '/dashboard/inicio',            label: 'Inicio',            icon: '📊' },
     { href: '/dashboard/cuenta-corriente',  label: 'Cuentas Corrientes', icon: '📋' },
@@ -20,6 +24,20 @@ const NAV: Record<string, Item[]> = {
     { href: '/dashboard/deudores',      label: 'Saldos Pendientes', icon: '📈' },
     { section: 'Gestión', label: '', icon: '' },
     { href: '/dashboard/ganancias',      label: 'Ganancias', icon: '💰' },
+    { href: '/dashboard/admin/usuarios', label: 'Usuarios',  icon: '👥' },
+    { href: '/dashboard/admin/auditoria', label: 'Auditoría', icon: '🔎' },
+    { href: '/dashboard/admin/sync',     label: 'Sincronizar', icon: '🔄' },
+    { href: '/dashboard/mi-cuenta', label: 'Mi cuenta', icon: '🔑' },
+  ],
+  administrador: [
+    { section: 'Operación', label: '', icon: '' },
+    { href: '/dashboard/inicio',            label: 'Inicio',            icon: '📊' },
+    { href: '/dashboard/cuenta-corriente',  label: 'Cuentas Corrientes', icon: '📋' },
+    { href: '/dashboard/nueva-transaccion', label: 'Nueva transacción', icon: '💱' },
+    { href: '/dashboard/transacciones', label: 'Transacciones',    icon: '💲' },
+    { href: '/dashboard/calle',         label: 'Dinero en calle',  icon: '🚚' },
+    { href: '/dashboard/deudores',      label: 'Saldos Pendientes', icon: '📈' },
+    { section: 'Gestión', label: '', icon: '' },
     { href: '/dashboard/admin/usuarios', label: 'Usuarios',  icon: '👥' },
     { href: '/dashboard/admin/auditoria', label: 'Auditoría', icon: '🔎' },
     { href: '/dashboard/admin/sync',     label: 'Sincronizar', icon: '🔄' },

@@ -5,6 +5,7 @@ import { getGoogleToken } from '@/lib/google'
 import {
   registrarAuditoria, calcularHuella, fotoMovimiento, camposCambiados, describirMovimiento,
 } from '@/lib/auditoria'
+import { esAdmin } from '@/lib/roles'
 
 // Edita un movimiento de caja. NO escribe en el Google Sheet (decisión 5/7/2026):
 // mientras dure la convivencia, el próximo sync pisa estos cambios — comportamiento
@@ -18,9 +19,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const { data: profile } = await supabase.from('profiles').select('rol, nombre').eq('id', user.id).single()
   const rol = (profile as any)?.rol
-  // Editar es exclusivo del superusuario (el operador solo visualiza).
-  if (rol !== 'superusuario')
-    return NextResponse.json({ error: 'Solo el superusuario puede editar transacciones' }, { status: 403 })
+  // Editar es exclusivo de administrador/superadmin (el operador solo visualiza).
+  if (!esAdmin(rol))
+    return NextResponse.json({ error: 'Solo un administrador puede editar transacciones' }, { status: 403 })
 
   const body = await request.json()
   const { fecha, cliente, operacion, propio, externo, monto, cot, costo_pct, debe, notas } = body
@@ -286,8 +287,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { data: profile } = await supabase.from('profiles').select('rol, nombre').eq('id', user.id).single()
-  if ((profile as any)?.rol !== 'superusuario')
-    return NextResponse.json({ error: 'Solo el superusuario puede eliminar transacciones' }, { status: 403 })
+  if (!esAdmin((profile as any)?.rol))
+    return NextResponse.json({ error: 'Solo un administrador puede eliminar transacciones' }, { status: 403 })
 
   // Los datos del movimiento se leen ANTES de borrarlo (sirven para ubicar la fila allá).
   // Se trae la fila COMPLETA: es la única copia que va a quedar del movimiento, y es lo

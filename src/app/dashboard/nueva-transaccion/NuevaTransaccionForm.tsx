@@ -551,7 +551,7 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
         )}
       </div>
 
-      {/* Umbral de alerta (en dólares, configurable por el superusuario sin deploy) */}
+      {/* Umbral de alerta (en dólares, configurable por un administrador sin deploy) */}
       <UmbralAlerta umbral={umbral} onCambio={setUmbral} puedeEditar={puedeEditarUmbral} />
 
       <div className="flex items-center gap-4 pt-1">
@@ -565,7 +565,7 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
   )
 }
 
-// Línea informativa del umbral de alerta + editor inline (solo superusuario).
+// Línea informativa del umbral de alerta + editor inline (solo administradores).
 // El valor vive en app_config y se cambia sin deploy.
 function UmbralAlerta({ umbral, onCambio, puedeEditar }: {
   umbral: number; onCambio: (v: number) => void; puedeEditar: boolean
