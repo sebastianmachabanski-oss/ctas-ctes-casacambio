@@ -78,13 +78,31 @@ movimiento son canjes, así que **esos paneles muestran solo la porción operada
 pesos**; los importes involucrados son chicos frente a los dólares, pero conviene tenerlo
 presente antes de leer el panel de euros como "la ganancia en euros del mes".
 
-**Pendiente de verificar: la pata de cuenta corriente.** Por código, la cta cte se
-acumula por separado (`vCcc`/`vVcc`) y se suma cuando la configuración lo pide. Pero una
-fila de CTA CTE con operación COMPRA/VENTA impacta `dolares` contra `cc_pesos` —patas
-cruzadas— y la agregación exige que ambas estén en la misma pata, así que quedaría
-afuera. El mes medido **no tuvo ninguna operación de cta cte**, por lo que el caso no
-pudo comprobarse contra datos reales. Antes de dar el módulo por validado hay que repetir
-la medición sobre un período que sí tenga compras o ventas en cuenta corriente.
+### La cuenta corriente: por qué hoy no incide, y qué pasaría si incidiera
+
+Los movimientos de cuenta corriente **no generan resultado** y no entran: el filtro por
+operación (COMPRA / VENTA / GASTOS) ya deja afuera INGRESAN, EGRESAN, SWITCH y TT. Al
+11/8/2026 la operatoria de cta cte es exclusivamente INGRESAN/EGRESAN, así que el módulo
+está midiendo todo lo que hay que medir.
+
+Queda anotado, para cuando eso cambie, que **una COMPRA o VENTA con `tipo = 'CTA CTE'`
+hoy quedaría afuera del cálculo**. El motor le da patas cruzadas —la moneda en la columna
+de caja y la contrapartida en `cc_pesos`, o al revés— y la agregación exige que volumen y
+pesos estén en la misma pata:
+
+```
+CTA CTE COMPRA dólares (propio DOLARES) →  DOLARES 1.000   CC PESOS -1.500.000
+CTA CTE COMPRA dólares (propio PESOS)   →  PESOS 1.500.000   CC DOLARES -1.000
+```
+
+Ninguna de las dos formas coincide con los pares que busca la pantalla (`dolares`+`pesos`
+o `cc_dolares`+`cc_pesos`). Como efecto colateral, los acumuladores `vCcc`/`vVcc` nunca
+se llenan para COMPRA/VENTA y **el interruptor "incluir cuenta corriente" no modifica el
+resultado**. Lo mismo aplica a `d.gcc`: GASTOS siempre va a `PESOS`, nunca a `cc_pesos`.
+
+Antes de habilitar compras o ventas en cuenta corriente —el caso más probable es el
+descuento de documentos contra la cuenta del cliente— hay que corregir la agregación para
+reconocer las patas cruzadas.
 
 Lo mismo vale para los pares **cheques** y **USDT**: al 10/8/2026 no existe en toda la
 base ni una sola COMPRA o VENTA con esas monedas, así que ambos paneles están sin
@@ -120,6 +138,47 @@ valor. Tres criterios, configurables en el drawer:
 
 Solo existen en **pesos** (regla del dominio) y entran con su signo, restando. Se pueden
 excluir desde la configuración para ver la ganancia bruta.
+
+Dos precisiones al leerlos:
+
+- **No están prorrateados entre monedas.** Se restan enteros en el par que se esté
+  mirando. En dólares el efecto es despreciable frente al margen; en euros o reales los
+  gastos del período pueden superar el margen y dar negativo. No es un error de cálculo
+  —los gastos son en pesos y no pertenecen a ninguna moneda— pero condiciona la lectura
+  de los paneles chicos.
+- La rama `d.gcc` (gastos de cuenta corriente) **siempre suma cero**: el motor manda
+  GASTOS a `PESOS` incluso con `tipo = 'CTA CTE'`, y en ese caso además devuelve
+  `cuenta = null` porque la planilla no contempla la combinación.
+
+### Costo %
+
+El campo **no lo lee esta pantalla**, y sin embargo **está incluido en el resultado**. El
+motor lo aplica sobre la pata en pesos al calcular el movimiento (`factor = 1 + costo x
+signo de la pata externa`), así que la columna `pesos` que Ganancias suma ya lo tiene
+incorporado:
+
+```
+COMPRA 1.000 dólares a 1.500, costo 0 %  →  DOLARES  1.000   PESOS -1.500.000
+COMPRA 1.000 dólares a 1.500, costo 1 %  →  DOLARES  1.000   PESOS -1.485.000
+VENTA  1.000 dólares a 1.500, costo 1 %  →  DOLARES -1.000   PESOS  1.515.000
+```
+
+Funciona como una comisión sobre la cotización: comprando se pagan menos pesos, vendiendo
+se cobran más — un costo positivo siempre juega a favor de la casa. La consecuencia para
+la lectura de la pantalla es que `t1` y `t2` son **tasas efectivas con comisión incluida**,
+no la cotización de pizarra.
+
+En cheques rige igual, y eso vuelve equivalentes dos formas de cargar un descuento de
+documentos:
+
+```
+COMPRA 1.000.000 en cheques, cot 0,95, costo —    →  PESOS -950.000   CHEQUES 1.000.000
+COMPRA 1.000.000 en cheques, cot 1,00, costo 5 %  →  PESOS -950.000   CHEQUES 1.000.000
+```
+
+La ganancia informada es idéntica en los dos casos, porque ambas dejan la misma columna
+`pesos`. La diferencia es solo de registro: la primera guarda el precio efectivo, la
+segunda deja la tasa de descuento como dato separado y auditable.
 
 ### Ejemplo
 
