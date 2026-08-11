@@ -7,7 +7,14 @@ type Usuario = {
   telefono: string | null; notas: string | null; created_at: string
   ve_ganancias?: boolean
 }
-interface Props { usuariosIniciales: Usuario[]; cuentas: string[] }
+interface Props {
+  usuariosIniciales: Usuario[]
+  cuentas: string[]
+  /** Usuario de la sesión: nadie edita su propio rol ni sus propios permisos. */
+  miId: string
+  /** Si la sesión tiene acceso a Ganancias. Nadie otorga un permiso que no tiene. */
+  puedoGanancias: boolean
+}
 
 const ROL_LABELS: Record<string, string> = { superusuario: 'Superusuario', operador: 'Operador', cliente: 'Cliente' }
 // Tags de rol con los colores del mockup: superusuario azul, operador gris, cliente verde.
@@ -24,7 +31,7 @@ function generarEmail(nombre: string) {
     .replace(/[^a-z0-9.]/g, '') + '@casadecambio.com'
 }
 
-export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Props) {
+export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, puedoGanancias }: Props) {
   const [usuarios, setUsuarios] = useState<Usuario[]>(usuariosIniciales)
   const [modal, setModal] = useState<'nuevo' | 'editar' | null>(null)
   const [editando, setEditando] = useState<Usuario | null>(null)
@@ -41,6 +48,11 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
   }
 
   const [veGanancias, setVeGanancias] = useState(false)
+
+  // Espejo de las reglas que aplica el servidor, para no ofrecer un control que va a
+  // terminar en un 403. La validación real vive en /api/admin/usuarios/[id].
+  const esMiUsuario = editando?.id === miId
+  const puedeEditarGanancias = puedoGanancias && !esMiUsuario
 
   function abrirEditar(u: Usuario) {
     setEditando(u)
@@ -335,11 +347,15 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
               </div>
               <div>
                 <label className="label">Rol *</label>
-                <select className="input" value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value, cuenta_cte: '' }))}>
+                <select className="input" value={form.rol} disabled={esMiUsuario}
+                  onChange={e => setForm(f => ({ ...f, rol: e.target.value, cuenta_cte: '' }))}>
                   <option value="cliente">Cliente</option>
                   <option value="operador">Operador</option>
                   <option value="superusuario">Superusuario</option>
                 </select>
+                {esMiUsuario && (
+                  <p className="text-xs text-gray-500 mt-1">Nadie puede modificar su propio rol.</p>
+                )}
               </div>
               {form.rol === 'cliente' && (
                 <div>
@@ -351,13 +367,17 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Prop
                 </div>
               )}
               {form.rol !== 'cliente' && (
-                <label className="flex items-start gap-2.5 p-3 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer">
-                  <input type="checkbox" className="mt-0.5 accent-purple-600"
+                <label className={`flex items-start gap-2.5 p-3 rounded-lg border border-gray-200 bg-gray-50 ${puedeEditarGanancias ? 'cursor-pointer' : 'opacity-60'}`}>
+                  <input type="checkbox" className="mt-0.5 accent-purple-600" disabled={!puedeEditarGanancias}
                     checked={veGanancias} onChange={e => setVeGanancias(e.target.checked)} />
                   <span className="text-sm">
                     <span className="font-medium text-gray-900">💰 Acceso a Ganancias (superadmin)</span>
                     <span className="block text-xs text-gray-500 mt-0.5">
-                      Permiso individual, independiente del rol: habilita el módulo de resultados del negocio.
+                      {esMiUsuario
+                        ? 'Nadie puede otorgarse este permiso a sí mismo.'
+                        : puedoGanancias
+                          ? 'Permiso individual, independiente del rol: habilita el módulo de resultados del negocio.'
+                          : 'Solo un usuario que ya tiene acceso a Ganancias puede otorgar o quitar este permiso.'}
                     </span>
                   </span>
                 </label>

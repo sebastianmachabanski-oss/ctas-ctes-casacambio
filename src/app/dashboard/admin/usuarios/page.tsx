@@ -6,7 +6,7 @@ export default async function AdminUsuariosPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const { data: profile } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('profiles').select('rol, ve_ganancias').eq('id', user.id).single()
   if (!profile || (profile as any).rol !== 'superusuario') redirect('/dashboard')
 
   const { data: usuarios } = await supabase.from('profiles').select('*').order('nombre')
@@ -16,6 +16,8 @@ export default async function AdminUsuariosPage() {
     <AdminUsuariosClient
       usuariosIniciales={(usuarios as any[]) ?? []}
       cuentas={(cuentas ?? []).map((c: any) => c.nombre)}
+      miId={user.id}
+      puedoGanancias={!!(profile as any).ve_ganancias}
     />
   )
 }

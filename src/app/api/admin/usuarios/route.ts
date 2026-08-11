@@ -27,6 +27,26 @@ export async function POST(request: Request) {
   if (!email || !nombre || !rol) return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
   if (rol === 'cliente' && !cuenta_cte) return NextResponse.json({ error: 'La cuenta corriente es obligatoria para clientes' }, { status: 400 })
 
+  // Esta ruta BORRA cualquier usuario preexistente con el mismo email antes de crear.
+  // Sin esta guarda, un superusuario sin acceso a Ganancias podría eliminar la cuenta
+  // del dueño simplemente dando de alta un usuario con su dirección de correo.
+  {
+    const guard = createAdminClient()
+    const [{ data: yo }, { data: previo }] = await Promise.all([
+      guard.from('profiles').select('ve_ganancias').eq('id', user.id).single(),
+      guard.from('profiles').select('ve_ganancias').eq('email', email).maybeSingle(),
+    ])
+    if (previo?.ve_ganancias && !yo?.ve_ganancias) {
+      return NextResponse.json(
+        { error: 'Ese correo pertenece a un usuario con acceso a Ganancias. No podés reemplazarlo.' },
+        { status: 403 },
+      )
+    }
+  }
+
+  // Los usuarios nuevos nacen SIEMPRE sin acceso a Ganancias: el permiso se otorga
+  // después, y solo puede otorgarlo alguien que ya lo tenga.
+
   const debug: any = { step: 'init', email }
   const ser = (e: any) => e && JSON.parse(JSON.stringify(e, Object.getOwnPropertyNames(e)))
 
