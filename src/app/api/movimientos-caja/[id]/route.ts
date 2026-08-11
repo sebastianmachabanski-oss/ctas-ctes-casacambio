@@ -131,8 +131,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 const SHEET_ID     = '1BxW5TGUbi12LHATOIjnkBc71GY9JZARsy5_LP5Sl1CE'
 const SHEET_NAME   = 'CAJA'
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
-// Mismo conmutador que excel-write: la limpieza espejada existe solo en el camino 'sheets'.
-const WRITE_SOURCE: 'excel' | 'sheets' = process.env.WRITE_SOURCE === 'sheets' ? 'sheets' : 'excel'
 
 function colLetter(index0: number): string {
   let n = index0 + 1
@@ -326,9 +324,6 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   }
   // Limpieza espejada en la planilla (best effort: si falla, el movimiento ya salió del
   // sistema y se informa para borrarlo a mano allá).
-  if (WRITE_SOURCE !== 'sheets') {
-    return NextResponse.json({ ok: true, planilla: 'deshabilitado' })
-  }
   try {
     const r = await limpiarFilaPlanilla({
       fecha: mov.fecha, tipo: mov.tipo, cliente: mov.cliente,
