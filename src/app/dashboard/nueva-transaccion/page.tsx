@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import NuevaTransaccionForm from './NuevaTransaccionForm'
+import { esAdmin, esStaff } from '@/lib/roles'
 
 export default async function NuevaTransaccionPage() {
   const supabase = await createClient()
@@ -9,7 +10,7 @@ export default async function NuevaTransaccionPage() {
 
   const { data: profileData } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
   const rol = (profileData as any)?.rol
-  if (rol !== 'superusuario' && rol !== 'operador') redirect('/dashboard')
+  if (!esStaff(rol)) redirect('/dashboard')
 
   // El selector de cliente depende del Tipo (decisión 11/7/2026):
   //  - CTA CTE: SOLO cuentas corrientes reales (si se tipea un cliente eventual acá,
@@ -33,7 +34,7 @@ export default async function NuevaTransaccionPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <NuevaTransaccionForm cuentas={cuentas} umbralUsd={umbralUsd} puedeEditarUmbral={rol === 'superusuario'} />
+      <NuevaTransaccionForm cuentas={cuentas} umbralUsd={umbralUsd} puedeEditarUmbral={esAdmin(rol)} />
     </div>
   )
 }

@@ -1,13 +1,14 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AdminUsuariosClient from './AdminUsuariosClient'
+import { esAdmin } from '@/lib/roles'
 
 export default async function AdminUsuariosPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const { data: profile } = await supabase.from('profiles').select('rol, ve_ganancias').eq('id', user.id).single()
-  if (!profile || (profile as any).rol !== 'superusuario') redirect('/dashboard')
+  const { data: profile } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
+  if (!profile || !esAdmin((profile as any).rol)) redirect('/dashboard')
 
   const { data: usuarios } = await supabase.from('profiles').select('*').order('nombre')
   const { data: cuentas } = await supabase.from('cuentas_corrientes').select('nombre').eq('activo', true).order('nombre')
@@ -17,7 +18,7 @@ export default async function AdminUsuariosPage() {
       usuariosIniciales={(usuarios as any[]) ?? []}
       cuentas={(cuentas ?? []).map((c: any) => c.nombre)}
       miId={user.id}
-      puedoGanancias={!!(profile as any).ve_ganancias}
+      miRol={(profile as any).rol}
     />
   )
 }

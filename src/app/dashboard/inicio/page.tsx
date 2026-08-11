@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import TableroInicio from '@/components/inicio/TableroInicio'
+import { esStaff } from '@/lib/roles'
 
 // Columnas de "calle" (dinero con repartidor asignado). Regla de la planilla: al total
 // solo suman los valores POSITIVOS.
@@ -49,7 +50,7 @@ export default async function InicioPage({
   const { data: profileData } = await supabase.from('profiles').select('rol, nombre').eq('id', user.id).single()
   const profile = profileData as { rol: string; nombre: string } | null
   if (!profile) redirect('/login')
-  if (profile.rol !== 'superusuario' && profile.rol !== 'operador') redirect('/dashboard/cuenta-corriente')
+  if (!esStaff(profile.rol)) redirect('/dashboard/cuenta-corriente')
 
   // Rango del período: sin parámetros = TODO el historial (situación actual de caja).
   // Con p=dia|semana|mes|anio o desde/hasta, TODOS los reportes se consultan con ese rango.
