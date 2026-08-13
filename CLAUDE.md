@@ -28,27 +28,14 @@ Documentación clave: `docs/SINCRONIZACION.md` (sync Sheet→DB), `docs/MOTOR-CA
 - GASTOS solo existe en PESOS. El campo DEBE cargado = dinero "en la calle".
 - El motor de cálculo (`src/lib/motor-calculo`) está validado contra la planilla:
   ante cualquier cambio correr `npx tsx scripts/validar-motor-calculo.mts`.
-- La app NUNCA interactúa con el Excel viejo. El único origen externo es el Google Sheet
-  (`WRITE_SOURCE='sheets'`). El camino a Excel de `excel-write` es código heredado: no
-  proponerlo, no probar contra él, no dejarlo como fallback silencioso.
 - Editar transacciones en la app NO escribe al Sheet (definido 5/7/2026): mientras
   dure la convivencia, el sync puede pisar esos cambios y es un comportamiento asumido.
-  PREMISA VENCIDA desde la puesta en producción: ahora la app es la fuente de verdad y
-  el Sheet quedó como backup, así que la edición es el único movimiento que no llega
-  allá. No está roto — nunca se construyó.
 - USDT (definido 20/7/2026): moneda SOLO-app, NO existe en la planilla. Solo opera en CAJA
   (compra/venta contra pesos y dólares, ingresos/egresos) — sin cuenta corriente ni TT/SWITCH.
   Se cotiza como el dólar (pesos por USDT; ~1:1 contra dólar físico con spread). Las filas
   USDT se marcan `movimientos_caja.origen='app'` y el sync NO las toca (si no, se perderían).
   El alta USDT no se escribe al Sheet (evita duplicar la pata en pesos vía sync). Cuando se
   retire la planilla, `origen` deja de ser necesario pero no molesta.
-- ROLES (definido 11/8/2026, ver `docs/ROLES.md`): cliente / operador / administrador /
-  superadmin. El rol es la ÚNICA fuente de verdad de permisos — `ve_ganancias` ya no existe.
-  NUNCA comparar roles a mano: usar los predicados de `src/lib/roles.ts` (app) y
-  `es_admin()` / `es_staff()` / `ve_ganancias()` (policies de RLS). La diferencia entre
-  administrador y superadmin es solo Ganancias, y las reglas de contención (nadie cambia
-  su propio rol, nadie asigna un rol al que no llega, un administrador no toca la cuenta
-  de un superadmin) se validan EN EL SERVIDOR, no en el navegador.
 - BORRAR transacciones en la app SÍ limpia la fila en la planilla (definido 11/7/2026):
   se identifica por contenido y solo se limpia si la coincidencia es única — con cero o
   varias coincidencias se borra solo de la base y se avisa para el borrado manual.

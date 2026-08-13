@@ -2,7 +2,6 @@ import { redirect, notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
 import FormEditarTransaccion from '@/components/transacciones/FormEditarTransaccion'
-import { esAdmin } from '@/lib/roles'
 
 export default async function EditarTransaccionPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -12,8 +11,8 @@ export default async function EditarTransaccionPage({ params }: { params: { id: 
   const { data: profileData } = await supabase
     .from('profiles').select('rol').eq('id', user.id).single()
   const rol = (profileData as { rol: string } | null)?.rol
-  // Editar es exclusivo de administrador/superadmin; el operador vuelve al listado.
-  if (!esAdmin(rol)) redirect('/dashboard/transacciones')
+  // Editar es exclusivo del superusuario; el operador vuelve al listado.
+  if (rol !== 'superusuario') redirect('/dashboard/transacciones')
 
   const { data: mov } = await supabase
     .from('movimientos_caja').select('*').eq('id', params.id).single()

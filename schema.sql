@@ -3,22 +3,12 @@
 -- Ejecutar en el SQL Editor de Supabase (nuevo proyecto)
 -- ============================================================
 
--- ── 0. MODELO DE ROLES ───────────────────────────────────────────
---   cliente        solo su cuenta corriente y su contraseña
---   operador       cuentas corrientes y transacciones; carga, pero NO edita ni borra
---   administrador  acceso total SIN Ganancias
---   superadmin     acceso total CON Ganancias
---
--- El rol es la ÚNICA fuente de verdad de permisos. Las policies no comparan strings:
--- llaman a los predicados de más abajo, que son el espejo de src/lib/roles.ts.
-
-
 -- ── 1. TABLA: profiles ───────────────────────────────────────────
 create table if not exists public.profiles (
   id                 uuid primary key references auth.users(id) on delete cascade,
   email              text not null unique,
   nombre             text not null,
-  rol                text not null check (rol in ('superadmin', 'administrador', 'operador', 'cliente')),
+  rol                text not null check (rol in ('superusuario', 'operador', 'cliente')),
   activo             boolean not null default true,
   cuenta_cte         text,
   telefono           text,
@@ -30,40 +20,27 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
--- Predicados de permiso — el único lugar donde vive la jerarquía.
--- `security definer` para que puedan consultar `profiles` sin quedar atrapados en la
--- RLS de la propia tabla.
-create or replace function public.rol_actual()
-returns text language sql stable security definer set search_path = public as $$
-  select rol from public.profiles where id = auth.uid()
-$$;
-
-create or replace function public.es_admin()
-returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce(public.rol_actual() in ('superadmin', 'administrador'), false)
-$$;
-
-create or replace function public.es_staff()
-returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce(public.rol_actual() in ('superadmin', 'administrador', 'operador'), false)
-$$;
-
-create or replace function public.ve_ganancias()
-returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce(public.rol_actual() = 'superadmin', false)
-$$;
-
 create policy "Usuarios ven su propio perfil"
   on public.profiles for select
   using (auth.uid() = id);
 
-create policy "Administradores ven todos los perfiles"
+create policy "Superusuarios ven todos los perfiles"
   on public.profiles for select
-  using (public.es_admin());
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.rol = 'superusuario'
+    )
+  );
 
-create policy "Administradores editan perfiles"
+create policy "Superusuarios editan perfiles"
   on public.profiles for update
-  using (public.es_admin());
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.rol = 'superusuario'
+    )
+  );
 
 create policy "Usuarios actualizan su propio perfil"
   on public.profiles for update
@@ -117,9 +94,14 @@ create policy "Autenticados ven cuentas activas"
   to authenticated
   using (activo = true);
 
-create policy "Administradores gestionan cuentas"
+create policy "Superusuarios gestionan cuentas"
   on public.cuentas_corrientes for all
-  using (public.es_admin());
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.rol = 'superusuario'
+    )
+  );
 
 
 -- ── 3. TABLA: tipos_operacion ────────────────────────────────────
@@ -138,9 +120,14 @@ create policy "Autenticados ven tipos activos"
   to authenticated
   using (activo = true);
 
-create policy "Administradores gestionan tipos"
+create policy "Superusuarios gestionan tipos"
   on public.tipos_operacion for all
-  using (public.es_admin());
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.rol = 'superusuario'
+    )
+  );
 
 -- Tipos de operación iniciales (ajustar según necesidad)
 insert into public.tipos_operacion (codigo, descripcion) values
@@ -195,17 +182,32 @@ create policy "Clientes ven sus propios movimientos"
     )
   );
 
-create policy "Staff ve el diario"
+create policy "Operadores y superusuarios ven todo"
   on public.diario for select
-  using (public.es_staff());
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.rol in ('operador', 'superusuario')
+    )
+  );
 
-create policy "Staff inserta en el diario"
+create policy "Operadores y superusuarios insertan"
   on public.diario for insert
-  with check (public.es_staff());
+  with check (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.rol in ('operador', 'superusuario')
+    )
+  );
 
-create policy "Administradores actualizan el diario"
+create policy "Superusuarios actualizan"
   on public.diario for update
-  using (public.es_admin());
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.rol = 'superusuario'
+    )
+  );
 
 create trigger on_diario_updated
   before update on public.diario
@@ -250,9 +252,7 @@ begin
 end;
 $$;
 
--- Crear usuario administrado (un administrador invita a un cliente/operador).
--- HEREDADA: la app no la usa (el alta va por /api/admin/usuarios). Queda por
--- compatibilidad; la comprobación de permiso usa el predicado nuevo.
+-- Crear usuario administrado (superusuario invita a un cliente/operador)
 create or replace function public.crear_usuario_admin(
   p_email      text,
   p_password   text,
@@ -264,8 +264,8 @@ returns uuid language plpgsql security definer as $$
 declare
   v_user_id uuid;
 begin
-  -- Solo administradores pueden llamar esta función
-  if not public.es_admin() then
+  -- Solo superusuarios pueden llamar esta función
+  if (select rol from public.profiles where id = auth.uid()) != 'superusuario' then
     raise exception 'Sin permisos';
   end if;
 
@@ -306,15 +306,14 @@ begin
 end;
 $$;
 
--- Cambiar contraseña de un usuario (por un administrador).
--- HEREDADA: la app no la usa (el reseteo va por /api/admin/usuarios).
+-- Cambiar contraseña de un usuario (por superusuario)
 create or replace function public.admin_cambiar_clave(
   p_user_id uuid,
   p_nueva_clave text
 )
 returns void language plpgsql security definer as $$
 begin
-  if not public.es_admin() then
+  if (select rol from public.profiles where id = auth.uid()) != 'superusuario' then
     raise exception 'Sin permisos';
   end if;
 
@@ -330,7 +329,7 @@ end;
 $$;
 
 
--- ── 7. SUPERADMIN INICIAL ────────────────────────────────────────
+-- ── 7. SUPERUSUARIO INICIAL ──────────────────────────────────────
 -- IMPORTANTE: Reemplazá el email y contraseña antes de ejecutar
 -- Después de ejecutar esto, iniciá sesión con estas credenciales
 
@@ -353,7 +352,7 @@ begin
     now(), '{}', now(), now(), 'authenticated', 'authenticated'
   ) returning id into v_id;
 
-  update public.profiles set rol = 'superadmin', debe_cambiar_clave = false
+  update public.profiles set rol = 'superusuario', debe_cambiar_clave = false
   where id = v_id;
 end $$;
 */

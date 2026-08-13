@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { registrarAuditoria, calcularHuella, describirMovimiento } from '@/lib/auditoria'
-import { esAdmin } from '@/lib/roles'
 
 // Marca que el dinero "en la calle" ingresó a la caja: borra el campo DEBE (repartidor),
 // igual que hacen hoy en la planilla. NO escribe en el Google Sheet: si la planilla
@@ -13,8 +12,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { data: profile } = await supabase.from('profiles').select('rol, nombre').eq('id', user.id).single()
-  if (!esAdmin((profile as any)?.rol))
-    return NextResponse.json({ error: 'Solo un administrador puede registrar el ingreso' }, { status: 403 })
+  if ((profile as any)?.rol !== 'superusuario')
+    return NextResponse.json({ error: 'Solo el superusuario puede registrar el ingreso' }, { status: 403 })
 
   // Se lee antes de actualizar: es dinero que vuelve del reparto y hay que dejar
   // registrado quién lo dio por ingresado y a qué repartidor se le estaba contando.

@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 import { registrarAuditoria, calcularHuella, describirMovimiento } from '@/lib/auditoria'
-import { esStaff } from '@/lib/roles'
 
 export const maxDuration = 30
 
@@ -24,7 +23,7 @@ export async function POST(request: Request) {
   const { data: profile } = await supabase.from('profiles').select('rol, nombre').eq('id', user.id).single()
   if (!profile) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   const rol = (profile as any).rol
-  if (!esStaff(rol))
+  if (rol !== 'superusuario' && rol !== 'operador')
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   const body = await request.json()

@@ -1,10 +1,9 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AuditoriaView from '@/components/auditoria/AuditoriaView'
-import { esAdmin } from '@/lib/roles'
 
 // Registro de actividad: quién hizo qué y cuándo (tabla `auditoria`, append-only).
-// Exclusivo de administrador/superadmin — la policy de SELECT ya lo restringe en la base, acá se
+// Exclusivo del superusuario — la policy de SELECT ya lo restringe en la base, acá se
 // corta antes para no mostrar una pantalla vacía a quien no corresponde.
 
 const POR_PAGINA = 100
@@ -20,7 +19,7 @@ export default async function AuditoriaPage({
 
   const { data: profileData } = await supabase
     .from('profiles').select('rol').eq('id', user.id).single()
-  if (!esAdmin((profileData as { rol: string } | null)?.rol)) redirect('/dashboard')
+  if ((profileData as { rol: string } | null)?.rol !== 'superusuario') redirect('/dashboard')
 
   const desde   = searchParams.desde || ''
   const hasta   = searchParams.hasta || ''
