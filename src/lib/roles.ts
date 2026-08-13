@@ -30,8 +30,16 @@ export const ROL_DESCRIPCION: Record<Rol, string> = {
   cliente:       'Solo su cuenta corriente y su contraseña.',
 }
 
-const norm = (rol: string | null | undefined): Rol | null =>
-  (ROLES as readonly string[]).includes(rol ?? '') ? (rol as Rol) : null
+// Alias transitorio: entre que se publica esta versión y que se corre la migración de
+// roles, la base todavía dice 'superusuario'. Sin esto nadie podría entrar en esos
+// minutos. Se comporta como administrador (sin Ganancias) — fail-closed. Se puede
+// eliminar una vez corrida la migración.
+const LEGACY_ADMIN = 'superusuario'
+
+const norm = (rol: string | null | undefined): Rol | null => {
+  if (rol === LEGACY_ADMIN) return 'administrador'
+  return (ROLES as readonly string[]).includes(rol ?? '') ? (rol as Rol) : null
+}
 
 /** Personal interno: operador, administrador o superadmin. Todo menos los clientes. */
 export function esStaff(rol: string | null | undefined): boolean {

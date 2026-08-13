@@ -62,8 +62,14 @@ comment on column public.profiles.rol is
 -- ─────────────────────────────────────────────────────────────────────────
 -- 2. Predicados de permiso — el único lugar donde vive la jerarquía
 -- ─────────────────────────────────────────────────────────────────────────
--- `stable` y no `immutable`: leen una tabla. `security definer` para que puedan
--- consultar `profiles` sin quedar atrapadas en la RLS de la propia tabla.
+-- `stable` y no `immutable`: leen una tabla. `security definer` es IMPRESCINDIBLE: sin
+-- eso, una policy de `profiles` que consulte `profiles` entra en recursión infinita y la
+-- app deja de cargar por completo.
+--
+-- En las policies se las llama SIEMPRE envueltas en un subselect —`(select es_admin())`—
+-- porque Postgres no puede insertar en línea una función `security definer`: sin el
+-- subselect se ejecuta una vez POR FILA, y las pantallas que leen decenas de miles de
+-- filas se pasan del statement timeout.
 create or replace function public.rol_actual()
 returns text language sql stable security definer set search_path = public as $$
   select rol from public.profiles where id = auth.uid()
@@ -71,12 +77,12 @@ $$;
 
 create or replace function public.es_admin()
 returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce(public.rol_actual() in ('superadmin', 'administrador'), false)
+  select coalesce(public.rol_actual() in ('superadmin', 'administrador', 'superusuario'), false)
 $$;
 
 create or replace function public.es_staff()
 returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce(public.rol_actual() in ('superadmin', 'administrador', 'operador'), false)
+  select coalesce(public.rol_actual() in ('superadmin', 'administrador', 'operador', 'superusuario'), false)
 $$;
 
 create or replace function public.ve_ganancias()
@@ -95,98 +101,101 @@ comment on function public.ve_ganancias() is
 -- 3. Policies reescritas sobre los predicados
 -- ─────────────────────────────────────────────────────────────────────────
 
--- profiles
+-- profiles — OJO: estas dos policies NO pueden consultar `profiles` con un `exists
+-- (select ... from profiles)`. Esa forma es recursiva y tumba la app entera (pasó el
+-- 13/8/2026: ninguna pantalla cargaba). Por eso van contra el predicado, que resuelve el
+-- rol con `security definer` y corta la recursión.
 drop policy if exists "Superusuarios ven todos los perfiles" on public.profiles;
 drop policy if exists "Administradores ven todos los perfiles" on public.profiles;
 create policy "Administradores ven todos los perfiles"
-  on public.profiles for select using (public.es_admin());
+  on public.profiles for select using ((select public.es_admin()));
 
 drop policy if exists "Superusuarios editan perfiles" on public.profiles;
 drop policy if exists "Administradores editan perfiles" on public.profiles;
 create policy "Administradores editan perfiles"
-  on public.profiles for update using (public.es_admin());
+  on public.profiles for update using ((select public.es_admin()));
 
 -- cuentas_corrientes
 drop policy if exists "Superusuarios gestionan cuentas" on public.cuentas_corrientes;
 drop policy if exists "Administradores gestionan cuentas" on public.cuentas_corrientes;
 create policy "Administradores gestionan cuentas"
-  on public.cuentas_corrientes for all using (public.es_admin());
+  on public.cuentas_corrientes for all using ((select public.es_admin()));
 
 -- tipos_operacion
 drop policy if exists "Superusuarios gestionan tipos" on public.tipos_operacion;
 drop policy if exists "Administradores gestionan tipos" on public.tipos_operacion;
 create policy "Administradores gestionan tipos"
-  on public.tipos_operacion for all using (public.es_admin());
+  on public.tipos_operacion for all using ((select public.es_admin()));
 
 -- clientes
 drop policy if exists "Superusuarios gestionan clientes" on public.clientes;
 drop policy if exists "Administradores gestionan clientes" on public.clientes;
 create policy "Administradores gestionan clientes"
-  on public.clientes for all using (public.es_admin());
+  on public.clientes for all using ((select public.es_admin()));
 
 -- diario
 drop policy if exists "Operadores y superusuarios ven todo" on public.diario;
 drop policy if exists "Staff ve el diario" on public.diario;
 create policy "Staff ve el diario"
-  on public.diario for select using (public.es_staff());
+  on public.diario for select using ((select public.es_staff()));
 
 drop policy if exists "Operadores y superusuarios insertan" on public.diario;
 drop policy if exists "Staff inserta en el diario" on public.diario;
 create policy "Staff inserta en el diario"
-  on public.diario for insert with check (public.es_staff());
+  on public.diario for insert with check ((select public.es_staff()));
 
 drop policy if exists "Superusuarios actualizan" on public.diario;
 drop policy if exists "Administradores actualizan el diario" on public.diario;
 create policy "Administradores actualizan el diario"
-  on public.diario for update using (public.es_admin());
+  on public.diario for update using ((select public.es_admin()));
 
 drop policy if exists "Superusuarios borran" on public.diario;
 drop policy if exists "Administradores borran del diario" on public.diario;
 create policy "Administradores borran del diario"
-  on public.diario for delete using (public.es_admin());
+  on public.diario for delete using ((select public.es_admin()));
 
 -- movimientos_caja
 drop policy if exists "Operadores y superusuarios ven movimientos de caja" on public.movimientos_caja;
 drop policy if exists "Staff ve movimientos de caja" on public.movimientos_caja;
 create policy "Staff ve movimientos de caja"
-  on public.movimientos_caja for select using (public.es_staff());
+  on public.movimientos_caja for select using ((select public.es_staff()));
 
 drop policy if exists "Operadores y superusuarios insertan movimientos de caja" on public.movimientos_caja;
 drop policy if exists "Staff inserta movimientos de caja" on public.movimientos_caja;
 create policy "Staff inserta movimientos de caja"
-  on public.movimientos_caja for insert with check (public.es_staff());
+  on public.movimientos_caja for insert with check ((select public.es_staff()));
 
 drop policy if exists "Superusuarios editan movimientos de caja" on public.movimientos_caja;
 drop policy if exists "Administradores editan movimientos de caja" on public.movimientos_caja;
 create policy "Administradores editan movimientos de caja"
   on public.movimientos_caja for update
-  using (public.es_admin()) with check (public.es_admin());
+  using ((select public.es_admin())) with check ((select public.es_admin()));
 
 drop policy if exists "Superusuarios eliminan movimientos de caja" on public.movimientos_caja;
 drop policy if exists "Administradores eliminan movimientos de caja" on public.movimientos_caja;
 create policy "Administradores eliminan movimientos de caja"
-  on public.movimientos_caja for delete using (public.es_admin());
+  on public.movimientos_caja for delete using ((select public.es_admin()));
 
 -- app_config
 drop policy if exists "Staff lee configuración" on public.app_config;
 create policy "Staff lee configuración"
-  on public.app_config for select using (public.es_staff());
+  on public.app_config for select using ((select public.es_staff()));
 
 drop policy if exists "Superusuarios escriben configuración" on public.app_config;
 drop policy if exists "Administradores escriben configuración" on public.app_config;
 create policy "Administradores escriben configuración"
   on public.app_config for all
-  using (public.es_admin()) with check (public.es_admin());
+  using ((select public.es_admin())) with check ((select public.es_admin()));
 
 -- auditoria
 drop policy if exists "Staff registra auditoría" on public.auditoria;
 create policy "Staff registra auditoría"
-  on public.auditoria for insert with check (public.es_staff());
+  on public.auditoria for insert with check ((select public.es_staff()));
 
 drop policy if exists "Superusuarios leen auditoría" on public.auditoria;
 drop policy if exists "Administradores leen auditoría" on public.auditoria;
 create policy "Administradores leen auditoría"
-  on public.auditoria for select using (public.es_admin());
+  on public.auditoria for select using ((select public.es_admin()));
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- 4. Protección del rol contra escritura directa
@@ -232,3 +241,8 @@ create trigger profiles_proteger_permisos
 -- 'superusuario', que ya no existe: quedan fail-closed, rechazando a todo el mundo. No
 -- las usa la app —el alta y el reseteo de clave van por /api/admin/usuarios— así que se
 -- las deja bloqueadas a propósito en lugar de reactivarlas.
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- 6. Verificación
+-- ─────────────────────────────────────────────────────────────────────────
+select email, nombre, rol from public.profiles order by rol, nombre;
