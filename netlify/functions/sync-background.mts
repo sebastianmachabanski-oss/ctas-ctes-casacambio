@@ -1,5 +1,6 @@
 // Sync CAJA — planilla (Drive/Sheets) → base de datos. Ver docs/SINCRONIZACION.md.
 import { createClient } from "@supabase/supabase-js"
+import * as XLSX from "xlsx"
 import { calcularMovimiento, COLUMNAS_SALIDA } from "../../src/lib/motor-calculo/index"
 import { calcularHuella, AUTOR_PLANILLA } from "../../src/lib/auditoria"
 
@@ -9,13 +10,15 @@ import { calcularHuella, AUTOR_PLANILLA } from "../../src/lib/auditoria"
 // Se invoca desde las funciones programadas (cron-sync-*.mts), nunca por cron directo,
 // porque las scheduled tienen un límite de 30s y esto puede tardar más.
 //
-// El Google Sheet es el ÚNICO origen. El camino al .xlsx viejo de Drive existió hasta el
-// 11/8/2026, conmutable por la env var SYNC_SOURCE y con 'excel' por DEFECTO: si la
-// variable faltaba, el sync recargaba la base desde el Excel viejo sin aviso. Un origen,
-// sin fallback silencioso.
-const SHEET_ID   = '1BxW5TGUbi12LHATOIjnkBc71GY9JZARsy5_LP5Sl1CE'
-const SHEET_NAME = 'CAJA'
-const ACTIVE_FILE_ID = SHEET_ID
+// Fuente de datos conmutable por env var SYNC_SOURCE:
+//   - 'excel'  (default): baja el .xlsx de Drive y lo parsea con xlsx (comportamiento histórico).
+//   - 'sheets':           lee el Google Sheet nativo con la Sheets API (más rápido y simple).
+// Mientras SYNC_SOURCE no sea 'sheets', NO cambia nada respecto de hoy.
+const EXCEL_FILE_ID = '1tuURACcfs09rRkynmVLqLD90Je5r-u58'              // .xlsx viejo (Drive)
+const SHEET_ID      = '1BxW5TGUbi12LHATOIjnkBc71GY9JZARsy5_LP5Sl1CE'  // Google Sheet nuevo
+const SHEET_NAME    = 'CAJA'
+const SYNC_SOURCE: 'excel' | 'sheets' = process.env.SYNC_SOURCE === 'sheets' ? 'sheets' : 'excel'
+const ACTIVE_FILE_ID = SYNC_SOURCE === 'sheets' ? SHEET_ID : EXCEL_FILE_ID
 const WINDOW_DAYS = 30
 const BATCH       = 1000
 const CONCURRENCY = 8
@@ -99,7 +102,7 @@ async function getGoogleToken(): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
   const payload = {
     iss: creds.client_email,
-    // Drive para la metadata (modifiedTime) + Sheets para leer los valores.
+    // Drive (metadata/descarga del .xlsx) + Sheets (lectura del Sheet nativo).
     scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets.readonly',
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,
@@ -144,12 +147,24 @@ async function getFileModifiedTime(token: string): Promise<string | null> {
   return data.modifiedTime ?? null
 }
 
-// Lee la solapa CAJA del Google Sheet como matriz de filas (any[][]).
+// Lee la solapa CAJA como matriz de filas (any[][]), eligiendo la fuente según SYNC_SOURCE.
 async function readSheetRows(token: string): Promise<any[][]> {
-  return readFromSheets(token)
+  return SYNC_SOURCE === 'sheets' ? readFromSheets(token) : readFromExcel(token)
 }
 
-// Lee los valores del Google Sheet nativo con la Sheets API. Devuelve la
+// Fuente 'excel': baja el binario .xlsx de Drive y lo parsea con xlsx (comportamiento histórico).
+async function readFromExcel(token: string): Promise<any[][]> {
+  const url = `https://www.googleapis.com/drive/v3/files/${EXCEL_FILE_ID}?alt=media`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) throw new Error(`Error descargando archivo: ${res.status} ${res.statusText}`)
+  const buffer = await res.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
+  const sheet = workbook.Sheets[SHEET_NAME]
+  if (!sheet) throw new Error(`Pestaña "${SHEET_NAME}" no encontrada`)
+  return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, cellDates: true })
+}
+
+// Fuente 'sheets': lee los valores del Google Sheet nativo con la Sheets API. Devuelve la
 // grilla tal como se ve (FORMATTED_VALUE): fechas como texto d/m/aaaa y montos formateados,
 // que parseFecha/parseMonto ya saben interpretar.
 async function readFromSheets(token: string): Promise<any[][]> {
@@ -534,11 +549,11 @@ export default async function handler(req: Request) {
   const recordRun = (payload: any) => {
     const at = new Date().toISOString()
     const duration_s = Math.round((Date.parse(at) - Date.parse(startedAt)) / 1000)
-    return setSyncState(supabase, 'last_run', JSON.stringify({ started_at: startedAt, at, duration_s, source: 'sheets', ...payload })).catch(() => {})
+    return setSyncState(supabase, 'last_run', JSON.stringify({ started_at: startedAt, at, duration_s, source: SYNC_SOURCE, ...payload })).catch(() => {})
   }
 
   try {
-    console.log(`🔎 Fuente de datos: Google Sheet (${ACTIVE_FILE_ID})`)
+    console.log(`🔎 Fuente de datos: ${SYNC_SOURCE} (${ACTIVE_FILE_ID})`)
     const token = await getGoogleToken()
 
     // En modo incremental, si el archivo no cambió desde la última corrida, no hacemos nada.
@@ -561,9 +576,9 @@ export default async function handler(req: Request) {
 
     // Espejo completo de CAJA → movimientos_caja (todas las operaciones, no solo CTA CTE).
     // Corre en el mismo modo (full/incremental) y valida sus propias sumas al terminar.
-    // Segunda lectura, esta vez SIN formato: los valores formateados acumulan deriva de
-    // redondeo y los importes tienen que coincidir EXACTO con la planilla.
-    const rowsCaja = await readFromSheetsUnformatted(token)
+    // Lee valores SIN formato para coincidir exacto con la planilla (la fuente excel ya
+    // viene cruda por raw:true; para sheets se hace una segunda lectura UNFORMATTED).
+    const rowsCaja = SYNC_SOURCE === 'sheets' ? await readFromSheetsUnformatted(token) : rows
     const desdeCaja = new Date()
     desdeCaja.setDate(desdeCaja.getDate() - WINDOW_DAYS)
     const caja = await syncCaja(supabase, parseMovimientosCaja(rowsCaja), mode, desdeCaja.toISOString().slice(0, 10))

@@ -28,14 +28,8 @@ Documentación clave: `docs/SINCRONIZACION.md` (sync Sheet→DB), `docs/MOTOR-CA
 - GASTOS solo existe en PESOS. El campo DEBE cargado = dinero "en la calle".
 - El motor de cálculo (`src/lib/motor-calculo`) está validado contra la planilla:
   ante cualquier cambio correr `npx tsx scripts/validar-motor-calculo.mts`.
-- La app NUNCA interactúa con el Excel viejo. El único origen externo es el Google Sheet
-  (`WRITE_SOURCE='sheets'`). El camino a Excel de `excel-write` es código heredado: no
-  proponerlo, no probar contra él, no dejarlo como fallback silencioso.
 - Editar transacciones en la app NO escribe al Sheet (definido 5/7/2026): mientras
   dure la convivencia, el sync puede pisar esos cambios y es un comportamiento asumido.
-  PREMISA VENCIDA desde la puesta en producción: ahora la app es la fuente de verdad y
-  el Sheet quedó como backup, así que la edición es el único movimiento que no llega
-  allá. No está roto — nunca se construyó.
 - USDT (definido 20/7/2026): moneda SOLO-app, NO existe en la planilla. Solo opera en CAJA
   (compra/venta contra pesos y dólares, ingresos/egresos) — sin cuenta corriente ni TT/SWITCH.
   Se cotiza como el dólar (pesos por USDT; ~1:1 contra dólar físico con spread). Las filas
