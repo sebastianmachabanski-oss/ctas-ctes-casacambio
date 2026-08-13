@@ -66,7 +66,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const [errorBorrar, setErrorBorrar] = useState('')
   const [avisoPlanilla, setAvisoPlanilla] = useState('')
 
-  // Borrar (solo superusuario): borrado ESPEJADO — elimina del sistema y del origen externo
+  // Borrar (solo administrador/superadmin): borrado ESPEJADO — elimina del sistema y del origen externo
   // de datos (solo si se identifica sin ambigüedad; si no, avisa para hacerlo a mano).
   async function borrar(m: Mov) {
     const desc = `${m.cliente ?? '—'} · ${m.operacion} · ${nf.format(montoPrincipal(m))}`

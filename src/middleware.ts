@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
+import { esAdmin } from '@/lib/roles'
 
 export async function middleware(request: NextRequest) {
   // Las funciones de Netlify (p.ej. sync-background) manejan su propia autenticación
@@ -57,8 +58,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/mi-cuenta?forzado=1', request.url))
   }
 
-  // Solo superusuario puede acceder a /admin
-  if (pathname.startsWith('/dashboard/admin') && profile.rol !== 'superusuario') {
+  // Solo administrador/superadmin pueden acceder a /admin
+  if (pathname.startsWith('/dashboard/admin') && !esAdmin(profile.rol)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 

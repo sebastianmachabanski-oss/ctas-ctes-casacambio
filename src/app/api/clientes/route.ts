@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { esStaff } from '@/lib/roles'
 
 // Alta manual de un cliente nuevo desde "Nueva Transacción" (cliente nuevo o eventual
 // que todavía no aparece en la planilla). Se agrega ya mismo a la tabla `clientes` para
@@ -7,7 +8,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 // a re-confirmar la próxima vez que corra, una vez que la transacción quede escrita en
 // la planilla con este nombre.
 //
-// Usa el service role: la política de escritura de `clientes` es solo para superusuario,
+// Usa el service role: la política de escritura de `clientes` es solo para administradores,
 // pero esta pantalla también la usa el rol operador — el permiso ya se valida acá arriba.
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
 
   const { data: profile } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
   const rol = (profile as any)?.rol
-  if (rol !== 'superusuario' && rol !== 'operador')
+  if (!esStaff(rol))
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   const body = await request.json()

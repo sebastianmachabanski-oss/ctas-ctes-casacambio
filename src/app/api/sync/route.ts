@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { esAdmin } from '@/lib/roles'
 
 export const maxDuration = 30
 
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
   const { data: profile } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
-  if (!profile || (profile as any).rol !== 'superusuario')
+  if (!profile || !esAdmin((profile as any).rol))
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   const mode = new URL(request.url).searchParams.get('mode') === 'full' ? 'full' : 'incremental'

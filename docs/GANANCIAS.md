@@ -47,8 +47,66 @@ corriente:
 | `vV` | volumen vendido |
 | `aV` | pesos recibidos por esas ventas |
 
-Cada par (dólares, euros, reales, USDT) se acumula por separado y **nunca se mezclan**:
-se elige uno en la configuración y ese es el resultado.
+Cada par (dólares, euros, reales, USDT, cheques) se acumula por separado y **nunca se
+mezclan**: se elige uno en la configuración y ese es el resultado.
+
+### Qué queda afuera: los canjes moneda contra moneda
+
+La condición es que la fila tenga **volumen y pesos** en la misma pata. Una operación
+que cambia una moneda por otra sin pasar por pesos —comprar dólares pagando con euros,
+cambiar cheques por dólares— tiene la columna `pesos` en cero, así que **no entra en el
+cálculo de ningún par**.
+
+No es un olvido: la fórmula mide el margen *contra pesos* (`t2 − t1` está expresado en
+pesos por unidad). En un canje no hay tasa en pesos que comparar, y forzar una la
+inventaría. Es la misma limitación que tiene la solapa COLO de la planilla, que este
+módulo replica. La contracara es que esas operaciones tampoco mueven el **stock** que ve
+la pantalla (`stock = |vC − vV|`), porque el stock se deriva de las mismas cantidades
+acumuladas.
+
+Medición sobre un mes real de producción, para dimensionar el efecto:
+
+| Moneda | Volumen que entra | Volumen excluido | % excluido |
+|---|---:|---:|---:|
+| Dólares | 4.844.586,25 | 75.373,53 | 1,5 % |
+| Euros | 24.060,00 | 59.820,00 | 71,3 % |
+| Reales | 2.340,00 | 15.315,00 | 86,7 % |
+
+En dólares —que concentran más del 98 % del margen calzado— la exclusión es marginal y
+el resultado de la pantalla es representativo. En euros y reales la mayor parte del
+movimiento son canjes, así que **esos paneles muestran solo la porción operada contra
+pesos**; los importes involucrados son chicos frente a los dólares, pero conviene tenerlo
+presente antes de leer el panel de euros como "la ganancia en euros del mes".
+
+### La cuenta corriente: por qué hoy no incide, y qué pasaría si incidiera
+
+Los movimientos de cuenta corriente **no generan resultado** y no entran: el filtro por
+operación (COMPRA / VENTA / GASTOS) ya deja afuera INGRESAN, EGRESAN, SWITCH y TT. Al
+11/8/2026 la operatoria de cta cte es exclusivamente INGRESAN/EGRESAN, así que el módulo
+está midiendo todo lo que hay que medir.
+
+Queda anotado, para cuando eso cambie, que **una COMPRA o VENTA con `tipo = 'CTA CTE'`
+hoy quedaría afuera del cálculo**. El motor le da patas cruzadas —la moneda en la columna
+de caja y la contrapartida en `cc_pesos`, o al revés— y la agregación exige que volumen y
+pesos estén en la misma pata:
+
+```
+CTA CTE COMPRA dólares (propio DOLARES) →  DOLARES 1.000   CC PESOS -1.500.000
+CTA CTE COMPRA dólares (propio PESOS)   →  PESOS 1.500.000   CC DOLARES -1.000
+```
+
+Ninguna de las dos formas coincide con los pares que busca la pantalla (`dolares`+`pesos`
+o `cc_dolares`+`cc_pesos`). Como efecto colateral, los acumuladores `vCcc`/`vVcc` nunca
+se llenan para COMPRA/VENTA y **el interruptor "incluir cuenta corriente" no modifica el
+resultado**. Lo mismo aplica a `d.gcc`: GASTOS siempre va a `PESOS`, nunca a `cc_pesos`.
+
+Antes de habilitar compras o ventas en cuenta corriente —el caso más probable es el
+descuento de documentos contra la cuenta del cliente— hay que corregir la agregación para
+reconocer las patas cruzadas.
+
+Lo mismo vale para los pares **cheques** y **USDT**: al 10/8/2026 no existe en toda la
+base ni una sola COMPRA o VENTA con esas monedas, así que ambos paneles están sin
+contrastar contra datos reales.
 
 ---
 
@@ -76,10 +134,76 @@ valor. Tres criterios, configurables en el drawer:
 | **Al costo** | `0` | Postura conservadora: sin ganancia hasta vender |
 | **A precio de cierre** | `stock x (cierre - t1)` si sobran compras; `stock x (t2 - cierre)` si sobran ventas | Valuación a mercado |
 
+Los supuestos **son propios de cada par** (`SUPUESTOS_PAR` en `GananciasView.tsx`) y se
+reponen al cambiar de moneda: arrastrar los de la anterior daría un número sin sentido.
+
+#### Cheques: valuación a valor nominal
+
+El cliente reconoce la ganancia del descuento de documentos **en el momento del
+descuento** (definido 11/8/2026), no cuando el cheque se cobra. Ese criterio se obtiene
+valuando la cartera a **valor nominal**: es el criterio "a precio de cierre" con
+`cierre = 1,00`, un peso por cada peso de valor nominal.
+
+Verificado sobre el caso de un cheque de 1.000.000 tomado a 0,95:
+
+| Escenario | Margen fijo 0,050 | Cierre 1.500 (default divisas) | **Nominal 1,00** |
+|---|---:|---:|---:|
+| Descuento y cobro en el mismo período | 50.000 | 50.000 | **50.000** |
+| Período del descuento, sin cobrar aún | 50.000 | 1.499.050.000 | **50.000** |
+| Período del cobro, descontado antes | 50.000 | −1.499.000.000 | **0** |
+| Descuento sin cobro nunca registrado | 50.000 | 1.499.050.000 | **50.000** |
+
+Solo el criterio nominal da bien las cuatro filas: reconoce los 50.000 en el período del
+descuento y deja el período del cobro en cero, sin duplicar. El margen fijo acierta acá
+únicamente por coincidencia —0,050 por peso nominal *es* un descuento del 5 %—; con un
+descuento del 3 % seguiría informando 50.000 cuando la ganancia real es 30.000. Y heredar
+el default de divisas produciría cifras absurdas, de ahí que los supuestos sean por par.
+
 ### Gastos
 
 Solo existen en **pesos** (regla del dominio) y entran con su signo, restando. Se pueden
 excluir desde la configuración para ver la ganancia bruta.
+
+Dos precisiones al leerlos:
+
+- **No están prorrateados entre monedas.** Se restan enteros en el par que se esté
+  mirando. En dólares el efecto es despreciable frente al margen; en euros o reales los
+  gastos del período pueden superar el margen y dar negativo. No es un error de cálculo
+  —los gastos son en pesos y no pertenecen a ninguna moneda— pero condiciona la lectura
+  de los paneles chicos.
+- La rama `d.gcc` (gastos de cuenta corriente) **siempre suma cero**: el motor manda
+  GASTOS a `PESOS` incluso con `tipo = 'CTA CTE'`, y en ese caso además devuelve
+  `cuenta = null` porque la planilla no contempla la combinación.
+
+### Costo %
+
+El campo **no lo lee esta pantalla**, y sin embargo **está incluido en el resultado**. El
+motor lo aplica sobre la pata en pesos al calcular el movimiento (`factor = 1 + costo x
+signo de la pata externa`), así que la columna `pesos` que Ganancias suma ya lo tiene
+incorporado:
+
+```
+COMPRA 1.000 dólares a 1.500, costo 0 %  →  DOLARES  1.000   PESOS -1.500.000
+COMPRA 1.000 dólares a 1.500, costo 1 %  →  DOLARES  1.000   PESOS -1.485.000
+VENTA  1.000 dólares a 1.500, costo 1 %  →  DOLARES -1.000   PESOS  1.515.000
+```
+
+Funciona como una comisión sobre la cotización: comprando se pagan menos pesos, vendiendo
+se cobran más — un costo positivo siempre juega a favor de la casa. La consecuencia para
+la lectura de la pantalla es que `t1` y `t2` son **tasas efectivas con comisión incluida**,
+no la cotización de pizarra.
+
+En cheques rige igual, y eso vuelve equivalentes dos formas de cargar un descuento de
+documentos:
+
+```
+COMPRA 1.000.000 en cheques, cot 0,95, costo —    →  PESOS -950.000   CHEQUES 1.000.000
+COMPRA 1.000.000 en cheques, cot 1,00, costo 5 %  →  PESOS -950.000   CHEQUES 1.000.000
+```
+
+La ganancia informada es idéntica en los dos casos, porque ambas dejan la misma columna
+`pesos`. La diferencia es solo de registro: la primera guarda el precio efectivo, la
+segunda deja la tasa de descuento como dato separado y auditable.
 
 ### Ejemplo
 
