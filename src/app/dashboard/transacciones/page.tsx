@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import TransaccionesView from '@/components/transacciones/TransaccionesView'
-import { esAdmin, esStaff } from '@/lib/roles'
 
 // Pantalla de staff: TODOS los movimientos de la caja (tabla movimientos_caja, el espejo
 // completo de la solapa CAJA que llena el sync). Por defecto muestra los 100 más recientes;
@@ -22,7 +21,7 @@ export default async function TransaccionesPage({
   const { data: profileData } = await supabase
     .from('profiles').select('rol').eq('id', user.id).single()
   const rol = (profileData as { rol: string } | null)?.rol
-  if (!esStaff(rol)) redirect('/dashboard')
+  if (rol !== 'superusuario' && rol !== 'operador') redirect('/dashboard')
 
   const desde = searchParams.desde || ''
   const hasta = searchParams.hasta || ''
@@ -51,7 +50,7 @@ export default async function TransaccionesPage({
       ) : (
         <TransaccionesView
           movimientos={movimientos}
-          puedeEditar={esAdmin(rol)}
+          puedeEditar={rol === 'superusuario'}
           desde={desde}
           hasta={hasta}
           total={total}

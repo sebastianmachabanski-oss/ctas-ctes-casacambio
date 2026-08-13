@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getGoogleToken } from '@/lib/google'
-import { esStaff } from '@/lib/roles'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const XLSX = require('xlsx')
 
@@ -296,7 +295,7 @@ export async function POST(request: Request) {
   const { data: profile } = await supabase.from('profiles').select('rol').eq('id', user.id).single()
   if (!profile) return NextResponse.json({ excel: false, warning: 'No autorizado' })
   const rol = (profile as any).rol
-  if (!esStaff(rol))
+  if (rol !== 'superusuario' && rol !== 'operador')
     return NextResponse.json({ excel: false, warning: 'Sin permisos' })
 
   const body = await request.json()

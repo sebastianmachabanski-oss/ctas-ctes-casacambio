@@ -1,26 +1,18 @@
 'use client'
 import { useState } from 'react'
-import { ROLES, ROL_LABEL, ROL_DESCRIPCION, puedeAsignarRol, puedeAdministrarA, veGanancias, type Rol } from '@/lib/roles'
 
 type Usuario = {
   id: string; email: string; nombre: string; rol: string
   activo: boolean; cuenta_cte: string | null
   telefono: string | null; notas: string | null; created_at: string
+  ve_ganancias?: boolean
 }
-interface Props {
-  usuariosIniciales: Usuario[]
-  cuentas: string[]
-  /** Usuario de la sesión: nadie edita su propio rol. */
-  miId: string
-  /** Rol de la sesión: nadie asigna un nivel al que no llega. */
-  miRol: string
-}
+interface Props { usuariosIniciales: Usuario[]; cuentas: string[] }
 
-// Tags de rol: superadmin violeta (es el único que ve Ganancias), administrador azul,
-// operador gris, cliente verde.
+const ROL_LABELS: Record<string, string> = { superusuario: 'Superusuario', operador: 'Operador', cliente: 'Cliente' }
+// Tags de rol con los colores del mockup: superusuario azul, operador gris, cliente verde.
 const ROL_COLORS: Record<string, string> = {
-  superadmin: 'tag tag-purple',
-  administrador: 'tag tag-blue',
+  superusuario: 'tag tag-blue',
   operador: 'tag tag-gray',
   cliente: 'tag tag-green',
 }
@@ -32,7 +24,7 @@ function generarEmail(nombre: string) {
     .replace(/[^a-z0-9.]/g, '') + '@casadecambio.com'
 }
 
-export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, miRol }: Props) {
+export default function AdminUsuariosClient({ usuariosIniciales, cuentas }: Props) {
   const [usuarios, setUsuarios] = useState<Usuario[]>(usuariosIniciales)
   const [modal, setModal] = useState<'nuevo' | 'editar' | null>(null)
   const [editando, setEditando] = useState<Usuario | null>(null)
@@ -48,17 +40,12 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
     setError(null); setClaveMsg(null); setModal('nuevo')
   }
 
-  // Espejo de las reglas que aplica el servidor, para no ofrecer un control que va a
-  // terminar en un 403. La validación real vive en /api/admin/usuarios/[id].
-  const esMiUsuario = editando?.id === miId
-  const rolesAsignables = ROLES.filter(r => puedeAsignarRol(miRol, r))
-  // Un administrador no puede tocar la cuenta de un Superadmin: si pudiera resetearle la
-  // clave, entraría como él y llegaría a Ganancias igual.
-  const puedoTocar = (u: Usuario) => u.id === miId || puedeAdministrarA(miRol, u.rol)
+  const [veGanancias, setVeGanancias] = useState(false)
 
   function abrirEditar(u: Usuario) {
     setEditando(u)
     setForm({ nombre: u.nombre, email: u.email, telefono: u.telefono ?? '', rol: u.rol, cuenta_cte: u.cuenta_cte ?? '', notas: u.notas ?? '' })
+    setVeGanancias(u.ve_ganancias ?? false)
     setError(null); setClaveMsg(null); setModal('editar')
   }
 
@@ -90,13 +77,14 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
         nombre: form.nombre, rol: form.rol,
         cuenta_cte: form.rol === 'cliente' ? form.cuenta_cte : null,
         telefono: form.telefono || null, notas: form.notas || null,
+        ve_ganancias: form.rol === 'cliente' ? false : veGanancias,
       }),
     })
     const data = await res.json()
     setLoading(false)
     if (!res.ok) { setError(data.error); return }
     setUsuarios(prev => prev.map(u => u.id === editando!.id
-      ? { ...u, nombre: form.nombre, rol: form.rol, cuenta_cte: form.rol === 'cliente' ? form.cuenta_cte : null, telefono: form.telefono || null, notas: form.notas || null }
+      ? { ...u, nombre: form.nombre, rol: form.rol, cuenta_cte: form.rol === 'cliente' ? form.cuenta_cte : null, telefono: form.telefono || null, notas: form.notas || null, ve_ganancias: form.rol === 'cliente' ? false : veGanancias }
       : u))
     setModal(null)
   }
@@ -148,17 +136,14 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
                 <div className="flex items-center gap-1.5 ml-2 shrink-0">
                   <span title={u.activo ? 'Activo' : 'Suspendido'} className={`inline-block w-2.5 h-2.5 rounded-full ${u.activo ? 'bg-green-500' : 'bg-red-400'}`} />
                   <span className={ROL_COLORS[u.rol] ?? 'tag tag-gray'}>
-                    {ROL_LABEL[u.rol as Rol] ?? u.rol}
+                    {ROL_LABELS[u.rol] ?? u.rol}
                   </span>
-                  {veGanancias(u.rol) && <span title="Ve el módulo de Ganancias">💰</span>}
+                  {u.ve_ganancias && <span title="Acceso a Ganancias (superadmin)">💰</span>}
                 </div>
               </div>
               {u.cuenta_cte && <p className="text-xs text-gray-500 mb-1">Cuenta: {u.cuenta_cte}</p>}
               {u.notas && <p className="text-xs text-gray-400 italic mb-2">{u.notas}</p>}
               <div className="flex gap-2 flex-wrap mt-2">
-                {!puedoTocar(u) ? (
-                  <span className="text-xs text-gray-400 italic">🔒 Solo otro Superadmin puede administrar esta cuenta.</span>
-                ) : (<>
                 <button onClick={() => abrirEditar(u)} className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-colors">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                   Editar
@@ -177,7 +162,6 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   Eliminar
                 </button>
-                </>)}
               </div>
             </div>
           ))}
@@ -206,9 +190,9 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
                   <td className="px-3 py-3 text-gray-500 text-xs">{u.telefono ?? '—'}</td>
                   <td className="px-3 py-3">
                     <span className={ROL_COLORS[u.rol] ?? 'tag tag-gray'}>
-                      {ROL_LABEL[u.rol as Rol] ?? u.rol}
+                      {ROL_LABELS[u.rol] ?? u.rol}
                     </span>
-                    {veGanancias(u.rol) && <span className="ml-1" title="Ve el módulo de Ganancias">💰</span>}
+                    {u.ve_ganancias && <span className="ml-1" title="Acceso a Ganancias (superadmin)">💰</span>}
                   </td>
                   <td className="px-3 py-3 text-gray-600 text-xs">{u.cuenta_cte ?? '—'}</td>
                   <td className="px-3 py-3 text-center">
@@ -219,9 +203,6 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex items-center justify-center gap-0.5">
-                      {!puedoTocar(u) ? (
-                        <span title="Solo otro Superadmin puede administrar esta cuenta" className="text-gray-300">🔒</span>
-                      ) : (<>
                       <button onClick={() => abrirEditar(u)} title="Editar usuario" className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
@@ -237,7 +218,6 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
                       <button onClick={() => eliminarUsuario(u)} title="Eliminar usuario" className="p-1.5 rounded-md text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
-                      </>)}
                     </div>
                   </td>
                 </tr>
@@ -294,11 +274,10 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
                 <div>
                   <label className="label">Rol *</label>
                   <select className="input" value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value, cuenta_cte: '' }))}>
-                    {rolesAsignables.map(r => (
-                      <option key={r} value={r}>{ROL_LABEL[r]}</option>
-                    ))}
+                    <option value="cliente">Cliente</option>
+                    <option value="operador">Operador</option>
+                    <option value="superusuario">Superusuario</option>
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">{ROL_DESCRIPCION[form.rol as Rol] ?? ''}</p>
                 </div>
                 {form.rol === 'cliente' && (
                   <div>
@@ -356,17 +335,11 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
               </div>
               <div>
                 <label className="label">Rol *</label>
-                <select className="input" value={form.rol} disabled={esMiUsuario}
-                  onChange={e => setForm(f => ({ ...f, rol: e.target.value, cuenta_cte: '' }))}>
-                  {rolesAsignables.map(r => (
-                    <option key={r} value={r}>{ROL_LABEL[r]}</option>
-                  ))}
+                <select className="input" value={form.rol} onChange={e => setForm(f => ({ ...f, rol: e.target.value, cuenta_cte: '' }))}>
+                  <option value="cliente">Cliente</option>
+                  <option value="operador">Operador</option>
+                  <option value="superusuario">Superusuario</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {esMiUsuario
-                    ? 'Nadie puede modificar su propio rol.'
-                    : ROL_DESCRIPCION[form.rol as Rol] ?? ''}
-                </p>
               </div>
               {form.rol === 'cliente' && (
                 <div>
@@ -377,7 +350,18 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
                   </select>
                 </div>
               )}
-
+              {form.rol !== 'cliente' && (
+                <label className="flex items-start gap-2.5 p-3 rounded-lg border border-gray-200 bg-gray-50 cursor-pointer">
+                  <input type="checkbox" className="mt-0.5 accent-purple-600"
+                    checked={veGanancias} onChange={e => setVeGanancias(e.target.checked)} />
+                  <span className="text-sm">
+                    <span className="font-medium text-gray-900">💰 Acceso a Ganancias (superadmin)</span>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      Permiso individual, independiente del rol: habilita el módulo de resultados del negocio.
+                    </span>
+                  </span>
+                </label>
+              )}
               <div>
                 <label className="label">Notas internas</label>
                 <textarea className="input h-20 resize-none" placeholder="Observaciones..."

@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { esStaff } from '@/lib/roles'
 
 export default async function DeudoresPage() {
   const supabase = await createClient()
@@ -9,7 +8,7 @@ export default async function DeudoresPage() {
 
   const { data: profile } = await supabase
     .from('profiles').select('rol').eq('id', user.id).single()
-  if (!profile || !esStaff((profile as any).rol)) redirect('/dashboard')
+  if (!profile || !['superusuario', 'operador'].includes((profile as any).rol)) redirect('/dashboard')
 
   const { data: saldos } = await supabase
     .from('saldos_cuenta_corriente')

@@ -1,9 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import GananciasView, { type DiaAgg, type ParAgg } from '@/components/ganancias/GananciasView'
-import { veGanancias } from '@/lib/roles'
 
-// Módulo de Ganancias — exclusivo del rol superadmin (ver src/lib/roles.ts).
+// Módulo de Ganancias — acceso por permiso INDIVIDUAL (profiles.ve_ganancias).
 // Réplica de la solapa COLO: el servidor agrega por día las operaciones COMPRA/VENTA/
 // GASTOS del período usando las columnas CALCULADAS POR LA PLANILLA (exactitud
 // garantizada); el cliente aplica la configuración (par, cta cte, valuación del stock,
@@ -46,18 +45,18 @@ export default async function GananciasPage({
   if (!user) redirect('/login')
 
   const { data: profileData } = await supabase
-    .from('profiles').select('rol').eq('id', user.id).single()
-  const profile = profileData as { rol: string } | null
+    .from('profiles').select('rol, ve_ganancias').eq('id', user.id).single()
+  const profile = profileData as { rol: string; ve_ganancias?: boolean } | null
 
-  if (!veGanancias(profile?.rol)) {
+  if (!profile?.ve_ganancias) {
     return (
       <div className="p-4 md:p-6 space-y-4 max-w-3xl">
         <div className="card p-8 text-center space-y-3">
           <p className="text-4xl">🔒</p>
           <p className="font-semibold text-gray-900">Acceso restringido</p>
           <p className="text-sm text-gray-500 max-w-md mx-auto">
-            El módulo de Ganancias es exclusivo del rol <b>Superadmin</b>, que tu usuario no tiene.
-            Solo otro Superadmin puede asignarlo, desde la pantalla de <b>Usuarios</b>.
+            El módulo de Ganancias usa un permiso individual (💰) que hoy tu usuario no tiene.
+            Se habilita desde <b>Usuarios</b>, marcando el acceso a Ganancias en el perfil.
           </p>
         </div>
       </div>
