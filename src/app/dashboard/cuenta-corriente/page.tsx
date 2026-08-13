@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import FiltrosMovimientos from '@/components/cuenta-corriente/FiltrosMovimientos'
 import TablaMovimientos from '@/components/cuenta-corriente/TablaMovimientos'
 import TarjetasSaldos from '@/components/cuenta-corriente/TarjetasSaldos'
+import { esStaff, esCliente } from '@/lib/roles'
 
 // El servidor (Netlify) corre en UTC sin importar el huso del usuario: usar la fecha
 // local del proceso daría el día siguiente durante la noche en Argentina. Se fija
@@ -25,14 +26,14 @@ export default async function CuentaCorrientePage({
   const profile = profileData as { rol: string; cuenta_cte: string | null; nombre: string } | null
   if (!profile) redirect('/login')
 
-  const esStaff = profile.rol === 'superusuario' || profile.rol === 'operador'
-  const esCliente = profile.rol === 'cliente'
+  const staff = esStaff(profile.rol)
+  const cliente = esCliente(profile.rol)
 
-  const cuentaFiltro = esCliente
+  const cuentaFiltro = cliente
     ? profile.cuenta_cte
     : searchParams.cuenta || null
 
-  if (esCliente && !profile.cuenta_cte) {
+  if (cliente && !profile.cuenta_cte) {
     return (
       <div className="p-4 md:p-8">
         <div className="card p-6 text-center text-gray-500">
@@ -50,7 +51,7 @@ export default async function CuentaCorrientePage({
 
   // Lista de cuentas para el selector (solo staff)
   let cuentasList: string[] = []
-  if (esStaff) {
+  if (staff) {
     const { data: cuentasData } = await supabase
       .from('cuentas_corrientes').select('nombre').eq('activo', true).order('nombre')
     cuentasList = (cuentasData ?? []).map((c: any) => c.nombre)
@@ -155,7 +156,7 @@ export default async function CuentaCorrientePage({
             cuenta: searchParams.cuenta ?? '',
           }}
           cuentas={cuentasList}
-          esSuperusuarioOOperador={esStaff}
+          esSuperusuarioOOperador={staff}
         />
       </div>
 

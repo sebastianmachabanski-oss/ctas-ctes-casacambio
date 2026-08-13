@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ListaCalle from '@/components/calle/ListaCalle'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
+import { esAdmin, esStaff } from '@/lib/roles'
 
 // Dinero "en la calle": movimientos cuyo campo DEBE tiene un repartidor cargado — plata
 // que todavía no se integró a la caja. Réplica del recuadro rojo "Calle" de la solapa
@@ -17,7 +18,7 @@ export default async function CallePage() {
   const { data: profileData } = await supabase
     .from('profiles').select('rol').eq('id', user.id).single()
   const rol = (profileData as { rol: string } | null)?.rol
-  if (rol !== 'superusuario' && rol !== 'operador') redirect('/dashboard')
+  if (!esStaff(rol)) redirect('/dashboard')
 
   const { data, error } = await supabase.from('movimientos_caja')
     .select('*')
@@ -45,13 +46,13 @@ export default async function CallePage() {
         <ListaCalle
           movimientos={movimientos}
           totales={totales}
-          puedeIngresar={rol === 'superusuario'}
+          puedeIngresar={esAdmin(rol)}
         />
       )}
 
       {/* Aviso de convivencia: describe un efecto REAL de la fuente externa de datos.
           Desaparece solo cuando se apaga PLANILLA_ACTIVA (ver src/lib/planilla.ts). */}
-      {rol === 'superusuario' && PLANILLA_ACTIVA && (
+      {esAdmin(rol) && PLANILLA_ACTIVA && (
         <div className="banner-warn">
           ⚠️ Marcar un ingreso acá <b>no borra el DEBE en el origen externo de datos</b>:
           si allá sigue cargado, la próxima sincronización lo vuelve a mostrar. Hasta que
