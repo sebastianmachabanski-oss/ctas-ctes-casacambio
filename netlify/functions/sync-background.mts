@@ -57,7 +57,25 @@ function parseNumeroPreciso(val: any): number | null {
   return redondeado === 0 && String(val).trim() !== '0' ? null : redondeado
 }
 
+// Descarta una fecha que no exista de verdad. Sin esto, una sola celda mal escrita
+// hacía fallar el insert COMPLETO de `diario` (16.500 filas) con un error de Postgres;
+// mejor saltear la fila y cargar el resto.
+function fechaValida(iso: string | null): string | null {
+  if (!iso) return null
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return null
+  const [y, mes, dia] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null
+  const d = new Date(Date.UTC(y, mes - 1, dia))
+  if (d.getUTCFullYear() !== y || d.getUTCMonth() + 1 !== mes || d.getUTCDate() !== dia) return null
+  return iso
+}
+
 function parseFecha(val: any): string | null {
+  return fechaValida(parseFechaCruda(val))
+}
+
+function parseFechaCruda(val: any): string | null {
   if (!val) return null
   if (val instanceof Date) {
     const y = val.getFullYear()
@@ -79,8 +97,11 @@ function parseFecha(val: any): string | null {
     const [d, m, y] = s.split('/')
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
   }
+  // Año de dos dígitos. Formato argentino DÍA/MES/AÑO, igual que la rama de arriba:
+  // hasta el 13/8/2026 esta rama leía mes/día e inventaba fechas como "2024-29-11",
+  // que hacían fallar la carga entera de `diario` con "date/time field value out of range".
   if (s.match(/^\d{1,2}\/\d{1,2}\/\d{2}$/)) {
-    const [m, d, y] = s.split('/')
+    const [d, m, y] = s.split('/')
     return `${parseInt(y) + 2000}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
   }
   if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0, 10)
