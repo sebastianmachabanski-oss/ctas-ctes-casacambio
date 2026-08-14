@@ -1,6 +1,5 @@
 // Sync CAJA — planilla (Drive/Sheets) → base de datos. Ver docs/SINCRONIZACION.md.
 import { createClient } from "@supabase/supabase-js"
-import * as XLSX from "xlsx"
 import { calcularMovimiento, COLUMNAS_SALIDA } from "../../src/lib/motor-calculo/index"
 import { calcularHuella, AUTOR_PLANILLA } from "../../src/lib/auditoria"
 
@@ -10,15 +9,13 @@ import { calcularHuella, AUTOR_PLANILLA } from "../../src/lib/auditoria"
 // Se invoca desde las funciones programadas (cron-sync-*.mts), nunca por cron directo,
 // porque las scheduled tienen un límite de 30s y esto puede tardar más.
 //
-// Fuente de datos conmutable por env var SYNC_SOURCE:
-//   - 'excel'  (default): baja el .xlsx de Drive y lo parsea con xlsx (comportamiento histórico).
-//   - 'sheets':           lee el Google Sheet nativo con la Sheets API (más rápido y simple).
-// Mientras SYNC_SOURCE no sea 'sheets', NO cambia nada respecto de hoy.
-const EXCEL_FILE_ID = '1tuURACcfs09rRkynmVLqLD90Je5r-u58'              // .xlsx viejo (Drive)
-const SHEET_ID      = '1BxW5TGUbi12LHATOIjnkBc71GY9JZARsy5_LP5Sl1CE'  // Google Sheet nuevo
-const SHEET_NAME    = 'CAJA'
-const SYNC_SOURCE: 'excel' | 'sheets' = process.env.SYNC_SOURCE === 'sheets' ? 'sheets' : 'excel'
-const ACTIVE_FILE_ID = SYNC_SOURCE === 'sheets' ? SHEET_ID : EXCEL_FILE_ID
+// El Google Sheet es el ÚNICO origen (regla del dominio, 11/8/2026). El camino al .xlsx
+// viejo de Drive existió hasta hoy conmutable por la env var SYNC_SOURCE, con 'excel' por
+// DEFECTO: si la variable faltaba, el sync recargaba la base entera desde el archivo
+// equivocado sin ningún aviso.
+const SHEET_ID   = '1BxW5TGUbi12LHATOIjnkBc71GY9JZARsy5_LP5Sl1CE'
+const SHEET_NAME = 'CAJA'
+const ACTIVE_FILE_ID = SHEET_ID
 const WINDOW_DAYS = 30
 const BATCH       = 1000
 const CONCURRENCY = 8
@@ -168,44 +165,9 @@ async function getFileModifiedTime(token: string): Promise<string | null> {
   return data.modifiedTime ?? null
 }
 
-// Lee la solapa CAJA como matriz de filas (any[][]), eligiendo la fuente según SYNC_SOURCE.
-async function readSheetRows(token: string): Promise<any[][]> {
-  return SYNC_SOURCE === 'sheets' ? readFromSheets(token) : readFromExcel(token)
-}
-
-// Fuente 'excel': baja el binario .xlsx de Drive y lo parsea con xlsx (comportamiento histórico).
-async function readFromExcel(token: string): Promise<any[][]> {
-  const url = `https://www.googleapis.com/drive/v3/files/${EXCEL_FILE_ID}?alt=media`
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-  if (!res.ok) throw new Error(`Error descargando archivo: ${res.status} ${res.statusText}`)
-  const buffer = await res.arrayBuffer()
-  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true })
-  const sheet = workbook.Sheets[SHEET_NAME]
-  if (!sheet) throw new Error(`Pestaña "${SHEET_NAME}" no encontrada`)
-  return XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, cellDates: true })
-}
-
-// Fuente 'sheets': lee los valores del Google Sheet nativo con la Sheets API. Devuelve la
-// grilla tal como se ve (FORMATTED_VALUE): fechas como texto d/m/aaaa y montos formateados,
-// que parseFecha/parseMonto ya saben interpretar.
-async function readFromSheets(token: string): Promise<any[][]> {
-  const range = encodeURIComponent(SHEET_NAME)
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}` +
-              `?valueRenderOption=FORMATTED_VALUE&majorDimension=ROWS`
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-  if (!res.ok) {
-    const msg = await res.text()
-    throw new Error(`Error leyendo Google Sheet: ${res.status} ${msg}`)
-  }
-  const data = await res.json()
-  return (data.values ?? []) as any[][]
-}
-
-// Igual que readFromSheets pero con UNFORMATTED_VALUE: números crudos (sin el redondeo
-// del formato de celda) y fechas como serial. La usa el espejo de CAJA para que las sumas
-// coincidan EXACTO con la aritmética interna de la planilla — leyendo valores formateados
-// se acumula deriva de redondeo (medida en la reconciliación de julio 2026: ~7 dólares en
-// 34.000 filas). parseFecha ya interpreta seriales y parseMonto números.
+// NO existe una lectura FORMATEADA a propósito: la fecha "01/09/2026" no se puede
+// desambiguar entre 1 de septiembre y 9 de enero, y eso dejó `diario` con el día y el mes
+// cambiados. Todo se lee sin formato, donde la fecha llega como número de serie.
 async function readFromSheetsUnformatted(token: string): Promise<any[][]> {
   const range = encodeURIComponent(SHEET_NAME)
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${range}` +
@@ -570,11 +532,11 @@ export default async function handler(req: Request) {
   const recordRun = (payload: any) => {
     const at = new Date().toISOString()
     const duration_s = Math.round((Date.parse(at) - Date.parse(startedAt)) / 1000)
-    return setSyncState(supabase, 'last_run', JSON.stringify({ started_at: startedAt, at, duration_s, source: SYNC_SOURCE, ...payload })).catch(() => {})
+    return setSyncState(supabase, 'last_run', JSON.stringify({ started_at: startedAt, at, duration_s, source: 'sheets', ...payload })).catch(() => {})
   }
 
   try {
-    console.log(`🔎 Fuente de datos: ${SYNC_SOURCE} (${ACTIVE_FILE_ID})`)
+    console.log(`🔎 Fuente de datos: Google Sheet (${ACTIVE_FILE_ID})`)
     const token = await getGoogleToken()
 
     // En modo incremental, si el archivo no cambió desde la última corrida, no hacemos nada.
@@ -588,7 +550,18 @@ export default async function handler(req: Request) {
       }
     }
 
-    const rows = await readSheetRows(token)
+    // Se lee SIN formato (UNFORMATTED) y esa lectura alimenta TODO.
+    //
+    // Antes `diario` se armaba con la lectura FORMATEADA, o sea con la fecha tal como se
+    // ve en pantalla, y había que adivinar si "01/09/2026" era 1 de septiembre o 9 de
+    // enero. La planilla la muestra como MES/DÍA y el parser asumía DÍA/MES, así que
+    // todas las fechas con día ≤ 12 quedaban con el día y el mes cambiados. Solo se
+    // notaban las que caían en el futuro (742 filas el 13/8/2026); el resto estaba mal
+    // igual, en silencio.
+    //
+    // Sin formato, la celda llega como número de serie: no hay ambigüedad posible.
+    // Es la misma regla que ya seguía `movimientos_caja` y la que manda el dominio.
+    const rows = await readFromSheetsUnformatted(token)
     if (rows.length < 2) throw new Error('El sheet está vacío')
     const todos = parseMovimientos(rows)
     // Lista de clientes para el selector de Nueva Transacción: se recalcula siempre sobre
@@ -597,9 +570,7 @@ export default async function handler(req: Request) {
 
     // Espejo completo de CAJA → movimientos_caja (todas las operaciones, no solo CTA CTE).
     // Corre en el mismo modo (full/incremental) y valida sus propias sumas al terminar.
-    // Lee valores SIN formato para coincidir exacto con la planilla (la fuente excel ya
-    // viene cruda por raw:true; para sheets se hace una segunda lectura UNFORMATTED).
-    const rowsCaja = SYNC_SOURCE === 'sheets' ? await readFromSheetsUnformatted(token) : rows
+    const rowsCaja = rows
     const desdeCaja = new Date()
     desdeCaja.setDate(desdeCaja.getDate() - WINDOW_DAYS)
     const caja = await syncCaja(supabase, parseMovimientosCaja(rowsCaja), mode, desdeCaja.toISOString().slice(0, 10))
