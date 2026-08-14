@@ -225,10 +225,22 @@ function parseMovimientos(rows: any[][]): any[] {
   const iExterno = col('EXTERNO')
   const iMonto   = col('MONTO')
   const iNotas   = col('NOTAS')
-  const iCCPesos = headers.findIndex(h => h === 'PESOS')
-  const iCCDolar = headers.findIndex(h => h === 'DOLARES')
-  const iCCEuro  = headers.findIndex(h => h === 'EUROS')
-  const iCCReal  = headers.findIndex(h => h === 'REALES')
+  // Columnas de CUENTA CORRIENTE, no las de caja.
+  //
+  // Hasta el 14/8/2026 esto leía 'PESOS'/'DOLARES'/'EUROS'/'REALES', que son las columnas
+  // de CAJA. Dos consecuencias:
+  //   - Los signos salían todos invertidos, porque la planilla llena la columna de caja y
+  //     la de cuenta corriente con signos opuestos. Parecía una convención deliberada.
+  //   - Cuando las dos patas están en monedas distintas, el importe caía en la moneda
+  //     equivocada. Ejemplo real (fila 12514): EGRESAN DOLARES → PESOS por 13.000; la
+  //     planilla lo pone en CC PESOS y la app lo ponía en dólares.
+  //
+  // La moneda de la cuenta corriente la define la columna EXTERNO, no PROPIO, y la
+  // planilla ya la resolvió al calcular estas columnas: alcanza con leerlas.
+  const iCCPesos = headers.findIndex(h => h === 'CC PESOS')
+  const iCCDolar = headers.findIndex(h => h === 'CC DOLARES')
+  const iCCEuro  = headers.findIndex(h => h === 'CC EUROS')
+  const iCCReal  = headers.findIndex(h => h === 'CC REALES')
 
   const movimientos: any[] = []
   for (let i = headerIdx + 1; i < rows.length; i++) {
