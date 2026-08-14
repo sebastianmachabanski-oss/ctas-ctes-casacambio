@@ -75,25 +75,41 @@ export default async function CuentaCorrientePage({
     desdeQuery = minData?.[0]?.fecha || '2000-01-01'
   }
 
-  let query = supabase.from('diario').select('*', { count: 'exact' })
-    .eq('tipo', 'CTA CTE').eq('anulado', false)
-    .gte('fecha', desdeQuery)
-    .lte('fecha', hastaQuery)
-    .order('fecha', { ascending: false })
-    // Orden secundario estable: dentro de un mismo día, del más nuevo al más viejo.
-    // Necesario para que el saldo acumulado sea determinístico.
-    .order('created_at', { ascending: false })
+  // OJO: Postgrest corta CUALQUIER respuesta en 1.000 filas si no se pagina. Las cuentas
+  // grandes tienen más movimientos que eso: sin el `range` la lista salía incompleta y el
+  // saldo acumulado no cerraba contra el saldo de la cuenta (aviso del 13/8/2026).
+  const armarQuery = () => {
+    let q = supabase.from('diario').select('*', { count: 'exact' })
+      .eq('tipo', 'CTA CTE').eq('anulado', false)
+      .gte('fecha', desdeQuery)
+      .lte('fecha', hastaQuery)
+      .order('fecha', { ascending: false })
+      // Orden secundario estable: dentro de un mismo día, del más nuevo al más viejo.
+      // Necesario para que el saldo acumulado sea determinístico.
+      .order('created_at', { ascending: false })
+      // Desempate final: sin él, dos filas del mismo día y el mismo instante pueden
+      // volver en distinto orden entre páginas y duplicarse o perderse.
+      .order('id', { ascending: false })
 
-  if (cuentaFiltro) query = query.eq('cuenta_cte', cuentaFiltro)
-  // "Tipo de movimiento" filtra por DIRECCIÓN (ingreso/egreso), no por un código exacto:
-  // los movimientos usan INGRESAN/EGRESAN (planilla y app) y datos viejos DONACION/COMPROMISO.
-  // "INGRES" no es subcadena de "EGRESAN" ni viceversa, así que no se pisan.
-  if (operacion === 'INGRESO') query = query.or('operacion.ilike.*INGRES*,operacion.eq.DONACION')
-  else if (operacion === 'EGRESO') query = query.or('operacion.ilike.*EGRES*,operacion.eq.COMPROMISO')
+    if (cuentaFiltro) q = q.eq('cuenta_cte', cuentaFiltro)
+    // "Tipo de movimiento" filtra por DIRECCIÓN (ingreso/egreso), no por un código exacto:
+    // los movimientos usan INGRESAN/EGRESAN (planilla y app) y datos viejos DONACION/COMPROMISO.
+    // "INGRES" no es subcadena de "EGRESAN" ni viceversa, así que no se pisan.
+    if (operacion === 'INGRESO') q = q.or('operacion.ilike.*INGRES*,operacion.eq.DONACION')
+    else if (operacion === 'EGRESO') q = q.or('operacion.ilike.*EGRES*,operacion.eq.COMPROMISO')
+    return q
+  }
 
-  const { data, count } = await query
-  const movimientos = (data ?? []) as any[]
-  const totalMovimientos = count ?? 0
+  const PAGINA = 1000
+  const movimientos: any[] = []
+  let totalMovimientos = 0
+  for (let from = 0; ; from += PAGINA) {
+    const { data, count } = await armarQuery().range(from, from + PAGINA - 1)
+    const filas = (data ?? []) as any[]
+    if (from === 0) totalMovimientos = count ?? 0
+    movimientos.push(...filas)
+    if (filas.length < PAGINA) break
+  }
 
   // ── Saldo acumulado por fila (como el extracto del mockup) ──
   // Solo con UNA cuenta elegida y sin filtro de tipo (si no, el acumulado mentiría).
