@@ -13,6 +13,8 @@ function LoginForm() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
+    // Volver a ocultarla al enviar: si quedó revelada, no debe seguir a la vista.
+    setShowPass(false)
     setLoading(true); setError(null)
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -53,7 +55,12 @@ function LoginForm() {
                 <input id="password" type={showPass ? 'text' : 'password'} className="input pr-10"
                   placeholder="••••••••" value={password}
                   onChange={e => setPassword(e.target.value)} required autoComplete="current-password" />
-                <button type="button" onClick={() => setShowPass(!showPass)}
+                {/* tabIndex -1: fuera del recorrido del tabulador. Con la contraseña
+                    guardada en el navegador, el foco caía en este botón y el Enter lo
+                    activaba en vez de enviar el formulario, dejando la clave a la vista. */}
+                <button type="button" tabIndex={-1}
+                  aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  onClick={() => setShowPass(!showPass)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg">
                   {showPass ? '🙈' : '👁️'}
                 </button>
