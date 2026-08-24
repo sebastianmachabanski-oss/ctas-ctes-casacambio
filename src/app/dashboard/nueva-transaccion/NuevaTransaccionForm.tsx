@@ -112,7 +112,9 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
   const clientesFiltrados = clientes
     .filter(c => c.toUpperCase().includes(form.cuenta_cte.trim().toUpperCase()))
     .sort((a, b) => a.localeCompare(b, 'es'))
-    .slice(0, 30)
+    // Tope alto: la lista scrollea sola. Con 30 se veía una porción arbitraria del
+    // padrón cuando el campo estaba vacío.
+    .slice(0, 200)
 
   const nombreTipeado = clienteQuery.trim()
   const cuentaNoExiste = nombreTipeado.length > 1 &&

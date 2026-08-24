@@ -19,12 +19,28 @@ export default async function NuevaTransaccionPage() {
   //  - CAJA: sugerencias de los clientes ya conocidos, pero SIGUE siendo texto libre.
   //    La regla de dominio del 5/7/2026 no cambia: son clientes eventuales y no se
   //    normalizan. El desplegable ayuda a no re-tipear, no obliga a elegir.
-  const [{ data: cuentasData }, { data: clientesData }] = await Promise.all([
-    supabase.from('cuentas_corrientes').select('nombre').eq('activo', true).order('nombre'),
-    supabase.from('clientes').select('nombre').eq('activo', true).order('nombre'),
+  //
+  // OJO: hay más de 1.000 clientes y Postgrest corta CUALQUIER respuesta en 1.000 filas
+  // si no se pagina. Sin el `range` la lista llegaba truncada y, como viene ordenada
+  // alfabéticamente, los clientes del final del abecedario no aparecían nunca (25/8/2026).
+  const traerNombres = async (tabla: string): Promise<string[]> => {
+    const PAGINA = 1000
+    const acc: string[] = []
+    for (let desde = 0; ; desde += PAGINA) {
+      const { data } = await supabase.from(tabla)
+        .select('nombre').eq('activo', true).order('nombre')
+        .range(desde, desde + PAGINA - 1)
+      const filas = (data ?? []) as any[]
+      acc.push(...filas.map(c => c.nombre))
+      if (filas.length < PAGINA) break
+    }
+    return acc
+  }
+
+  const [cuentas, clientes] = await Promise.all([
+    traerNombres('cuentas_corrientes'),
+    traerNombres('clientes'),
   ])
-  const cuentas  = (cuentasData  ?? []).map((c: any) => c.nombre)
-  const clientes = (clientesData ?? []).map((c: any) => c.nombre)
 
   // Umbral de alerta en DÓLARES (configurable en app_config; tolerante si falta la
   // migración: usa el valor por defecto).
