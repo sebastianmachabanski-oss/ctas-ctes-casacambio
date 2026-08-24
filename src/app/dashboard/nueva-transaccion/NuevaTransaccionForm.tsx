@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import SelectBuscable from '@/components/SelectBuscable'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 
 // CHEQUES opera igual que el resto, en CAJA y en cuenta corriente: el cheque entra en la
@@ -16,29 +17,6 @@ const SIMBOLOS: Record<string, string> = {
 }
 const nfPreview = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
 
-/**
- * Salto por inicial en un desplegable, una tecla a la vez.
- *
- * El comportamiento nativo acumula las teclas y las trata como UNA búsqueda: al tocar
- * E y después V busca "EV", que no existe en la lista, y el desplegable no se mueve.
- * Con esto cada tecla arranca una búsqueda nueva, así E va a EGRESAN y V a VENTA.
- * Tocar la misma tecla otra vez cicla entre las opciones que empiezan igual.
- */
-function saltarPorInicial(
-  opciones: string[],
-  valorActual: string,
-  elegir: (v: string) => void,
-) {
-  return (e: React.KeyboardEvent<HTMLSelectElement>) => {
-    if (e.key.length !== 1 || e.altKey || e.ctrlKey || e.metaKey) return
-    const inicial = e.key.toUpperCase()
-    const coincidencias = opciones.filter(o => o.toUpperCase().startsWith(inicial))
-    if (!coincidencias.length) return
-    e.preventDefault()
-    const i = coincidencias.indexOf(valorActual)
-    elegir(coincidencias[(i + 1) % coincidencias.length])
-  }
-}
 
 // Monto con separador de miles en vivo (como el mockup): puntos de miles, coma decimal.
 function fmtMonto(s: string): string {
@@ -538,27 +516,18 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
         )}
         <div>
           <label className="label">Operación<Required /></label>
-          <select className="input" value={form.operacion}
-            onChange={e => set('operacion', e.target.value)}
-            onKeyDown={saltarPorInicial(operacionesDisponibles, form.operacion, v => set('operacion', v))}>
-            {operacionesDisponibles.map(op => <option key={op} value={op}>{op}</option>)}
-          </select>
+          <SelectBuscable id="operacion" value={form.operacion} opciones={operacionesDisponibles}
+            onChange={v => set('operacion', v)} required />
         </div>
         <div>
           <label className="label">Moneda propia<Required /></label>
-          <select className="input" value={form.propio}
-            onChange={e => set('propio', e.target.value)}
-            onKeyDown={saltarPorInicial(monedasDisponibles(form.tipo), form.propio, v => set('propio', v))}>
-            {monedasDisponibles(form.tipo).map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
+          <SelectBuscable id="propio" value={form.propio} opciones={monedasDisponibles(form.tipo)}
+            onChange={v => set('propio', v)} required />
         </div>
         <div>
           <label className="label">Moneda externa<Required /></label>
-          <select className="input" value={form.externo}
-            onChange={e => set('externo', e.target.value)}
-            onKeyDown={saltarPorInicial(monedasDisponibles(form.tipo), form.externo, v => set('externo', v))}>
-            {monedasDisponibles(form.tipo).map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
+          <SelectBuscable id="externo" value={form.externo} opciones={monedasDisponibles(form.tipo)}
+            onChange={v => set('externo', v)} required />
         </div>
         <div>
           <label className="label">Monto<Required /></label>
