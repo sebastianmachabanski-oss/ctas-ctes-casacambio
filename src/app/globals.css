@@ -206,6 +206,39 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .cc-tbl .zero { color: #c3ccd8; }
 .tbl-wrap { overflow-x: auto; }
 
+/* Barra de desplazamiento SIEMPRE visible en las tablas anchas.
+   Por defecto Windows y Chrome usan barras "overlay": aparecen al scrollear y
+   desaparecen, así que no se ve que la tabla sigue hacia la derecha y hay que
+   descubrirlo con las flechas (pedido del 25/8/2026). */
+.tbl-wrap {
+  scrollbar-width: thin;                      /* Firefox */
+  scrollbar-color: var(--ink-2) var(--grid);
+  padding-bottom: 2px;
+}
+.tbl-wrap::-webkit-scrollbar { height: 10px; }
+.tbl-wrap::-webkit-scrollbar-track { background: var(--grid); border-radius: 999px; }
+.tbl-wrap::-webkit-scrollbar-thumb {
+  background: #9aa6b6; border-radius: 999px; border: 2px solid var(--grid);
+}
+.tbl-wrap::-webkit-scrollbar-thumb:hover { background: var(--ink-2); }
+
+/* Área de tabla con alto acotado: sin esto la barra horizontal queda al pie de TODAS
+   las filas y hay que bajar hasta el final para alcanzarla — por eso el desplazamiento
+   lateral solo se lograba con las flechas (25/8/2026). */
+.tbl-scroll { max-height: 62vh; overflow: auto; }
+.tbl-scroll thead th { position: sticky; top: 0; background: var(--card); z-index: 2; }
+/* Segunda fila (filtros por columna): se apoya debajo de la primera. */
+.tbl-scroll thead tr.tx-filtros th { top: 25px; z-index: 2; }
+
+/* Variante compacta: más columnas a la vista sin perder legibilidad.
+   Se usa en Transacciones, que es la tabla con más columnas. */
+.cc-tbl.densa { font-size: 12px; }
+.cc-tbl.densa th { font-size: 9.5px; padding: 6px 9px; letter-spacing: .03em; }
+.cc-tbl.densa td { padding: 5px 9px; }
+.cc-tbl.densa .tag { font-size: 10px; padding: 1px 6px; }
+.cc-tbl.densa .imp { font-size: 11px; padding: 2px 6px; }
+.cc-tbl.densa .srch { font-size: 11px; padding: 3px 6px; }
+
 /* formulario fluido (estilo mockup): los campos se acomodan al ancho */
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
 .banner-warn { background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-ink); border-radius: 11px; padding: 13px 16px; font-size: 13px; line-height: 1.5; }
