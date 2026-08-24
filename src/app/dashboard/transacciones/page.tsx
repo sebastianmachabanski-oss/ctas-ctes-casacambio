@@ -32,6 +32,12 @@ export default async function TransaccionesPage({
     .select('*', { count: 'exact' })
     .neq('operacion', 'OPERACION?')
     .order('fecha', { ascending: false })
+    // Desempate dentro del mismo día. Las transacciones cargadas en la app nacen con
+    // `fila_sheet` en null —todavía no tienen lugar en la planilla—, así que entre varias
+    // del mismo día el orden quedaba indefinido. `creado_at` las ordena de la más nueva a
+    // la más vieja; las que vienen de la planilla no lo tienen y caen después, ordenadas
+    // por su posición en el Sheet.
+    .order('creado_at', { ascending: false, nullsFirst: false })
     .order('fila_sheet', { ascending: false })
   if (desde) query = query.gte('fecha', desde)
   if (hasta) query = query.lte('fecha', hasta)
