@@ -6,7 +6,7 @@ import { PLANILLA_ACTIVA } from '@/lib/planilla'
 
 type Mov = {
   id: string; fecha: string; cliente: string | null; operacion: string; monto: number
-  tipo: string; debe: string | null; cot: number | null
+  tipo: string; debe: string | null; cot: number | null; notas: string | null
   creado_por: string | null; creado_at: string | null
   editado_por: string | null; editado_at: string | null
   pesos: number; cheques: number; dolares: number; euros: number; reales: number; usdt: number; banco: number
@@ -62,6 +62,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const [fOp, setFOp] = useState('')
   const [fMin, setFMin] = useState('')
   const [fAutor, setFAutor] = useState('')
+  const [fNotas, setFNotas] = useState('')
   const [borrando, setBorrando] = useState<string | null>(null)
   const [errorBorrar, setErrorBorrar] = useState('')
   const [avisoPlanilla, setAvisoPlanilla] = useState('')
@@ -129,12 +130,15 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
       return autor.includes(qa) || (m.editado_por ?? '').toUpperCase().includes(qa)
     }
 
+    const qn = fNotas.trim().toUpperCase()
+
     return movimientos.filter(m =>
       (m.cliente ?? '').toUpperCase().includes(qc) &&
       (!fOp || m.operacion === fOp) &&
+      (!qn || (m.notas ?? '').toUpperCase().includes(qn)) &&
       filtroAutor(m) &&
       filtroMonto(m))
-  }, [movimientos, fCli, fOp, fMin, fAutor])
+  }, [movimientos, fCli, fOp, fMin, fAutor, fNotas])
 
   // Navegación (rango de fechas y paginación) conservando el estado en la URL.
   function navegar(p: number, d1v = d1, d2v = d2) {
@@ -147,7 +151,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   }
   const buscar = () => navegar(1)  // cambiar el rango vuelve a la página 1
 
-  const ncols = 6 + cols.length + (puedeEditar ? 1 : 0)
+  const ncols = 7 + cols.length + (puedeEditar ? 1 : 0)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
@@ -196,6 +200,10 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 <th style={{ textAlign: 'left' }}>Operación</th>
                 <th>Cot.</th>
                 <th>Monto</th>
+                {/* Notas va en el mismo lugar que en la planilla: después de los datos de
+                    carga y antes de las columnas calculadas. Ancho acotado y con recorte
+                    para no empujar la tabla a scroll horizontal. */}
+                <th style={{ textAlign: 'left' }}>Notas</th>
                 {cols.map(c => <th key={c.key as string}>Imp. {c.sym}</th>)}
                 <th style={{ textAlign: 'left' }} title="Quién cargó la transacción. Las operaciones anteriores a la puesta en marcha del sistema figuran como carga inicial.">Registró</th>
                 {puedeEditar && <th></th>}
@@ -213,6 +221,10 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 </th>
                 <th></th>
                 <th><input className="srch" placeholder="monto · &gt; &lt;" title="Un número busca ese monto exacto. Con > o < filtra por rango (ej. >1000000)" value={fMin} onChange={e => setFMin(e.target.value)} style={{ width: 110, minWidth: 0 }} /></th>
+                <th style={{ textAlign: 'left' }}>
+                  <input className="srch" placeholder="filtrar…" value={fNotas}
+                    onChange={e => setFNotas(e.target.value)} style={{ width: 120, minWidth: 0 }} />
+                </th>
                 {cols.map(c => <th key={c.key as string}></th>)}
                 <th style={{ textAlign: 'left' }}>
                   <input className="srch" placeholder="usuario" value={fAutor}
@@ -232,6 +244,11 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                   <td style={{ textAlign: 'left' }}><span className={`tag ${badge(m.operacion)}`}>{m.operacion}</span></td>
                   <td className="num" style={{ color: 'var(--muted)', fontWeight: 400 }}>{m.cot ? nfCot.format(Number(m.cot)) : <span className="zero">—</span>}</td>
                   <td className="num">{nf.format(montoPrincipal(m))}</td>
+                  <td style={{ textAlign: 'left', fontSize: 12, color: 'var(--muted)' }}>
+                    {m.notas
+                      ? <div title={m.notas} style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.notas}</div>
+                      : <span className="zero">—</span>}
+                  </td>
                   {cols.map(c => {
                     const v = num(m[c.key])
                     return <td key={c.key as string}>{v ? <span className={`imp ${v > 0 ? 'p' : 'n'}`}>{money(v)}</span> : <span className="zero">—</span>}</td>
