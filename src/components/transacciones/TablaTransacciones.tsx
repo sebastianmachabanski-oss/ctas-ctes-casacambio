@@ -95,6 +95,10 @@ export default function TablaTransacciones({ movimientos, puedeEditar = false }:
               <th className="px-4 py-3">Operación</th>
               <th className="px-4 py-3">Detalle</th>
               <th className="px-4 py-3 text-right">Monto</th>
+              {/* Notas va acá, en el mismo lugar que en la planilla: después de MONTO y
+                  antes de las columnas calculadas. Ancho acotado y con recorte, para no
+                  empujar la tabla a scroll horizontal. */}
+              <th className="px-4 py-3">Notas</th>
               {colsImpacto.map(c => (
                 <th key={c.key as string} className="px-4 py-3 text-right whitespace-nowrap">{c.sym}</th>
               ))}
@@ -119,6 +123,11 @@ export default function TablaTransacciones({ movimientos, puedeEditar = false }:
                 </td>
                 <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{detalleOperacion(m)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-gray-900 whitespace-nowrap">{nf.format(m.monto)}</td>
+                <td className="px-4 py-2.5 text-gray-500">
+                  {m.notas
+                    ? <div className="max-w-[13rem] truncate" title={m.notas}>{m.notas}</div>
+                    : <span className="text-gray-300">—</span>}
+                </td>
                 {colsImpacto.map(c => (
                   <td key={c.key as string} className="px-4 py-2.5 text-right whitespace-nowrap">
                     <ImpactoCelda v={(m[c.key] as number) ?? 0} />
@@ -160,6 +169,7 @@ export default function TablaTransacciones({ movimientos, puedeEditar = false }:
               <span className="text-sm tabular-nums text-gray-700">Monto: {nf.format(m.monto)}</span>
               <Impactos m={m} />
             </div>
+            {m.notas && <p className="text-xs text-gray-500 mt-1.5">{m.notas}</p>}
             {puedeEditar && (
               <div className="mt-2 text-right">
                 <Link href={`/dashboard/transacciones/${m.id}/editar`}
