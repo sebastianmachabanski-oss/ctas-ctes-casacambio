@@ -63,6 +63,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const [fMin, setFMin] = useState('')
   const [fAutor, setFAutor] = useState('')
   const [fNotas, setFNotas] = useState('')
+  const [fTipo, setFTipo] = useState('')
   const [borrando, setBorrando] = useState<string | null>(null)
   const [errorBorrar, setErrorBorrar] = useState('')
   const [avisoPlanilla, setAvisoPlanilla] = useState('')
@@ -136,9 +137,10 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
       (m.cliente ?? '').toUpperCase().includes(qc) &&
       (!fOp || m.operacion === fOp) &&
       (!qn || (m.notas ?? '').toUpperCase().includes(qn)) &&
+      (!fTipo || m.tipo === fTipo) &&
       filtroAutor(m) &&
       filtroMonto(m))
-  }, [movimientos, fCli, fOp, fMin, fAutor, fNotas])
+  }, [movimientos, fCli, fOp, fMin, fAutor, fNotas, fTipo])
 
   // Navegación (rango de fechas y paginación) conservando el estado en la URL.
   function navegar(p: number, d1v = d1, d2v = d2) {
@@ -151,7 +153,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   }
   const buscar = () => navegar(1)  // cambiar el rango vuelve a la página 1
 
-  const ncols = 7 + cols.length + (puedeEditar ? 1 : 0)
+  const ncols = 8 + cols.length + (puedeEditar ? 1 : 0)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
@@ -196,6 +198,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
             <thead>
               <tr>
                 <th>Fecha</th>
+                <th style={{ textAlign: 'left' }}>Tipo</th>
                 <th style={{ textAlign: 'left' }}>Cliente</th>
                 <th style={{ textAlign: 'left' }}>Operación</th>
                 <th>Cot.</th>
@@ -210,6 +213,14 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               </tr>
               <tr className="tx-filtros">
                 <th></th>
+                <th style={{ textAlign: 'left' }}>
+                  <select className="srch" value={fTipo} onChange={e => setFTipo(e.target.value)}
+                    style={{ width: 100, minWidth: 0 }}>
+                    <option value="">todo</option>
+                    <option value="CAJA">CAJA</option>
+                    <option value="CTA CTE">CTA CTE</option>
+                  </select>
+                </th>
                 <th style={{ textAlign: 'left' }}>
                   <input className="srch" placeholder="filtrar…" value={fCli} onChange={e => setFCli(e.target.value)} style={{ width: '100%', minWidth: 0 }} />
                 </th>
@@ -237,6 +248,10 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               {filtrados.map(m => (
                 <tr key={m.id}>
                   <td style={{ color: 'var(--muted)' }}>{fmtFecha(m.fecha)}</td>
+                  <td style={{ textAlign: 'left' }}>
+                    <span className={`tag ${m.tipo === 'CTA CTE' ? 'tag-blue' : 'tag-gray'}`}
+                      style={{ whiteSpace: 'nowrap' }}>{m.tipo}</span>
+                  </td>
                   <td style={{ textAlign: 'left' }}>
                     {m.cliente ?? '—'}
                     {m.debe && <span className="tag tag-gray" style={{ marginLeft: 6, fontWeight: 600 }}>🚚 {m.debe}</span>}
