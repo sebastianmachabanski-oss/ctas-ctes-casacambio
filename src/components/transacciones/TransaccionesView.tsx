@@ -194,8 +194,8 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
 
       {/* Tabla con filtros por columna */}
       <div className="card">
-        <div className="tbl-wrap">
-          <table className="cc-tbl">
+        <div className="tbl-wrap tbl-scroll">
+          <table className="cc-tbl densa">
             <thead>
               <tr>
                 <th>Fecha</th>
