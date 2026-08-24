@@ -8,17 +8,17 @@
 import { buscarSignoOperacion, buscarMultCotizacion } from './signos'
 import { OPERACIONES_CUENTA } from './operaciones'
 
-// USDT (20/7/2026): moneda solo-app, NO existe en la planilla. Solo opera en CAJA, por
-// eso se agrega la columna USDT pero NO "CC USDT" (no participa de cuentas corrientes).
+// USDT: moneda solo-app, NO existe en la planilla — no hay ni una transacción cargada
+// allá. Desde el 25/8/2026 opera también en CUENTA CORRIENTE, así que se suma "CC USDT".
+// Como en el Sheet no existe, ambas columnas quedan en 0 para toda fila de la planilla y
+// la validación del motor contra el Sheet no se ve afectada.
 export const MONEDAS = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT'] as const
 export type Moneda = typeof MONEDAS[number]
 
-// Columnas de salida: las 10 de la planilla + USDT (solo caja, sin CC USDT). USDT queda
-// en 0 para toda operación de la planilla, por lo que la validación contra el Sheet no
-// se ve afectada.
+// Columnas de salida: las 10 de la planilla + USDT y CC USDT, que son solo de la app.
 export const COLUMNAS_SALIDA = [
   'PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT', 'BANCO',
-  'CC PESOS', 'CC DOLARES', 'CC EUROS', 'CC REALES',
+  'CC PESOS', 'CC DOLARES', 'CC EUROS', 'CC REALES', 'CC USDT',
 ] as const
 export type ColumnaSalida = typeof COLUMNAS_SALIDA[number]
 
@@ -107,8 +107,8 @@ export function calcularMovimiento(data: DatosTransaccion): ResultadoCalculo {
 
   // Red de seguridad: si la columna calculada no existe en COLUMNAS_SALIDA, el importe
   // no se asignaría a ninguna columna y DESAPARECERÍA sin aviso. Pasa con las
-  // combinaciones que generan "CC CHEQUES" o "CC USDT" (moneda propia + SWITCH/TT en
-  // cuenta corriente): ninguna de las dos existe como columna, ni en la planilla ni acá.
+  // combinaciones que generan "CC CHEQUES" (moneda propia + SWITCH/TT en cuenta
+  // corriente): esa columna no existe, ni en la planilla ni acá.
   // Mejor cortar con un error explícito que guardar un movimiento en cero.
   for (const col of [monedaPropiaCol, monedaExternaCol]) {
     if (col && !(COLUMNAS_SALIDA as readonly string[]).includes(col)) {

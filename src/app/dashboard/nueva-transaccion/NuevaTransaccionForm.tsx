@@ -9,12 +9,13 @@ import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 // columna CHEQUES y la contrapartida en CC PESOS / CC DOLARES (así lo hace la planilla).
 // USDT es solo-CAJA: no participa de cuentas corrientes (decisión 20/7/2026). Por eso la
 // lista de monedas depende del Tipo — ver monedasDisponibles().
-const MONEDAS = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES']
+const MONEDAS = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT']
 const MONEDAS_CAJA = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT']
 function monedasDisponibles(tipo: string) { return tipo === 'CAJA' ? MONEDAS_CAJA : MONEDAS }
 const SIMBOLOS: Record<string, string> = {
   pesos: '$', cheques: 'CH$', dolares: 'U$S', euros: '€', reales: 'R$', usdt: 'USDT',
   banco: 'BCO', cc_pesos: 'CC $', cc_dolares: 'CC U$S', cc_euros: 'CC €', cc_reales: 'CC R$',
+  cc_usdt: 'CC USDT',
 }
 const nfPreview = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
 
