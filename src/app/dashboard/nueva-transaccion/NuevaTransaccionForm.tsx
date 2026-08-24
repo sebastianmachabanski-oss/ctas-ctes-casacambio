@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import SelectBuscable from '@/components/SelectBuscable'
+import { useAvisoSinGuardar } from '@/lib/useAvisoSinGuardar'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 
 // CHEQUES opera igual que el resto, en CAJA y en cuenta corriente: el cheque entra en la
@@ -156,6 +157,13 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     if (exacta) { elegirCuenta(exacta); return }
     if (cuentasFiltradas.length === 1) elegirCuenta(cuentasFiltradas[0])
   }
+
+  // Aviso al salir con una carga a medio hacer. Solo cuenta lo que el usuario tipeó:
+  // fecha, tipo y monedas vienen con valor por defecto desde que se abre la pantalla.
+  const hayCambios = step !== 'done' && Boolean(
+    form.monto || form.cuenta_cte || form.cotizacion || form.debe || form.notas || form.costo_porcentaje
+  )
+  useAvisoSinGuardar(hayCambios)
 
   const operacionesDisponibles = OPERACIONES_POR_TIPO[form.tipo] ?? []
   const cotizacionRequerida = OPERACIONES_REQUIEREN_COTIZACION.includes(form.operacion)
