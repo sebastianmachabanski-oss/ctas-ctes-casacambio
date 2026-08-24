@@ -16,6 +16,30 @@ const SIMBOLOS: Record<string, string> = {
 }
 const nfPreview = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
 
+/**
+ * Salto por inicial en un desplegable, una tecla a la vez.
+ *
+ * El comportamiento nativo acumula las teclas y las trata como UNA búsqueda: al tocar
+ * E y después V busca "EV", que no existe en la lista, y el desplegable no se mueve.
+ * Con esto cada tecla arranca una búsqueda nueva, así E va a EGRESAN y V a VENTA.
+ * Tocar la misma tecla otra vez cicla entre las opciones que empiezan igual.
+ */
+function saltarPorInicial(
+  opciones: string[],
+  valorActual: string,
+  elegir: (v: string) => void,
+) {
+  return (e: React.KeyboardEvent<HTMLSelectElement>) => {
+    if (e.key.length !== 1 || e.altKey || e.ctrlKey || e.metaKey) return
+    const inicial = e.key.toUpperCase()
+    const coincidencias = opciones.filter(o => o.toUpperCase().startsWith(inicial))
+    if (!coincidencias.length) return
+    e.preventDefault()
+    const i = coincidencias.indexOf(valorActual)
+    elegir(coincidencias[(i + 1) % coincidencias.length])
+  }
+}
+
 // Monto con separador de miles en vivo (como el mockup): puntos de miles, coma decimal.
 function fmtMonto(s: string): string {
   const limpio = s.replace(/[^\d,]/g, '')
@@ -62,8 +86,8 @@ function Required() {
 
 const fmtUsd = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
 
-export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUmbral }: {
-  cuentas: string[]; umbralUsd: number; puedeEditarUmbral: boolean
+export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, puedeEditarUmbral }: {
+  cuentas: string[]; clientes: string[]; umbralUsd: number; puedeEditarUmbral: boolean
 }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -90,15 +114,53 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
     notas: '',
   })
 
-  // Selector de cliente según el Tipo (decisión 11/7/2026):
-  //  - CTA CTE: buscador SOLO sobre las cuentas corrientes reales (sin alta libre —
-  //    un nombre que no exista rompe las fórmulas de la planilla).
-  //  - CAJA: texto libre sin desplegable (clientes eventuales, NO normalizados).
+  // Selector de cliente según el Tipo:
+  //  - CTA CTE: buscador sobre las cuentas reales. Si el nombre no existe, se ofrece
+  //    crearla PREVIA CONFIRMACIÓN (25/8/2026): el nombre es la clave con la que se
+  //    agrupan los saldos, y un alta por error de tipeo parte el saldo en dos cuentas.
+  //  - CAJA: sugerencias de los clientes conocidos, pero el campo SIGUE siendo libre.
+  //    La regla del 5/7/2026 no cambia: son clientes eventuales y no se normalizan.
   const [clienteQuery, setClienteQuery] = useState('')
   const [clienteOpen, setClienteOpen] = useState(false)
-  const cuentasFiltradas = cuentas
+  const [cuentasLocales, setCuentasLocales] = useState<string[]>(cuentas)
+  const [creandoCuenta, setCreandoCuenta] = useState(false)
+
+  const cuentasFiltradas = cuentasLocales
     .filter(c => c.toUpperCase().includes(clienteQuery.trim().toUpperCase()))
     .sort((a, b) => a.localeCompare(b, 'es'))
+
+  // Sugerencias para CAJA: se filtran igual, pero no obligan a elegir.
+  const clientesFiltrados = clientes
+    .filter(c => c.toUpperCase().includes(form.cuenta_cte.trim().toUpperCase()))
+    .sort((a, b) => a.localeCompare(b, 'es'))
+    .slice(0, 30)
+
+  const nombreTipeado = clienteQuery.trim()
+  const cuentaNoExiste = nombreTipeado.length > 1 &&
+    !cuentasLocales.some(c => c.toUpperCase() === nombreTipeado.toUpperCase())
+
+  async function crearCuenta(nombre: string) {
+    if (!confirm(
+      `La cuenta corriente "${nombre}" no existe.\n\n` +
+      `¿Crearla ahora?\n\nRevisá que no sea un error de tipeo: si ya existe con otro ` +
+      `nombre parecido, el saldo va a quedar partido entre las dos.`
+    )) return
+    setCreandoCuenta(true)
+    try {
+      const res = await fetch('/api/cuentas-corrientes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'No se pudo crear la cuenta corriente'); return }
+      setCuentasLocales(prev => prev.includes(data.nombre) ? prev : [...prev, data.nombre])
+      elegirCuenta(data.nombre)
+    } catch {
+      setError('Error de conexión al crear la cuenta corriente')
+    } finally {
+      setCreandoCuenta(false)
+    }
+  }
 
   function elegirCuenta(nombre: string) {
     set('cuenta_cte', nombre)
@@ -419,42 +481,82 @@ export default function NuevaTransaccionForm({ cuentas, umbralUsd, puedeEditarUm
                       {c}
                     </button>
                   </li>
-                )) : (
-                  <li className="px-3 py-2 text-sm text-gray-400">Sin resultados — la cuenta corriente debe existir (se crean desde Usuarios)</li>
+                )) : null}
+                {cuentaNoExiste && (
+                  <li className="border-t border-gray-100">
+                    <button
+                      type="button"
+                      disabled={creandoCuenta}
+                      className="w-full text-left px-3 py-2 text-sm text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => crearCuenta(nombreTipeado)}
+                    >
+                      {creandoCuenta ? 'Creando…' : <>➕ Crear la cuenta corriente «<b>{nombreTipeado}</b>»</>}
+                    </button>
+                  </li>
+                )}
+                {cuentasFiltradas.length === 0 && !cuentaNoExiste && (
+                  <li className="px-3 py-2 text-sm text-gray-400">Escribí el nombre de la cuenta</li>
                 )}
               </ul>
             )}
           </div>
         ) : (
-          <div>
+          <div className="relative">
             <label className="label">Cliente<Required /></label>
             <input
               type="text"
               className="input"
               value={form.cuenta_cte}
-              onChange={e => set('cuenta_cte', e.target.value)}
+              onChange={e => { set('cuenta_cte', e.target.value); setClienteOpen(true) }}
+              onFocus={() => setClienteOpen(true)}
+              onBlur={() => setTimeout(() => setClienteOpen(false), 150)}
               placeholder="Nombre del cliente"
               autoComplete="off"
               required
             />
-            <p className="text-xs text-gray-400 mt-1">Cliente eventual: se escribe tal cual, sin lista.</p>
+            {clienteOpen && clientesFiltrados.length > 0 && (
+              <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                {clientesFiltrados.map(c => (
+                  <li key={c}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => { set('cuenta_cte', c); setClienteOpen(false) }}
+                    >
+                      {c}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Sugerencias de clientes ya usados. Podés escribir uno nuevo: el campo es libre.
+            </p>
           </div>
         )}
         <div>
           <label className="label">Operación<Required /></label>
-          <select className="input" value={form.operacion} onChange={e => set('operacion', e.target.value)}>
+          <select className="input" value={form.operacion}
+            onChange={e => set('operacion', e.target.value)}
+            onKeyDown={saltarPorInicial(operacionesDisponibles, form.operacion, v => set('operacion', v))}>
             {operacionesDisponibles.map(op => <option key={op} value={op}>{op}</option>)}
           </select>
         </div>
         <div>
           <label className="label">Moneda propia<Required /></label>
-          <select className="input" value={form.propio} onChange={e => set('propio', e.target.value)}>
+          <select className="input" value={form.propio}
+            onChange={e => set('propio', e.target.value)}
+            onKeyDown={saltarPorInicial(monedasDisponibles(form.tipo), form.propio, v => set('propio', v))}>
             {monedasDisponibles(form.tipo).map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
         <div>
           <label className="label">Moneda externa<Required /></label>
-          <select className="input" value={form.externo} onChange={e => set('externo', e.target.value)}>
+          <select className="input" value={form.externo}
+            onChange={e => set('externo', e.target.value)}
+            onKeyDown={saltarPorInicial(monedasDisponibles(form.tipo), form.externo, v => set('externo', v))}>
             {monedasDisponibles(form.tipo).map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>

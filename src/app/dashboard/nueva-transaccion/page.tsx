@@ -12,17 +12,19 @@ export default async function NuevaTransaccionPage() {
   const rol = (profileData as any)?.rol
   if (!esStaff(rol)) redirect('/dashboard')
 
-  // El selector de cliente depende del Tipo (decisión 11/7/2026):
-  //  - CTA CTE: SOLO cuentas corrientes reales (si se tipea un cliente eventual acá,
-  //    la planilla calcula mal las fórmulas). Se elige de esta lista, sin alta libre.
-  //  - CAJA: clientes eventuales, texto libre sin desplegable (regla de dominio:
-  //    NO normalizado).
-  const { data: cuentasData } = await supabase
-    .from('cuentas_corrientes')
-    .select('nombre')
-    .eq('activo', true)
-    .order('nombre')
-  const cuentas = (cuentasData ?? []).map((c: any) => c.nombre)
+  // El selector de cliente depende del Tipo:
+  //  - CTA CTE: se elige de las cuentas reales. Si el nombre no existe, la pantalla
+  //    ofrece crearla previa confirmación (25/8/2026) — antes era imposible y había que
+  //    ir a Usuarios.
+  //  - CAJA: sugerencias de los clientes ya conocidos, pero SIGUE siendo texto libre.
+  //    La regla de dominio del 5/7/2026 no cambia: son clientes eventuales y no se
+  //    normalizan. El desplegable ayuda a no re-tipear, no obliga a elegir.
+  const [{ data: cuentasData }, { data: clientesData }] = await Promise.all([
+    supabase.from('cuentas_corrientes').select('nombre').eq('activo', true).order('nombre'),
+    supabase.from('clientes').select('nombre').eq('activo', true).order('nombre'),
+  ])
+  const cuentas  = (cuentasData  ?? []).map((c: any) => c.nombre)
+  const clientes = (clientesData ?? []).map((c: any) => c.nombre)
 
   // Umbral de alerta en DÓLARES (configurable en app_config; tolerante si falta la
   // migración: usa el valor por defecto).
@@ -34,7 +36,7 @@ export default async function NuevaTransaccionPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <NuevaTransaccionForm cuentas={cuentas} umbralUsd={umbralUsd} puedeEditarUmbral={esAdmin(rol)} />
+      <NuevaTransaccionForm cuentas={cuentas} clientes={clientes} umbralUsd={umbralUsd} puedeEditarUmbral={esAdmin(rol)} />
     </div>
   )
 }
