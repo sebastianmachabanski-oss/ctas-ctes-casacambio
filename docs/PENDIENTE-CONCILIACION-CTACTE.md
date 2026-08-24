@@ -1,4 +1,8 @@
-# Pendiente: conciliar Cuentas Corrientes contra la planilla
+# Conciliación de Cuentas Corrientes contra la planilla — CERRADA
+
+**Estado al 18/8/2026: cierra en las cuatro puntas** — caja en pesos y dólares, cuenta
+corriente en pesos y dólares. Se deja el documento como registro de los errores que hubo
+que corregir para llegar acá y del método que sirvió para encontrarlos.
 
 Anotado el 13/8/2026, al final de una jornada larga de correcciones. La app funciona;
 esto es una diferencia de importe en un saldo, no una pérdida de datos.
@@ -66,3 +70,31 @@ Hipótesis a revisar con la planilla al lado, en ese orden:
    una tabla y no en la otra.
 2. Operaciones de TT y SWITCH, que tienen dos patas y se registran distinto en cada tabla.
 3. Filas con `anulado = true`, que `diario` excluye y `movimientos_caja` no distingue.
+
+
+---
+
+## Cierre (18/8/2026)
+
+Tras importar la versión nueva del Excel y correr un full, los totales coinciden. La
+diferencia de 13.000 dólares que aparecía al comparar era de lectura: se estaba mirando la
+columna de caja en vez de `CC DOLARES`.
+
+**El método que sirvió**, por si vuelve a aparecer una diferencia:
+
+1. Comparar `diario` contra `movimientos_caja`. Si difieren, el problema está en el parser
+   del sync; si coinciden, la app refleja la planilla y hay que mirar del otro lado.
+2. Si difieren, agrupar por cuenta, después por fecha, y así hasta aislar la fila.
+3. Contrastar esa fila contra la planilla mirando las **dos** familias de columnas: las de
+   caja (`PESOS`, `DOLARES`…) y las de cuenta corriente (`CC PESOS`, `CC DOLARES`…).
+
+**Trampa a evitar:** buscar en la base una fila cuyo importe coincida con la diferencia y
+darla por culpable. Pasó dos veces en esta investigación y las dos veces fue coincidencia.
+La comparación tabla contra tabla es la que da certeza.
+
+## Una fila para revisar, sin urgencia
+
+La 12514 (EDY, 3/7/2025) es la única de toda la cuenta corriente con las dos patas en
+monedas distintas: `EGRESAN DOLARES → PESOS` por 13.000, sin cotización. Salen 13.000
+dólares y se acreditan 13.000 pesos, que económicamente no cierra. No genera diferencia en
+los totales, pero conviene que el cliente la mire alguna vez.
