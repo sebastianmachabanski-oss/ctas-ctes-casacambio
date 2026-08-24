@@ -114,16 +114,16 @@ export default async function CuentaCorrientePage({
   // ── Saldo acumulado por fila (como el extracto del mockup) ──
   // Solo con UNA cuenta elegida y sin filtro de tipo (si no, el acumulado mentiría).
   // Arranca del saldo previo al rango y acumula cronológicamente cada moneda.
-  let acumulados: Record<string, { p: number; d: number; e: number; r: number }> | undefined
+  let acumulados: Record<string, { p: number; d: number; e: number; r: number; u: number }> | undefined
   let saldoCierra: boolean | null = null
   if (cuentaFiltro && !operacion) {
-    const prior = { p: 0, d: 0, e: 0, r: 0 }
+    const prior = { p: 0, d: 0, e: 0, r: 0, u: 0 }
     if (desde) {
       // El usuario acotó el rango: sumar todo lo ANTERIOR para el saldo inicial.
       const PAGE = 1000
       for (let from = 0; ; from += PAGE) {
         const { data: pg } = await supabase.from('diario')
-          .select('cc_pesos, cc_dolares, cc_euros, cc_reales')
+          .select('cc_pesos, cc_dolares, cc_euros, cc_reales, cc_usdt')
           .eq('tipo', 'CTA CTE').eq('anulado', false)
           .eq('cuenta_cte', cuentaFiltro)
           .lt('fecha', desdeQuery)
@@ -132,6 +132,7 @@ export default async function CuentaCorrientePage({
         for (const r of rows) {
           prior.p += r.cc_pesos ?? 0; prior.d += r.cc_dolares ?? 0
           prior.e += r.cc_euros ?? 0; prior.r += r.cc_reales ?? 0
+          prior.u += r.cc_usdt ?? 0
         }
         if (rows.length < PAGE) break
       }
@@ -142,7 +143,8 @@ export default async function CuentaCorrientePage({
     for (const m of [...movimientos].reverse()) {
       run.p += m.cc_pesos ?? 0; run.d += m.cc_dolares ?? 0
       run.e += m.cc_euros ?? 0; run.r += m.cc_reales ?? 0
-      acumulados[m.id] = { p: run.p, d: run.d, e: run.e, r: run.r }
+      run.u += m.cc_usdt ?? 0
+      acumulados[m.id] = { p: run.p, d: run.d, e: run.e, r: run.r, u: run.u }
     }
     // Verificación de exactitud: sin filtros de fecha, el acumulado final debe cerrar
     // EXACTO con el saldo de la cuenta (vista saldos_cuenta_corriente).
@@ -152,6 +154,7 @@ export default async function CuentaCorrientePage({
         const eq = (a: number, b: number | null) => Math.abs(a - (b ?? 0)) < 0.005
         saldoCierra = eq(run.p, s.saldo_pesos) && eq(run.d, s.saldo_dolares)
           && eq(run.e, s.saldo_euros) && eq(run.r, s.saldo_reales)
+          && eq(run.u, s.saldo_usdt)
       }
     }
   }

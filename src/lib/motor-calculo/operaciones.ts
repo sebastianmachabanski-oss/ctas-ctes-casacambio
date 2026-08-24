@@ -106,7 +106,8 @@ export const OPERACIONES_CUENTA: Record<string, string> = {
   "CTA CTESALE TTCC PESOSCC PESOS": "CAMBIO DIVISAS",
   "CTA CTEENTRA TTCC PESOSCC PESOS": "CAMBIO DIVISAS",
 
-  // USDT (20/7/2026) — moneda solo-app, solo operaciones de CAJA (sin CTA CTE/TT/SWITCH).
+  // USDT — moneda solo-app: no existe ni una transacción con USDT en la planilla, así
+  // que estos códigos no afectan la validación del motor contra el Sheet.
   // Compra/venta contra PESOS y DÓLARES; ingresos/egresos, saldos y ajustes en caja.
   "INGRESANUSDT": "CAJA",
   "EGRESANUSDT": "CAJA",
@@ -120,4 +121,23 @@ export const OPERACIONES_CUENTA: Record<string, string> = {
   "VENTAUSDTPESOS": "CAMBIO DIVISAS",
   "VENTAUSDTDOLARES": "CAMBIO DIVISAS",
   "VENTADOLARESUSDT": "CAMBIO DIVISAS",
+
+  // USDT en CUENTA CORRIENTE (25/8/2026). Espeja exactamente los códigos de DOLARES:
+  // misma agrupación para las mismas operaciones. SWITCH y ENTRA/SALE TT siguen sin
+  // contemplarse, igual que antes.
+  "CTA CTEINGRESANUSDTCC USDT": "CAJA",
+  "CTA CTEEGRESANUSDTCC USDT": "CAJA",
+  "CTA CTEINGRESANPESOSCC USDT": "CAJA",
+  "CTA CTEEGRESANPESOSCC USDT": "CAJA",
+  "CTA CTEINGRESANDOLARESCC USDT": "CAJA",
+  "CTA CTEEGRESANDOLARESCC USDT": "CAJA",
+  "CTA CTEINGRESANUSDTCC PESOS": "CAJA",
+  "CTA CTEEGRESANUSDTCC PESOS": "CAJA",
+  "CTA CTEINGRESANUSDTCC DOLARES": "CAJA",
+  "CTA CTEEGRESANUSDTCC DOLARES": "CAJA",
+  "CTA CTECOMPRAUSDTCC PESOS": "CAMBIO DIVISAS",
+  "CTA CTECOMPRAUSDTCC DOLARES": "CAMBIO DIVISAS",
+  "CTA CTEVENTAUSDTCC PESOS": "CAMBIO DIVISAS",
+  "CTA CTEVENTAUSDTCC DOLARES": "CAMBIO DIVISAS",
+  "CTA CTESALDO INICIALUSDTCC USDT": "CTA CTE",
 }

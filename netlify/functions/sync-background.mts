@@ -589,7 +589,11 @@ export default async function handler(req: Request) {
 
     if (mode === 'full') {
       if (!todos.length) throw new Error('Sin movimientos CTA CTE')
-      const { error: delError } = await supabase.from('diario').delete().eq('tipo', 'CTA CTE')
+      // `neq('origen','app')`: no tocar lo que cargó la app y NO existe en el Sheet
+      // (USDT, y cualquier alta cuya replicación a la planilla haya fallado). Si se
+      // borrara, no habría de dónde recuperarlo. Mismo criterio que movimientos_caja.
+      const { error: delError } = await supabase.from('diario').delete()
+        .eq('tipo', 'CTA CTE').neq('origen', 'app')
       if (delError) throw new Error('Error borrando datos previos: ' + delError.message)
       await insertEnParalelo(supabase, todos)
       const nCuentas = await upsertCuentas(supabase, todos)
@@ -606,7 +610,7 @@ export default async function handler(req: Request) {
 
     const ventana = todos.filter(m => m.fecha >= windowStart)
     const { error: delError } = await supabase
-      .from('diario').delete().eq('tipo', 'CTA CTE').gte('fecha', windowStart)
+      .from('diario').delete().eq('tipo', 'CTA CTE').neq('origen', 'app').gte('fecha', windowStart)
     if (delError) throw new Error('Error borrando ventana: ' + delError.message)
     await insertEnParalelo(supabase, ventana)
     const nCuentas = await upsertCuentas(supabase, ventana)

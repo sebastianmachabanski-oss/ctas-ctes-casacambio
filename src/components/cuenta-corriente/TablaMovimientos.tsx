@@ -67,7 +67,7 @@ function MovimientoCard({ m }: { m: DiarioRow }) {
   )
 }
 
-type Acum = { p: number; d: number; e: number; r: number }
+type Acum = { p: number; d: number; e: number; r: number; u: number }
 
 // Celda de saldo acumulado: "U$S 4.000,00 · $ 530.000,00" (solo las monedas con
 // movimiento en la cuenta), negativos entre paréntesis, como el extracto del mockup.
@@ -98,7 +98,7 @@ export default function TablaMovimientos({ movimientos, acumulados }: {
 
   // Monedas a mostrar en el acumulado: las que tienen algún valor distinto de cero
   // en la cuenta (si ninguna, dólares y pesos por defecto).
-  const TODAS: [keyof Acum, string][] = [['d', 'U$S'], ['p', '$'], ['e', '€'], ['r', 'R$']]
+  const TODAS: [keyof Acum, string][] = [['d', 'U$S'], ['p', '$'], ['e', '€'], ['r', 'R$'], ['u', 'USDT']]
   const monedasAcum = acumulados
     ? (() => {
         const activas = TODAS.filter(([k]) => Object.values(acumulados).some(a => a[k] !== 0))

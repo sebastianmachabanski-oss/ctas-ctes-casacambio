@@ -82,14 +82,20 @@ export async function POST(request: Request) {
   // cuenta corriente (INGRESAN/EGRESAN) — `diario` solo lo consultan las vistas de CTA CTE.
   // Las operaciones de CAJA (COMPRA/VENTA/GASTOS) no mueven saldo de cta cte: quedan en 0.
   const monedaNorm = mapMoneda(propio)
-  let cc_pesos = 0, cc_dolares = 0, cc_euros = 0, cc_reales = 0
+  let cc_pesos = 0, cc_dolares = 0, cc_euros = 0, cc_reales = 0, cc_usdt = 0
   if (operacion === 'INGRESAN' || operacion === 'EGRESAN') {
     const sign = operacion === 'INGRESAN' ? 1 : -1
     cc_pesos    = monedaNorm === 'PESOS'   ? sign * monto : 0
     cc_dolares  = monedaNorm === 'DOLARES' ? sign * monto : 0
     cc_euros    = monedaNorm === 'EUROS'   ? sign * monto : 0
     cc_reales   = monedaNorm === 'REALES'  ? sign * monto : 0
+    cc_usdt     = monedaNorm === 'USDT'    ? sign * monto : 0
   }
+
+  // USDT no existe en la planilla, así que una fila que lo toque solo puede venir de acá:
+  // se marca 'app' para que el sync no la borre. En `diario` esa marca es la diferencia
+  // entre conservar el saldo USDT de la cuenta corriente y perderlo en la próxima corrida.
+  const involucraUsdt = monedaNorm === 'USDT' || mapMoneda(String(externo)) === 'USDT'
 
   // Insert into Supabase
   const { error: insertError } = await supabase.from('diario').insert({
@@ -106,6 +112,8 @@ export async function POST(request: Request) {
     cc_dolares,
     cc_euros,
     cc_reales,
+    cc_usdt,
+    origen: involucraUsdt ? 'app' : 'sheet',
     notas: notas || null,
     creado_por: (profile as any).nombre ?? user.email,
     anulado: false,
@@ -117,10 +125,6 @@ export async function POST(request: Request) {
   // impacto las calcula el motor (validado 100% contra la planilla). Mientras dure la
   // convivencia, el próximo sync full reemplaza esta fila por la copia que venga de la
   // planilla (idéntica si la escritura al Sheet salió bien) — sin duplicados.
-  // USDT no existe en la planilla: si la operación lo toca, la fila es 'app' y el sync
-  // NO la borra (si no, se perdería en la próxima corrida). El resto queda 'sheet', que
-  // es el comportamiento de convivencia actual (el sync la puede reemplazar por la del Sheet).
-  const involucraUsdt = monedaNorm === 'USDT' || mapMoneda(String(externo)) === 'USDT'
   const { error: cajaError } = await supabase.from('movimientos_caja').insert({
     fila_sheet: null,
     origen: involucraUsdt ? 'app' : 'sheet',
