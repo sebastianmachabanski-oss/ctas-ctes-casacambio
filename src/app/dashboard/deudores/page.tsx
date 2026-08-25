@@ -2,6 +2,11 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { esStaff } from '@/lib/roles'
 
+// Siempre se renderiza en el momento: es una pantalla de datos que cambian con cada
+// carga. Sin esto, Next puede servir una versión guardada y mostrar información vieja.
+export const dynamic = 'force-dynamic'
+
+
 export default async function DeudoresPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

@@ -5,6 +5,11 @@ import TablaMovimientos from '@/components/cuenta-corriente/TablaMovimientos'
 import TarjetasSaldos from '@/components/cuenta-corriente/TarjetasSaldos'
 import { esStaff, esCliente } from '@/lib/roles'
 
+// Siempre se renderiza en el momento: es una pantalla de datos que cambian con cada
+// carga. Sin esto, Next puede servir una versión guardada y mostrar información vieja.
+export const dynamic = 'force-dynamic'
+
+
 // El servidor (Netlify) corre en UTC sin importar el huso del usuario: usar la fecha
 // local del proceso daría el día siguiente durante la noche en Argentina. Se fija
 // explícitamente el huso de Argentina para que "hoy" sea siempre el correcto.

@@ -3,6 +3,11 @@ import { createClient } from '@/lib/supabase/server'
 import TransaccionesView from '@/components/transacciones/TransaccionesView'
 import { esAdmin, esStaff } from '@/lib/roles'
 
+// Siempre se renderiza en el momento: es una pantalla de datos que cambian con cada
+// carga. Sin esto, Next puede servir una versión guardada y mostrar información vieja.
+export const dynamic = 'force-dynamic'
+
+
 // Pantalla de staff: TODOS los movimientos de la caja (tabla movimientos_caja, el espejo
 // completo de la solapa CAJA que llena el sync). Por defecto muestra los 100 más recientes;
 // se pagina de a 100 y se puede acotar por rango de fechas. Los filtros por columna

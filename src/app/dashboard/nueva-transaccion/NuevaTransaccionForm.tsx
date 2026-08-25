@@ -352,6 +352,10 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
       // planilla sigue en segundo plano y actualiza su propio estado sin bloquear al usuario.
       setCajaDirecta(data.caja_directa === true)
       setStep('done')
+      // Next guarda en memoria la última versión de cada pantalla ya visitada. Sin esto,
+      // ir a Transacciones mostraba la lista anterior y el movimiento recién cargado no
+      // aparecía hasta refrescar a mano (25/8/2026).
+      router.refresh()
       setLoading(false)
 
       // USDT no va a la planilla (no existe allá): se omite la escritura al Sheet para no
@@ -455,7 +459,9 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
       <div className="form-grid">
         <div>
           <label className="label">Tipo<Required /></label>
-          <select className="input" value={form.tipo} onChange={e => setTipo(e.target.value)}>
+          {/* El foco arranca acá: la carga se hace entera con el teclado y este es el
+              primer campo del recorrido. */}
+          <select className="input" autoFocus value={form.tipo} onChange={e => setTipo(e.target.value)}>
             {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
