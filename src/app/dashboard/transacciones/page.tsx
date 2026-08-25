@@ -18,7 +18,10 @@ const POR_PAGINA = 100
 export default async function TransaccionesPage({
   searchParams,
 }: {
-  searchParams: { desde?: string; hasta?: string; pagina?: string }
+  searchParams: {
+    desde?: string; hasta?: string; pagina?: string
+    cli?: string; tipo?: string; op?: string; notas?: string; autor?: string; monto?: string
+  }
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -32,6 +35,16 @@ export default async function TransaccionesPage({
   const desde = searchParams.desde || ''
   const hasta = searchParams.hasta || ''
   const pagina = Math.max(1, parseInt(searchParams.pagina ?? '1', 10) || 1)
+
+  // Filtros por columna. Van EN EL SERVIDOR, no sobre la página ya traída: filtrando en
+  // el cliente, buscar un cliente mostraba solo sus movimientos dentro de las 100 filas
+  // de la página actual y seguía ofreciendo 23 páginas del resto (25/8/2026).
+  const fCli   = (searchParams.cli   ?? '').trim()
+  const fTipo  = (searchParams.tipo  ?? '').trim()
+  const fOp    = (searchParams.op    ?? '').trim()
+  const fNotas = (searchParams.notas ?? '').trim()
+  const fAutor = (searchParams.autor ?? '').trim()
+  const fMonto = (searchParams.monto ?? '').trim()
 
   let query = supabase.from('movimientos_caja')
     .select('*', { count: 'exact' })
@@ -54,6 +67,33 @@ export default async function TransaccionesPage({
     .order('creado_at', { ascending: false, nullsFirst: false })
   if (desde) query = query.gte('fecha', desde)
   if (hasta) query = query.lte('fecha', hasta)
+
+  if (fCli)   query = query.ilike('cliente', `%${fCli}%`)
+  if (fTipo)  query = query.eq('tipo', fTipo)
+  if (fOp)    query = query.eq('operacion', fOp)
+  if (fNotas) query = query.ilike('notas', `%${fNotas}%`)
+  // Autor: busca en quien cargó y en quien editó. Las filas importadas antes de la puesta
+  // en marcha no tienen autor y se muestran como "carga inicial".
+  if (fAutor) {
+    query = /CARGA/i.test(fAutor)
+      ? query.is('creado_por', null)
+      : query.or(`creado_por.ilike.%${fAutor}%,editado_por.ilike.%${fAutor}%`)
+  }
+  // Monto: un número solo busca ESE importe; con >, >=, < o <= compara. Se evalúa contra
+  // el importe de la operación, en valor absoluto.
+  if (fMonto) {
+    const op = fMonto.match(/^(>=|<=|>|<|=)/)?.[1] ?? '='
+    const crudo = fMonto.replace(/^(>=|<=|>|<|=)\s*/, '').replace(/\./g, '').replace(',', '.')
+    const val = Number(crudo)
+    if (isFinite(val) && crudo !== '') {
+      // Se compara el valor ABSOLUTO: los egresos se guardan en negativo.
+      if (op === '>')       query = query.or(`monto.gt.${val},monto.lt.${-val}`)
+      else if (op === '>=') query = query.or(`monto.gte.${val},monto.lte.${-val}`)
+      else if (op === '<')  query = query.lt('monto', val).gt('monto', -val)
+      else if (op === '<=') query = query.lte('monto', val).gte('monto', -val)
+      else                  query = query.or(`monto.eq.${val},monto.eq.${-val}`)
+    }
+  }
   query = query.range((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA - 1)
 
   const { data, count, error } = await query
@@ -69,6 +109,7 @@ export default async function TransaccionesPage({
         </div>
       ) : (
         <TransaccionesView
+          filtros={{ cli: fCli, tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMonto }}
           movimientos={movimientos}
           puedeEditar={esAdmin(rol)}
           desde={desde}
