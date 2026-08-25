@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import FiltrosMovimientos from '@/components/cuenta-corriente/FiltrosMovimientos'
 import TablaMovimientos from '@/components/cuenta-corriente/TablaMovimientos'
+import PaginacionCtaCte from '@/components/cuenta-corriente/PaginacionCtaCte'
 import TarjetasSaldos from '@/components/cuenta-corriente/TarjetasSaldos'
 import { esStaff, esCliente } from '@/lib/roles'
 
@@ -12,15 +13,11 @@ export const dynamic = 'force-dynamic'
 
 // El servidor (Netlify) corre en UTC sin importar el huso del usuario: usar la fecha
 // local del proceso daría el día siguiente durante la noche en Argentina. Se fija
-// explícitamente el huso de Argentina para que "hoy" sea siempre el correcto.
-function hoyArgentina(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date())
-}
 
 export default async function CuentaCorrientePage({
   searchParams,
 }: {
-  searchParams: { desde?: string; hasta?: string; operacion?: string; cuenta?: string }
+  searchParams: { desde?: string; hasta?: string; operacion?: string; cuenta?: string; pagina?: string }
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -68,101 +65,75 @@ export default async function CuentaCorrientePage({
   let desde = searchParams.desde || ''
   let hasta = searchParams.hasta || ''
 
-  // Siempre mostrar movimientos (con o sin fechas)
-  let desdeQuery = desde || undefined
-  let hastaQuery = hasta || hoyArgentina()
+  // ── Movimientos ──────────────────────────────────────────────────────────
+  // Con UNA cuenta elegida, la base devuelve la página pedida con el saldo acumulado ya
+  // calculado (función `cta_cte_movimientos`). Antes se traían TODOS los movimientos de
+  // la cuenta —7.661 en la más grande, en 8 viajes—, se acumulaba fila por fila acá y se
+  // mandaban las 7.661 al navegador: de ahí la demora (25/8/2026).
+  const POR_PAGINA = 200
+  const pagina = Math.max(1, parseInt(searchParams.pagina ?? '1', 10) || 1)
 
-  // Si no hay fecha desde, buscar la más antigua
-  if (!desdeQuery) {
-    let minQuery = supabase.from('diario').select('fecha').eq('tipo', 'CTA CTE').eq('anulado', false).order('fecha', { ascending: true }).limit(1)
-    if (cuentaFiltro) minQuery = minQuery.eq('cuenta_cte', cuentaFiltro)
-    const { data: minData } = await minQuery
-    desdeQuery = minData?.[0]?.fecha || '2000-01-01'
-  }
-
-  // OJO: Postgrest corta CUALQUIER respuesta en 1.000 filas si no se pagina. Las cuentas
-  // grandes tienen más movimientos que eso: sin el `range` la lista salía incompleta y el
-  // saldo acumulado no cerraba contra el saldo de la cuenta (aviso del 13/8/2026).
-  const armarQuery = () => {
-    let q = supabase.from('diario').select('*', { count: 'exact' })
-      .eq('tipo', 'CTA CTE').eq('anulado', false)
-      .gte('fecha', desdeQuery)
-      .lte('fecha', hastaQuery)
-      .order('fecha', { ascending: false })
-      // Orden secundario estable: dentro de un mismo día, del más nuevo al más viejo.
-      // Necesario para que el saldo acumulado sea determinístico.
-      .order('created_at', { ascending: false })
-      // Desempate final: sin él, dos filas del mismo día y el mismo instante pueden
-      // volver en distinto orden entre páginas y duplicarse o perderse.
-      .order('id', { ascending: false })
-
-    if (cuentaFiltro) q = q.eq('cuenta_cte', cuentaFiltro)
-    // "Tipo de movimiento" filtra por DIRECCIÓN (ingreso/egreso), no por un código exacto:
-    // los movimientos usan INGRESAN/EGRESAN (planilla y app) y datos viejos DONACION/COMPROMISO.
-    // "INGRES" no es subcadena de "EGRESAN" ni viceversa, así que no se pisan.
-    if (operacion === 'INGRESO') q = q.or('operacion.ilike.*INGRES*,operacion.eq.DONACION')
-    else if (operacion === 'EGRESO') q = q.or('operacion.ilike.*EGRES*,operacion.eq.COMPROMISO')
-    return q
-  }
-
-  const PAGINA = 1000
-  const movimientos: any[] = []
+  let movimientos: any[] = []
   let totalMovimientos = 0
-  for (let from = 0; ; from += PAGINA) {
-    const { data, count } = await armarQuery().range(from, from + PAGINA - 1)
-    const filas = (data ?? []) as any[]
-    if (from === 0) totalMovimientos = count ?? 0
-    movimientos.push(...filas)
-    if (filas.length < PAGINA) break
-  }
-
-  // ── Saldo acumulado por fila (como el extracto del mockup) ──
-  // Solo con UNA cuenta elegida y sin filtro de tipo (si no, el acumulado mentiría).
-  // Arranca del saldo previo al rango y acumula cronológicamente cada moneda.
   let acumulados: Record<string, { p: number; d: number; e: number; r: number; u: number }> | undefined
   let saldoCierra: boolean | null = null
-  if (cuentaFiltro && !operacion) {
-    const prior = { p: 0, d: 0, e: 0, r: 0, u: 0 }
-    if (desde) {
-      // El usuario acotó el rango: sumar todo lo ANTERIOR para el saldo inicial.
-      const PAGE = 1000
-      for (let from = 0; ; from += PAGE) {
-        const { data: pg } = await supabase.from('diario')
-          .select('cc_pesos, cc_dolares, cc_euros, cc_reales, cc_usdt')
-          .eq('tipo', 'CTA CTE').eq('anulado', false)
-          .eq('cuenta_cte', cuentaFiltro)
-          .lt('fecha', desdeQuery)
-          .range(from, from + PAGE - 1)
-        const rows = (pg ?? []) as any[]
-        for (const r of rows) {
-          prior.p += r.cc_pesos ?? 0; prior.d += r.cc_dolares ?? 0
-          prior.e += r.cc_euros ?? 0; prior.r += r.cc_reales ?? 0
-          prior.u += r.cc_usdt ?? 0
+
+  if (cuentaFiltro) {
+    const { data } = await (supabase as any).rpc('cta_cte_movimientos', {
+      p_cuenta: cuentaFiltro,
+      p_desde: desde || null,
+      p_hasta: hasta || null,
+      p_operacion: operacion ?? null,
+      p_limit: POR_PAGINA,
+      p_offset: (pagina - 1) * POR_PAGINA,
+    })
+    const filas = (data ?? []) as any[]
+    movimientos = filas
+    totalMovimientos = Number(filas[0]?.total_filas ?? 0)
+
+    // El acumulado por fila viene resuelto; acá solo se le da la forma que espera la tabla.
+    // Con filtro de tipo no se muestra: la columna mentiría, porque el saldo real incluye
+    // los movimientos de la otra dirección que el filtro deja fuera.
+    if (!operacion) {
+      acumulados = Object.fromEntries(filas.map(f => [f.id, {
+        p: Number(f.acum_pesos) || 0, d: Number(f.acum_dolares) || 0,
+        e: Number(f.acum_euros) || 0, r: Number(f.acum_reales) || 0,
+        u: Number(f.acum_usdt) || 0,
+      }]))
+
+      // Verificación de exactitud: sin filtros y en la primera página, el acumulado del
+      // movimiento MÁS NUEVO tiene que ser el saldo de la cuenta.
+      if (!desde && !hasta && pagina === 1 && filas.length) {
+        const s: any = saldos.find((x: any) => x.cuenta_cte === cuentaFiltro)
+        if (s) {
+          const eq = (a: number, b: number | null) => Math.abs(a - (b ?? 0)) < 0.005
+          const u = filas[0]
+          saldoCierra = eq(Number(u.acum_pesos) || 0, s.saldo_pesos)
+            && eq(Number(u.acum_dolares) || 0, s.saldo_dolares)
+            && eq(Number(u.acum_euros) || 0, s.saldo_euros)
+            && eq(Number(u.acum_reales) || 0, s.saldo_reales)
+            && eq(Number(u.acum_usdt) || 0, s.saldo_usdt)
         }
-        if (rows.length < PAGE) break
       }
     }
-    // La consulta viene DESC (fecha y created_at): invertida queda cronológica.
-    const run = { ...prior }
-    acumulados = {}
-    for (const m of [...movimientos].reverse()) {
-      run.p += m.cc_pesos ?? 0; run.d += m.cc_dolares ?? 0
-      run.e += m.cc_euros ?? 0; run.r += m.cc_reales ?? 0
-      run.u += m.cc_usdt ?? 0
-      acumulados[m.id] = { p: run.p, d: run.d, e: run.e, r: run.r, u: run.u }
-    }
-    // Verificación de exactitud: sin filtros de fecha, el acumulado final debe cerrar
-    // EXACTO con el saldo de la cuenta (vista saldos_cuenta_corriente).
-    if (!desde && !hasta) {
-      const s: any = saldos.find((x: any) => x.cuenta_cte === cuentaFiltro)
-      if (s) {
-        const eq = (a: number, b: number | null) => Math.abs(a - (b ?? 0)) < 0.005
-        saldoCierra = eq(run.p, s.saldo_pesos) && eq(run.d, s.saldo_dolares)
-          && eq(run.e, s.saldo_euros) && eq(run.r, s.saldo_reales)
-          && eq(run.u, s.saldo_usdt)
-      }
-    }
+  } else {
+    // Sin cuenta elegida no hay saldo acumulado posible (serían cuentas mezcladas), así
+    // que alcanza con una página del listado.
+    let q = supabase.from('diario').select('*', { count: 'exact' })
+      .eq('tipo', 'CTA CTE').eq('anulado', false)
+      .order('fecha', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+    if (desde) q = q.gte('fecha', desde)
+    if (hasta) q = q.lte('fecha', hasta)
+    if (operacion === 'INGRESO') q = q.or('operacion.ilike.*INGRES*,operacion.eq.DONACION')
+    else if (operacion === 'EGRESO') q = q.or('operacion.ilike.*EGRES*,operacion.eq.COMPROMISO')
+    const { data, count } = await q.range((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA - 1)
+    movimientos = (data ?? []) as any[]
+    totalMovimientos = count ?? 0
   }
+
+  const totalPaginas = Math.max(1, Math.ceil(totalMovimientos / POR_PAGINA))
 
   const { data: tiposData } = await supabase
     .from('tipos_operacion').select('codigo, descripcion').eq('activo', true)
@@ -194,6 +165,15 @@ export default async function CuentaCorrientePage({
           <span className="text-sm text-gray-500">{totalMovimientos} registro{totalMovimientos !== 1 ? 's' : ''}</span>
         </div>
         <TablaMovimientos movimientos={movimientos} acumulados={acumulados} />
+        {totalPaginas > 1 && (
+          <PaginacionCtaCte
+            pagina={pagina}
+            totalPaginas={totalPaginas}
+            mostrados={movimientos.length}
+            total={totalMovimientos}
+            params={searchParams}
+          />
+        )}
         {saldoCierra !== null && (
           <div style={{ padding: '8px 16px 12px', fontSize: 12, color: saldoCierra ? 'var(--pos-ink)' : 'var(--neg-ink)' }}>
             {saldoCierra
