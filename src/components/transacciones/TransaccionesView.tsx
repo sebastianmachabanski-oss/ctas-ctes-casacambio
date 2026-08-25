@@ -26,6 +26,10 @@ const OPERACIONES = ['COMPRA', 'VENTA', 'INGRESAN', 'EGRESAN', 'GASTOS', 'SWITCH
 const nf = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
 const nfCot = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 4 })
 const money = (v: number) => v < 0 ? `(${nf.format(-v)})` : nf.format(v)
+const nf0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
+// Totales de la cabecera: sin decimales, con el signo entre paréntesis como el resto.
+const ars = (v: number) => `$ ${v < 0 ? `(${nf0.format(-v)})` : nf0.format(v)}`
+const usdTot = (v: number) => `U$S ${v < 0 ? `(${nf0.format(-v)})` : nf0.format(v)}`
 const fmtFecha = (f: string) => new Date(f + 'T12:00:00').toLocaleDateString('es-AR')
 const num = (v: any): number => Number(v) || 0
 // Filas que no cargó ningún usuario (importación inicial de datos): se muestran en gris
@@ -53,10 +57,11 @@ function badge(op: string) {
 }
 
 type Filtros = { cli: string; tipo: string; op: string; notas: string; autor: string; monto: string }
+type Totales = { monto: number; pesos: number; dolares: number }
 
-export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas, filtros }: {
+export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas, filtros, totales }: {
   movimientos: Mov[]; puedeEditar: boolean; desde: string; hasta: string
-  total: number; pagina: number; totalPaginas: number; filtros: Filtros
+  total: number; pagina: number; totalPaginas: number; filtros: Filtros; totales: Totales
 }) {
   const router = useRouter()
   const [d1, setD1] = useState(desde)
@@ -141,15 +146,38 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
-      {/* Filtro de rango + aviso de filtros por columna */}
-      <div className="card" style={{ padding: '14px 16px' }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div><label className="label">Desde</label><input className="input" type="date" value={d1} onChange={e => setD1(e.target.value)} /></div>
-          <div><label className="label">Hasta</label><input className="input" type="date" value={d2} onChange={e => setD2(e.target.value)} /></div>
-          <button className="btn-primary" onClick={buscar}>Buscar</button>
-          <div style={{ marginLeft: 'auto', alignSelf: 'center' }}>
-            <span style={{ color: 'var(--muted)', fontSize: 12 }}>Filtrá directamente por columna abajo ↓</span>
+      {/* Rango de fechas (compacto) + totales del resultado filtrado */}
+      <div className="card" style={{ padding: '10px 14px' }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <label className="label" style={{ margin: 0, fontSize: 11 }}>Desde</label>
+            <input className="input" type="date" value={d1} onChange={e => setD1(e.target.value)}
+              style={{ width: 138, fontSize: 12, padding: '4px 8px' }} />
+            <label className="label" style={{ margin: 0, fontSize: 11 }}>Hasta</label>
+            <input className="input" type="date" value={d2} onChange={e => setD2(e.target.value)}
+              style={{ width: 138, fontSize: 12, padding: '4px 8px' }} />
+            <button className="btn-primary" onClick={buscar}
+              style={{ fontSize: 12, padding: '5px 14px' }}>Buscar</button>
           </div>
+
+          {/* Totales de TODO lo que coincide con los filtros, no solo de esta página. */}
+          <div style={{ display: 'flex', gap: 22, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            {([
+              ['Total monto', nf0.format(totales.monto), 'var(--ink)'],
+              ['Total imp. $', ars(Math.round(totales.pesos)), totales.pesos >= 0 ? 'var(--pos-ink)' : 'var(--neg-ink)'],
+              ['Total imp. U$S', usdTot(Math.round(totales.dolares)), totales.dolares >= 0 ? 'var(--pos-ink)' : 'var(--neg-ink)'],
+            ] as [string, string, string][]).map(([lbl, val, col]) => (
+              <div key={lbl} style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', fontWeight: 650 }}>{lbl}</div>
+                <div className="num" style={{ fontSize: 15, fontWeight: 700, color: col }}>{val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 11 }}>
+          {hayFiltro
+            ? `Totales de los ${total.toLocaleString('es-AR')} movimientos que coinciden con el filtro.`
+            : 'Totales de todos los movimientos del rango. Filtrá por columna abajo ↓'}
         </div>
       </div>
 
