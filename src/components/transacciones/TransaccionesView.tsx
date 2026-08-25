@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
+import FiltroClientes from './FiltroClientes'
 
 type Mov = {
   id: string; fecha: string; cliente: string | null; operacion: string; monto: number
@@ -59,9 +60,10 @@ function badge(op: string) {
 type Filtros = { cli: string; tipo: string; op: string; notas: string; autor: string; monto: string }
 type Totales = { monto: number; pesos: number; dolares: number }
 
-export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas, filtros, totales }: {
+export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas, filtros, totales, clientes, clientesSel }: {
   movimientos: Mov[]; puedeEditar: boolean; desde: string; hasta: string
   total: number; pagina: number; totalPaginas: number; filtros: Filtros; totales: Totales
+  clientes: string[]; clientesSel: string[]
 }) {
   const router = useRouter()
   const [d1, setD1] = useState(desde)
@@ -72,7 +74,8 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   //
   // El estado local es solo para que el campo responda mientras se tipea; el pedido al
   // servidor sale después de una pausa, para no consultar en cada tecla.
-  const [fCli, setFCli] = useState(filtros.cli)
+  // El cliente ya no se filtra por texto: se eligen uno o varios de la lista.
+  const [cliSel, setCliSel] = useState<string[]>(clientesSel)
   const [fOp, setFOp] = useState(filtros.op)
   const [fMin, setFMin] = useState(filtros.monto)
   const [fAutor, setFAutor] = useState(filtros.autor)
@@ -118,7 +121,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
 
   // Navegación: rango de fechas, filtros por columna y paginación, todo en la URL.
   function navegar(p: number, d1v = d1, d2v = d2, f: Partial<Filtros> = {}) {
-    const actuales: Filtros = { cli: fCli, tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMin, ...f }
+    const actuales: Filtros = { cli: cliSel.join('|'), tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMin, ...f }
     const params = new URLSearchParams()
     if (d1v) params.set('desde', d1v)
     if (d2v) params.set('hasta', d2v)
@@ -133,16 +136,15 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
 
   // Los campos de texto esperan a que se deje de tipear antes de consultar.
   useEffect(() => {
-    const cambio = fCli !== filtros.cli || fNotas !== filtros.notas
-      || fAutor !== filtros.autor || fMin !== filtros.monto
+    const cambio = fNotas !== filtros.notas || fAutor !== filtros.autor || fMin !== filtros.monto
     if (!cambio) return
-    const t = setTimeout(() => aplicarFiltro({ cli: fCli, notas: fNotas, autor: fAutor, monto: fMin }), 400)
+    const t = setTimeout(() => aplicarFiltro({ notas: fNotas, autor: fAutor, monto: fMin }), 400)
     return () => clearTimeout(t)
-  }, [fCli, fNotas, fAutor, fMin])
+  }, [fNotas, fAutor, fMin])
   const buscar = () => navegar(1)  // cambiar el rango vuelve a la página 1
 
   const ncols = 8 + cols.length + (puedeEditar ? 1 : 0)
-  const hayFiltro = Boolean(fCli || fTipo || fOp || fNotas || fAutor || fMin)
+  const hayFiltro = Boolean(cliSel.length || fTipo || fOp || fNotas || fAutor || fMin)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
@@ -234,7 +236,11 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                   </select>
                 </th>
                 <th style={{ textAlign: 'left' }}>
-                  <input className="srch" placeholder="filtrar…" value={fCli} onChange={e => setFCli(e.target.value)} style={{ width: '100%', minWidth: 0 }} />
+                  <FiltroClientes
+                    clientes={clientes}
+                    seleccionados={cliSel}
+                    onChange={sel => { setCliSel(sel); aplicarFiltro({ cli: sel.join('|') }) }}
+                  />
                 </th>
                 <th style={{ textAlign: 'left' }}>
                   <select className="srch" value={fOp} onChange={e => { setFOp(e.target.value); aplicarFiltro({ op: e.target.value }) }} style={{ width: '100%', minWidth: 0 }}>
