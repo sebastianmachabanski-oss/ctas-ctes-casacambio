@@ -4,6 +4,11 @@ import ListaCalle from '@/components/calle/ListaCalle'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
 import { esAdmin, esStaff } from '@/lib/roles'
 
+// Siempre se renderiza en el momento: es una pantalla de datos que cambian con cada
+// carga. Sin esto, Next puede servir una versión guardada y mostrar información vieja.
+export const dynamic = 'force-dynamic'
+
+
 // Dinero "en la calle": movimientos cuyo campo DEBE tiene un repartidor cargado — plata
 // que todavía no se integró a la caja. Réplica del recuadro rojo "Calle" de la solapa
 // CAJA. Regla de la planilla: al total de calle solo suman los valores POSITIVOS.

@@ -3,6 +3,11 @@ import { createClient } from '@/lib/supabase/server'
 import TableroInicio from '@/components/inicio/TableroInicio'
 import { esStaff } from '@/lib/roles'
 
+// Siempre se renderiza en el momento: es una pantalla de datos que cambian con cada
+// carga. Sin esto, Next puede servir una versión guardada y mostrar información vieja.
+export const dynamic = 'force-dynamic'
+
+
 // Columnas de "calle" (dinero con repartidor asignado). Regla de la planilla: al total
 // solo suman los valores POSITIVOS.
 const COLS_CALLE = ['pesos', 'cheques', 'dolares', 'euros', 'reales', 'usdt'] as const
