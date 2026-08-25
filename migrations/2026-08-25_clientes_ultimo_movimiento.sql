@@ -11,7 +11,12 @@
 -- Supabase rompe la linea al pegar esos caracteres y la consulta falla.
 
 -- Totales de CAJA por cliente, con la fecha de su ultimo movimiento.
-create or replace function public.caja_clientes_periodo(p_desde date default null, p_hasta date default null)
+--
+-- Se borra primero: la funcion ya existia y ahora devuelve una columna mas, y Postgres
+-- no permite cambiar las columnas de salida con create or replace.
+drop function if exists public.caja_clientes_periodo(date, date);
+
+create function public.caja_clientes_periodo(p_desde date default null, p_hasta date default null)
 returns table(
   cliente text, pesos numeric, dolares numeric, euros numeric, reales numeric,
   movimientos bigint, ultimo_movimiento date
