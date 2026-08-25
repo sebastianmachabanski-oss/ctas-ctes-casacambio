@@ -46,9 +46,40 @@ export default async function TransaccionesPage({
   const fAutor = (searchParams.autor ?? '').trim()
   const fMonto = (searchParams.monto ?? '').trim()
 
-  let query = supabase.from('movimientos_caja')
-    .select('*', { count: 'exact' })
-    .neq('operacion', 'OPERACION?')
+  // Un solo lugar arma los filtros: lo usan la consulta de la página y la de los totales.
+  // Duplicarlos sería garantizar que en algún momento dejen de coincidir.
+  const conFiltros = (columnas: string, opciones?: { count: 'exact' }) => {
+    let q = supabase.from('movimientos_caja')
+      .select(columnas, opciones)
+      .neq('operacion', 'OPERACION?')
+    if (desde) q = q.gte('fecha', desde)
+    if (hasta) q = q.lte('fecha', hasta)
+    if (fCli)   q = q.ilike('cliente', `%${fCli}%`)
+    if (fTipo)  q = q.eq('tipo', fTipo)
+    if (fOp)    q = q.eq('operacion', fOp)
+    if (fNotas) q = q.ilike('notas', `%${fNotas}%`)
+    if (fAutor) {
+      q = /CARGA/i.test(fAutor)
+        ? q.is('creado_por', null)
+        : q.or(`creado_por.ilike.%${fAutor}%,editado_por.ilike.%${fAutor}%`)
+    }
+    if (fMonto) {
+      const op = fMonto.match(/^(>=|<=|>|<|=)/)?.[1] ?? '='
+      const crudo = fMonto.replace(/^(>=|<=|>|<|=)\s*/, '').replace(/\./g, '').replace(',', '.')
+      const val = Number(crudo)
+      if (isFinite(val) && crudo !== '') {
+        // Se compara el valor ABSOLUTO: los egresos se guardan en negativo.
+        if (op === '>')       q = q.or(`monto.gt.${val},monto.lt.${-val}`)
+        else if (op === '>=') q = q.or(`monto.gte.${val},monto.lte.${-val}`)
+        else if (op === '<')  q = q.lt('monto', val).gt('monto', -val)
+        else if (op === '<=') q = q.lte('monto', val).gte('monto', -val)
+        else                  q = q.or(`monto.eq.${val},monto.eq.${-val}`)
+      }
+    }
+    return q
+  }
+
+  let query = conFiltros('*', { count: 'exact' })
     // MISMA SECUENCIA QUE LA PLANILLA, dada vuelta: lo más nuevo arriba (25/8/2026).
     //
     // Manda `fila_sheet` —la posición de la fila en la solapa CAJA— y NO la fecha. La
@@ -65,36 +96,23 @@ export default async function TransaccionesPage({
     // saltarían arriba de toda la planilla aunque ya estén integradas en el Sheet.
     .order('fila_sheet', { ascending: false, nullsFirst: true })
     .order('creado_at', { ascending: false, nullsFirst: false })
-  if (desde) query = query.gte('fecha', desde)
-  if (hasta) query = query.lte('fecha', hasta)
-
-  if (fCli)   query = query.ilike('cliente', `%${fCli}%`)
-  if (fTipo)  query = query.eq('tipo', fTipo)
-  if (fOp)    query = query.eq('operacion', fOp)
-  if (fNotas) query = query.ilike('notas', `%${fNotas}%`)
-  // Autor: busca en quien cargó y en quien editó. Las filas importadas antes de la puesta
-  // en marcha no tienen autor y se muestran como "carga inicial".
-  if (fAutor) {
-    query = /CARGA/i.test(fAutor)
-      ? query.is('creado_por', null)
-      : query.or(`creado_por.ilike.%${fAutor}%,editado_por.ilike.%${fAutor}%`)
-  }
-  // Monto: un número solo busca ESE importe; con >, >=, < o <= compara. Se evalúa contra
-  // el importe de la operación, en valor absoluto.
-  if (fMonto) {
-    const op = fMonto.match(/^(>=|<=|>|<|=)/)?.[1] ?? '='
-    const crudo = fMonto.replace(/^(>=|<=|>|<|=)\s*/, '').replace(/\./g, '').replace(',', '.')
-    const val = Number(crudo)
-    if (isFinite(val) && crudo !== '') {
-      // Se compara el valor ABSOLUTO: los egresos se guardan en negativo.
-      if (op === '>')       query = query.or(`monto.gt.${val},monto.lt.${-val}`)
-      else if (op === '>=') query = query.or(`monto.gte.${val},monto.lte.${-val}`)
-      else if (op === '<')  query = query.lt('monto', val).gt('monto', -val)
-      else if (op === '<=') query = query.lte('monto', val).gte('monto', -val)
-      else                  query = query.or(`monto.eq.${val},monto.eq.${-val}`)
-    }
-  }
   query = query.range((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA - 1)
+
+  // Totales del resultado filtrado COMPLETO. Sumar solo la página respondería otra
+  // pregunta: filtrando un cliente, lo que interesa es su total, no el de las 100 filas
+  // que entraron en pantalla. Se traen tres columnas y se sumaN acá; Postgrest no agrega.
+  const PAGINA_TOT = 1000
+  const totales = { monto: 0, pesos: 0, dolares: 0 }
+  for (let from = 0; ; from += PAGINA_TOT) {
+    const { data: pg } = await conFiltros('monto, pesos, dolares').range(from, from + PAGINA_TOT - 1)
+    const filas = (pg ?? []) as any[]
+    for (const f of filas) {
+      totales.monto   += Math.abs(Number(f.monto) || 0)
+      totales.pesos   += Number(f.pesos) || 0
+      totales.dolares += Number(f.dolares) || 0
+    }
+    if (filas.length < PAGINA_TOT) break
+  }
 
   const { data, count, error } = await query
   const movimientos = (data ?? []) as any[]
@@ -110,6 +128,7 @@ export default async function TransaccionesPage({
       ) : (
         <TransaccionesView
           filtros={{ cli: fCli, tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMonto }}
+          totales={totales}
           movimientos={movimientos}
           puedeEditar={esAdmin(rol)}
           desde={desde}
