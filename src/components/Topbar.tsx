@@ -25,7 +25,9 @@ export default function Topbar() {
         <div className="cc-crumb">Casa de Cambio</div>
         <div className="cc-ptitle">{title}</div>
       </div>
-      <span className="cc-pill"><span className="d" /><span className="t">Sincronizado</span></span>
+      {/* Acá iba una chapita verde que decía "Sincronizado". No era un estado real: era
+          texto fijo, y encima nombraba la planilla en todas las pantallas. Se retiró el
+          25/8/2026 junto con el resto de las menciones. */}
     </>
   )
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { PLANILLA_ACTIVA } from '@/lib/planilla'
 import type { Profile } from '@/lib/supabase/types'
 
 type Item = { href?: string; label: string; icon: string; off?: boolean; section?: string }
@@ -66,7 +67,10 @@ export default function Sidebar({ profile }: { profile: Profile }) {
   const router = useRouter()
   const [pinned, setPinned] = useState(true)
   const [navOpen, setNavOpen] = useState(false)
-  const items = NAV[profile.rol] ?? NAV.cliente
+  // "Sincronizar" no se muestra: la app no menciona la planilla (25/8/2026). La pantalla
+  // sigue existiendo y funcionando en /dashboard/admin/sync para quien la necesite.
+  const items = (NAV[profile.rol] ?? NAV.cliente)
+    .filter(it => PLANILLA_ACTIVA || it.href !== '/dashboard/admin/sync')
 
   // Estado de anclado: recordado entre visitas; en pantallas chicas arranca como panel.
   useEffect(() => {

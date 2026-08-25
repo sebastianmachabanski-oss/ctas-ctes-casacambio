@@ -30,6 +30,12 @@ Documentación clave: `docs/SINCRONIZACION.md` (sync Sheet→DB), `docs/MOTOR-CA
   ante cualquier cambio correr `npx tsx scripts/validar-motor-calculo.mts`.
 - Editar transacciones en la app NO escribe al Sheet (definido 5/7/2026): mientras
   dure la convivencia, el sync puede pisar esos cambios y es un comportamiento asumido.
+- La interfaz NO menciona la planilla ni el sync (definido 25/8/2026): la app se presenta
+  como el único sistema. El interruptor es `PLANILLA_ACTIVA` en `src/lib/planilla.ts`, hoy
+  apagado por defecto; `NEXT_PUBLIC_PLANILLA_ACTIVA=true` devuelve todos los avisos.
+  OJO: esto es SOLO lo que se ve. El sync, `excel-write` y el borrado espejado siguen
+  funcionando igual, así que las ediciones se siguen pisando — con la diferencia de que
+  ahora nadie lo avisa. Apagar el circuito de verdad es un trabajo aparte, pendiente.
 - USDT: moneda SOLO-app, NO existe en la planilla — no hay ni una transacción cargada allá
   y no la va a haber. Desde el 25/8/2026 opera en CAJA **y en CUENTA CORRIENTE** (antes era
   solo caja); sigue sin contemplarse en TT/SWITCH. Los saldos USDT de cta cte viven solo en

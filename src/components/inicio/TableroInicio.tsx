@@ -118,7 +118,7 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
         <div className="sec-lbl" style={{ margin: 0 }}>
           {esTodo ? 'Situación de caja — ahora' : 'Caja — movimiento del período'}{' '}
           <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--muted)' }}>
-            {esTodo ? '· se actualiza con cada sincronización' : '· los reportes de abajo responden al período elegido'}
+            {esTodo ? '· incluye todos los movimientos registrados' : '· los reportes de abajo responden al período elegido'}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
