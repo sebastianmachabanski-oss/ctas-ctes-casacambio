@@ -39,7 +39,10 @@ export default async function TransaccionesPage({
   // Filtros por columna. Van EN EL SERVIDOR, no sobre la página ya traída: filtrando en
   // el cliente, buscar un cliente mostraba solo sus movimientos dentro de las 100 filas
   // de la página actual y seguía ofreciendo 23 páginas del resto (25/8/2026).
-  const fCli   = (searchParams.cli   ?? '').trim()
+  // Lista de clientes elegidos. Van separados por "|" porque la coma aparece en nombres
+  // reales ("PEREZ, JUAN") y rompería el separador.
+  const clientesSel = (searchParams.cli ?? '').split('|').map(c => c.trim()).filter(Boolean)
+  const fCli = clientesSel.join('|')
   const fTipo  = (searchParams.tipo  ?? '').trim()
   const fOp    = (searchParams.op    ?? '').trim()
   const fNotas = (searchParams.notas ?? '').trim()
@@ -54,7 +57,9 @@ export default async function TransaccionesPage({
       .neq('operacion', 'OPERACION?')
     if (desde) q = q.gte('fecha', desde)
     if (hasta) q = q.lte('fecha', hasta)
-    if (fCli)   q = q.ilike('cliente', `%${fCli}%`)
+    // Selección exacta, no búsqueda por texto: el usuario ya eligió de la lista.
+    if (clientesSel.length === 1) q = q.eq('cliente', clientesSel[0])
+    else if (clientesSel.length > 1) q = q.in('cliente', clientesSel)
     if (fTipo)  q = q.eq('tipo', fTipo)
     if (fOp)    q = q.eq('operacion', fOp)
     if (fNotas) q = q.ilike('notas', `%${fNotas}%`)
@@ -77,6 +82,17 @@ export default async function TransaccionesPage({
       }
     }
     return q
+  }
+
+  // Padrón para el desplegable del filtro. Paginado: Postgrest corta en 1.000 y hay más
+  // clientes que eso, así que sin esto faltarían los del final del abecedario.
+  const clientes: string[] = []
+  for (let from = 0; ; from += 1000) {
+    const { data } = await supabase.from('clientes')
+      .select('nombre').eq('activo', true).order('nombre').range(from, from + 999)
+    const filas = (data ?? []) as any[]
+    clientes.push(...filas.map(c => c.nombre))
+    if (filas.length < 1000) break
   }
 
   let query = conFiltros('*', { count: 'exact' })
@@ -129,6 +145,8 @@ export default async function TransaccionesPage({
         <TransaccionesView
           filtros={{ cli: fCli, tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMonto }}
           totales={totales}
+          clientes={clientes}
+          clientesSel={clientesSel}
           movimientos={movimientos}
           puedeEditar={esAdmin(rol)}
           desde={desde}
