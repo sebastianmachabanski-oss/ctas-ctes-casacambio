@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import SelectBuscable from '@/components/SelectBuscable'
 import { useAvisoSinGuardar } from '@/lib/useAvisoSinGuardar'
@@ -102,6 +102,13 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
   //    La regla del 5/7/2026 no cambia: son clientes eventuales y no se normalizan.
   const [clienteQuery, setClienteQuery] = useState('')
   const [clienteOpen, setClienteOpen] = useState(false)
+  // Opción resaltada dentro de la lista de sugerencias, para moverse con las flechas.
+  const [marcada, setMarcada] = useState(0)
+  // Mantiene a la vista la opción marcada cuando se recorre la lista con las flechas.
+  const refMarcada = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    refMarcada.current?.scrollIntoView({ block: 'nearest' })
+  }, [marcada, clienteOpen])
   const [cuentasLocales, setCuentasLocales] = useState<string[]>(cuentas)
   const [creandoCuenta, setCreandoCuenta] = useState(false)
 
@@ -152,13 +159,42 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
 
   // Enter en el buscador: selecciona el match exacto (o el único resultado); nunca
   // dispara el submit ni da de alta nada.
+  // Navegación con flechas en la lista de sugerencias (25/8/2026). `total` incluye, en
+  // cuenta corriente, la opción final de crear la cuenta que no existe.
+  function moverMarcada(e: React.KeyboardEvent<HTMLInputElement>, total: number): boolean {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault(); setClienteOpen(true)
+      setMarcada(i => (total ? Math.min(i + 1, total - 1) : 0))
+      return true
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault(); setMarcada(i => Math.max(i - 1, 0))
+      return true
+    }
+    if (e.key === 'Escape') { e.preventDefault(); setClienteOpen(false); return true }
+    return false
+  }
+
   function handleCuentaKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    const total = cuentasFiltradas.length + (cuentaNoExiste ? 1 : 0)
+    if (moverMarcada(e, total)) return
     if (e.key !== 'Enter') return
     e.preventDefault()
+    // Un nombre escrito completo gana sobre la marca: es lo que el usuario tipeó.
     const query = clienteQuery.trim().toUpperCase()
     const exacta = cuentas.find(c => c.toUpperCase() === query)
     if (exacta) { elegirCuenta(exacta); return }
-    if (cuentasFiltradas.length === 1) elegirCuenta(cuentasFiltradas[0])
+    if (marcada < cuentasFiltradas.length) { elegirCuenta(cuentasFiltradas[marcada]); return }
+    if (cuentaNoExiste) crearCuenta(nombreTipeado)
+  }
+
+  function handleClienteKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (moverMarcada(e, clientesFiltrados.length)) return
+    if (e.key !== 'Enter' || !clienteOpen || !clientesFiltrados.length) return
+    // El campo es libre: Enter solo toma la sugerencia si hay una marcada.
+    e.preventDefault()
+    set('cuenta_cte', clientesFiltrados[marcada])
+    setClienteOpen(false)
   }
 
   // Aviso al salir con una carga a medio hacer. Solo cuenta lo que el usuario tipeó:
@@ -448,9 +484,9 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
               onChange={e => {
                 setClienteQuery(e.target.value)
                 set('cuenta_cte', '') // obliga a elegir una cuenta real de la lista
-                setClienteOpen(true)
+                setClienteOpen(true); setMarcada(0)
               }}
-              onFocus={() => setClienteOpen(true)}
+              onFocus={() => { setClienteOpen(true); setMarcada(0) }}
               onBlur={() => setTimeout(() => setClienteOpen(false), 150)}
               onKeyDown={handleCuentaKeyDown}
               placeholder="Buscar cuenta corriente…"
@@ -459,12 +495,14 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
             />
             {clienteOpen && (
               <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                {cuentasFiltradas.length > 0 ? cuentasFiltradas.map(c => (
+                {cuentasFiltradas.length > 0 ? cuentasFiltradas.map((c, i) => (
                   <li key={c}>
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                      ref={i === marcada ? refMarcada : undefined}
+                      className={`w-full text-left px-3 py-2 text-sm ${i === marcada ? 'bg-brand-50' : 'hover:bg-gray-50'}`}
                       onMouseDown={e => e.preventDefault()}
+                      onMouseEnter={() => setMarcada(i)}
                       onClick={() => elegirCuenta(c)}
                     >
                       {c}
@@ -476,8 +514,10 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
                     <button
                       type="button"
                       disabled={creandoCuenta}
-                      className="w-full text-left px-3 py-2 text-sm text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+                      ref={marcada === cuentasFiltradas.length ? refMarcada : undefined}
+                      className={`w-full text-left px-3 py-2 text-sm text-brand-700 disabled:opacity-50 ${marcada === cuentasFiltradas.length ? 'bg-brand-50' : 'hover:bg-brand-50'}`}
                       onMouseDown={e => e.preventDefault()}
+                      onMouseEnter={() => setMarcada(cuentasFiltradas.length)}
                       onClick={() => crearCuenta(nombreTipeado)}
                     >
                       {creandoCuenta ? 'Creando…' : <>➕ Crear la cuenta corriente «<b>{nombreTipeado}</b>»</>}
@@ -497,8 +537,9 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
               type="text"
               className="input"
               value={form.cuenta_cte}
-              onChange={e => { set('cuenta_cte', e.target.value); setClienteOpen(true) }}
-              onFocus={() => setClienteOpen(true)}
+              onChange={e => { set('cuenta_cte', e.target.value); setClienteOpen(true); setMarcada(0) }}
+              onFocus={() => { setClienteOpen(true); setMarcada(0) }}
+              onKeyDown={handleClienteKeyDown}
               onBlur={() => setTimeout(() => setClienteOpen(false), 150)}
               placeholder="Nombre del cliente"
               autoComplete="off"
@@ -506,12 +547,14 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
             />
             {clienteOpen && clientesFiltrados.length > 0 && (
               <ul className="absolute z-10 mt-1 w-full max-h-56 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg">
-                {clientesFiltrados.map(c => (
+                {clientesFiltrados.map((c, i) => (
                   <li key={c}>
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                      ref={i === marcada ? refMarcada : undefined}
+                      className={`w-full text-left px-3 py-2 text-sm ${i === marcada ? 'bg-brand-50' : 'hover:bg-gray-50'}`}
                       onMouseDown={e => e.preventDefault()}
+                      onMouseEnter={() => setMarcada(i)}
                       onClick={() => { set('cuenta_cte', c); setClienteOpen(false) }}
                     >
                       {c}
