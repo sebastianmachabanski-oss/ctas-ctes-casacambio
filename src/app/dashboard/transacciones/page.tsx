@@ -31,14 +31,22 @@ export default async function TransaccionesPage({
   let query = supabase.from('movimientos_caja')
     .select('*', { count: 'exact' })
     .neq('operacion', 'OPERACION?')
-    .order('fecha', { ascending: false })
-    // Desempate dentro del mismo día. Las transacciones cargadas en la app nacen con
-    // `fila_sheet` en null —todavía no tienen lugar en la planilla—, así que entre varias
-    // del mismo día el orden quedaba indefinido. `creado_at` las ordena de la más nueva a
-    // la más vieja; las que vienen de la planilla no lo tienen y caen después, ordenadas
-    // por su posición en el Sheet.
+    // MISMA SECUENCIA QUE LA PLANILLA, dada vuelta: lo más nuevo arriba (25/8/2026).
+    //
+    // Manda `fila_sheet` —la posición de la fila en la solapa CAJA— y NO la fecha. La
+    // planilla es un registro corrido: el orden de carga es el de las filas, y ese es el
+    // orden que el negocio reconoce. Ordenar por fecha se despegaba de la planilla en
+    // cuanto alguien cargaba una fila con fecha anterior a la de arriba.
+    //
+    // Los nulos van PRIMERO a propósito: son las transacciones cargadas en la app que
+    // todavía no tienen lugar en el Sheet, y tienen que verse arriba de todo. Entre
+    // ellas desempata la fecha de carga.
+    //
+    // Ojo con no invertir estas dos: al sincronizar, las filas que nacieron en la app
+    // recuperan su `creado_at` desde la auditoría. Si `creado_at` mandara, esas filas
+    // saltarían arriba de toda la planilla aunque ya estén integradas en el Sheet.
+    .order('fila_sheet', { ascending: false, nullsFirst: true })
     .order('creado_at', { ascending: false, nullsFirst: false })
-    .order('fila_sheet', { ascending: false })
   if (desde) query = query.gte('fecha', desde)
   if (hasta) query = query.lte('fecha', hasta)
   query = query.range((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA - 1)
