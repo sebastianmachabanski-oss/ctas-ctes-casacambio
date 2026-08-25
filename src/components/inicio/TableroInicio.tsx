@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type KPI = { cur: string; col: string; caja: number; calle: number | null; enCaja: number | null; cc: number | null }
-type Cliente = { nombre: string; pesos: number; dolares: number; euros: number; reales: number }
+type Cliente = { nombre: string; pesos: number; dolares: number; euros: number; reales: number; ultimo: string | null }
 type Punto = { fecha: string; saldo: number }
 
 const fmt = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
 const money = (n: number) => n < 0 ? `(${fmt.format(-Math.round(n))})` : fmt.format(Math.round(n))
+const fecha = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 const cell = (n: number) => n === 0
   ? <td className="zero">—</td>
   : <td className={`num ${n < 0 ? 'neg' : ''}`}>{money(n)}</td>
@@ -17,13 +18,19 @@ const cell = (n: number) => n === 0
 const PERIODOS: [string, string][] = [['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes'], ['anio', 'Año'], ['', 'Todo']]
 const VENTANA: Record<string, number> = { dia: 3, semana: 7, mes: 30, anio: 365, '': 90 }
 
-export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD, periodo, rDesde, rHasta }: {
+// Un cliente es "activo" si operó en los últimos 60 días. Los inactivos no se listan
+// —son cientos y entierran a los que sí operan—, pero siguen estando: aparecen apenas
+// se los busca por nombre, o con el botón "Ver todos".
+const DIAS_ACTIVO = 60
+
+export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD, hoy, periodo, rDesde, rHasta }: {
   kpis: KPI[]; clientesCaja: Cliente[]; clientesCC: Cliente[]; serieUSD: Punto[]
-  periodo: string; rDesde: string; rHasta: string
+  hoy: string; periodo: string; rDesde: string; rHasta: string
 }) {
   const router = useRouter()
   const [vista, setVista] = useState<'caja' | 'cc'>('caja')
   const [busca, setBusca] = useState('')
+  const [verTodos, setVerTodos] = useState(false)
   const esRango = !!(rDesde || rHasta)
   const [rangoOpen, setRangoOpen] = useState(esRango)
   const [r1, setR1] = useState(rDesde)
@@ -47,11 +54,35 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
   // los KPIs de arriba responden al período elegido.
   const saldoUSD = serieUSD.length ? serieUSD[serieUSD.length - 1].saldo : 0
 
+  // Fecha de corte de la actividad, calculada sobre el "hoy" de Argentina que manda el
+  // servidor (no sobre el reloj del navegador, que puede estar en otro huso).
+  const corte = useMemo(() => {
+    const d = new Date(hoy + 'T12:00:00Z')
+    d.setUTCDate(d.getUTCDate() - DIAS_ACTIVO)
+    return d.toISOString().slice(0, 10)
+  }, [hoy])
+
   const fuente = vista === 'caja' ? clientesCaja : clientesCC
-  const filtrados = useMemo(() => {
+  // Los más recientes arriba; los que no tienen fecha, al final y por nombre.
+  const ordenados = useMemo(() => (
+    [...fuente].sort((a, b) =>
+      (b.ultimo ?? '').localeCompare(a.ultimo ?? '') ||
+      (a.nombre || '').localeCompare(b.nombre || '', 'es'))
+  ), [fuente])
+
+  const { filtrados, ocultos } = useMemo(() => {
     const q = busca.trim().toUpperCase()
-    return fuente.filter(c => (c.nombre || '').toUpperCase().includes(q))
-  }, [fuente, busca])
+    const coinciden = q
+      ? ordenados.filter(c => (c.nombre || '').toUpperCase().includes(q))
+      : ordenados
+    // Buscando se ve TODO: si el usuario escribe un nombre, quiere ese cliente aunque
+    // no opere hace un año. El corte solo aplica a la lista sin buscar.
+    // Si ninguna fila trae fecha, la migración todavía no corrió: se muestra todo antes
+    // que dejar la tabla vacía.
+    if (q || verTodos || !coinciden.some(c => c.ultimo)) return { filtrados: coinciden, ocultos: 0 }
+    const activos = coinciden.filter(c => (c.ultimo ?? '') >= corte)
+    return { filtrados: activos, ocultos: coinciden.length - activos.length }
+  }, [ordenados, busca, corte, verTodos])
 
   // Auto-ajuste del tamaño de letra de los KPIs de caja: si un número no entra en una
   // línea (ej. negativos de 9+ dígitos), baja la fuente hasta que quepa (mín. 14px).
@@ -141,19 +172,33 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
           </div>
           <div className="tbl-wrap" style={{ maxHeight: 520, overflowY: 'auto' }}>
             <table className="cc-tbl">
-              <thead><tr><th>Cliente</th><th>Pesos</th><th>Dólares</th><th>Euros</th><th>Reales</th></tr></thead>
+              <thead><tr><th>Cliente</th><th>Pesos</th><th>Dólares</th><th>Euros</th><th>Reales</th><th>Último mov.</th></tr></thead>
               <tbody>
                 {filtrados.slice(0, 400).map((c, i) => (
                   <tr key={c.nombre + i}>
                     <td>{c.nombre}</td>{cell(c.pesos)}{cell(c.dolares)}{cell(c.euros)}{cell(c.reales)}
+                    <td className={c.ultimo && c.ultimo < corte ? 'zero' : ''} style={{ whiteSpace: 'nowrap' }}>
+                      {c.ultimo ? fecha(c.ultimo) : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div style={{ padding: '10px 16px 12px', color: 'var(--muted)', fontSize: 12 }}>
-            {filtrados.length} cliente{filtrados.length !== 1 ? 's' : ''} · vista {vista === 'caja' ? 'Caja' : 'Cta cte'}
-            {filtrados.length > 400 ? ' · mostrando primeros 400 (afiná la búsqueda)' : ''}
+          <div style={{ padding: '10px 16px 12px', color: 'var(--muted)', fontSize: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span>
+              {filtrados.length} cliente{filtrados.length !== 1 ? 's' : ''} · vista {vista === 'caja' ? 'Caja' : 'Cta cte'}
+              {filtrados.length > 400 ? ' · mostrando primeros 400 (afiná la búsqueda)' : ''}
+            </span>
+            {ocultos > 0 && (
+              <>
+                <span>· {ocultos} sin movimientos en {DIAS_ACTIVO} días</span>
+                <button className="chip" onClick={() => setVerTodos(true)}>Ver todos</button>
+              </>
+            )}
+            {verTodos && !busca.trim() && (
+              <button className="chip" onClick={() => setVerTodos(false)}>Ver solo activos</button>
+            )}
           </div>
         </section>
 

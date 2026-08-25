@@ -107,7 +107,7 @@ export default async function InicioPage({
     // Si la migración de la RPC aún no corrió, cae a la vista sin filtro de período.
     clientesCaja = await traerTodo<any>(async (from, to) => {
       const { data } = await supabase.from('caja_clientes')
-        .select('cliente,pesos,dolares,euros,reales')
+        .select('cliente,pesos,dolares,euros,reales,ultimo_movimiento')
         .order('cliente')
         .range(from, to)
       return (data ?? []) as any[]
@@ -115,7 +115,7 @@ export default async function InicioPage({
   }
   const clientesCC = await traerTodo<any>(async (from, to) => {
     const { data } = await supabase.from('saldos_cuenta_corriente')
-      .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales')
+      .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales,ultimo_movimiento')
       .order('cuenta_cte')
       .range(from, to)
     return (data ?? []) as any[]
@@ -138,13 +138,18 @@ export default async function InicioPage({
     { cur: 'Banco',   col: '#8a94a6', caja: t.banco ?? 0,   calle: null,          enCaja: null,                              cc: null },
   ]
 
+  // `ultimo` es la fecha del último movimiento del cliente: con ella el tablero pone
+  // primero a los que operan y esconde —sin perderlos— a los que no aparecen hace meses.
+  // Puede venir vacío si la migración todavía no corrió: en ese caso nadie se oculta.
   const clientesCajaN = clientesCaja.map(c => ({
     nombre: c.cliente, pesos: Number(c.pesos) || 0, dolares: Number(c.dolares) || 0,
     euros: Number(c.euros) || 0, reales: Number(c.reales) || 0,
+    ultimo: (c.ultimo_movimiento as string | null) ?? null,
   }))
   const clientesCCN = clientesCC.map(c => ({
     nombre: c.cuenta_cte, pesos: Number(c.saldo_pesos) || 0, dolares: Number(c.saldo_dolares) || 0,
     euros: Number(c.saldo_euros) || 0, reales: Number(c.saldo_reales) || 0,
+    ultimo: (c.ultimo_movimiento as string | null) ?? null,
   }))
 
   return (
@@ -153,6 +158,7 @@ export default async function InicioPage({
       clientesCaja={clientesCajaN}
       clientesCC={clientesCCN}
       serieUSD={serie}
+      hoy={hoyArgentina()}
       periodo={(PERIODOS as readonly string[]).includes(p) ? p : ''}
       rDesde={searchParams.desde ?? ''}
       rHasta={searchParams.hasta ?? ''}
