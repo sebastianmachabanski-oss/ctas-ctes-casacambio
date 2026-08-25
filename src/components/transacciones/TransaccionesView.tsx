@@ -143,6 +143,13 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   }, [fNotas, fAutor, fMin])
   const buscar = () => navegar(1)  // cambiar el rango vuelve a la página 1
 
+  // Quita solo el rango de fechas y conserva los filtros por columna: casi siempre lo que
+  // se quiere es ampliar la búsqueda del cliente ya elegido a todo el historial.
+  function limpiarFechas() {
+    setD1(''); setD2('')
+    navegar(1, '', '')
+  }
+
   const ncols = 8 + cols.length + (puedeEditar ? 1 : 0)
   const hayFiltro = Boolean(cliSel.length || fTipo || fOp || fNotas || fAutor || fMin)
 
@@ -160,6 +167,11 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               style={{ width: 138, fontSize: 12, padding: '4px 8px' }} />
             <button className="btn-primary" onClick={buscar}
               style={{ fontSize: 12, padding: '5px 14px' }}>Buscar</button>
+            {(d1 || d2) && (
+              <button className="btn-secondary" onClick={limpiarFechas}
+                title="Quitar el rango de fechas y ver todo el historial"
+                style={{ fontSize: 12, padding: '5px 12px' }}>Limpiar fechas</button>
+            )}
           </div>
 
           {/* Totales de TODO lo que coincide con los filtros, no solo de esta página. */}
