@@ -70,6 +70,13 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
       (a.nombre || '').localeCompare(b.nombre || '', 'es'))
   ), [fuente])
 
+  // Caja responde al período elegido: con Día/Semana/Mes la consulta ya trae solo a los
+  // que operaron en esa ventana, y con Año o un rango pasado esconder por antigüedad
+  // vaciaría la tabla justo cuando el usuario pidió mirar atrás. Así que ahí no se
+  // esconde nada. Cta cte, en cambio, es siempre el histórico completo: el corte aplica
+  // siempre.
+  const cortaPorActividad = vista === 'cc' || esTodo
+
   const { filtrados, ocultos } = useMemo(() => {
     const q = busca.trim().toUpperCase()
     const coinciden = q
@@ -79,10 +86,12 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
     // no opere hace un año. El corte solo aplica a la lista sin buscar.
     // Si ninguna fila trae fecha, la migración todavía no corrió: se muestra todo antes
     // que dejar la tabla vacía.
-    if (q || verTodos || !coinciden.some(c => c.ultimo)) return { filtrados: coinciden, ocultos: 0 }
+    if (q || verTodos || !cortaPorActividad || !coinciden.some(c => c.ultimo)) {
+      return { filtrados: coinciden, ocultos: 0 }
+    }
     const activos = coinciden.filter(c => (c.ultimo ?? '') >= corte)
     return { filtrados: activos, ocultos: coinciden.length - activos.length }
-  }, [ordenados, busca, corte, verTodos])
+  }, [ordenados, busca, corte, verTodos, cortaPorActividad])
 
   // Auto-ajuste del tamaño de letra de los KPIs de caja: si un número no entra en una
   // línea (ej. negativos de 9+ dígitos), baja la fuente hasta que quepa (mín. 14px).
@@ -177,7 +186,7 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
                 {filtrados.slice(0, 400).map((c, i) => (
                   <tr key={c.nombre + i}>
                     <td>{c.nombre}</td>{cell(c.pesos)}{cell(c.dolares)}{cell(c.euros)}{cell(c.reales)}
-                    <td className={c.ultimo && c.ultimo < corte ? 'zero' : ''} style={{ whiteSpace: 'nowrap' }}>
+                    <td className={cortaPorActividad && c.ultimo && c.ultimo < corte ? 'zero' : ''} style={{ whiteSpace: 'nowrap' }}>
                       {c.ultimo ? fecha(c.ultimo) : '—'}
                     </td>
                   </tr>
@@ -196,7 +205,7 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
                 <button className="chip" onClick={() => setVerTodos(true)}>Ver todos</button>
               </>
             )}
-            {verTodos && !busca.trim() && (
+            {verTodos && cortaPorActividad && !busca.trim() && (
               <button className="chip" onClick={() => setVerTodos(false)}>Ver solo activos</button>
             )}
           </div>
