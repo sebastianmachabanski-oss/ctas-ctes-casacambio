@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
@@ -52,19 +52,27 @@ function badge(op: string) {
   return 'tag-gray'
 }
 
-export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas }: {
+type Filtros = { cli: string; tipo: string; op: string; notas: string; autor: string; monto: string }
+
+export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas, filtros }: {
   movimientos: Mov[]; puedeEditar: boolean; desde: string; hasta: string
-  total: number; pagina: number; totalPaginas: number
+  total: number; pagina: number; totalPaginas: number; filtros: Filtros
 }) {
   const router = useRouter()
   const [d1, setD1] = useState(desde)
   const [d2, setD2] = useState(hasta)
-  const [fCli, setFCli] = useState('')
-  const [fOp, setFOp] = useState('')
-  const [fMin, setFMin] = useState('')
-  const [fAutor, setFAutor] = useState('')
-  const [fNotas, setFNotas] = useState('')
-  const [fTipo, setFTipo] = useState('')
+  // Los filtros se aplican EN EL SERVIDOR y viajan en la URL: si se filtrara la página ya
+  // traída, buscar un cliente mostraría solo sus movimientos entre las 100 filas de esta
+  // página y seguiría ofreciendo el resto paginado (25/8/2026).
+  //
+  // El estado local es solo para que el campo responda mientras se tipea; el pedido al
+  // servidor sale después de una pausa, para no consultar en cada tecla.
+  const [fCli, setFCli] = useState(filtros.cli)
+  const [fOp, setFOp] = useState(filtros.op)
+  const [fMin, setFMin] = useState(filtros.monto)
+  const [fAutor, setFAutor] = useState(filtros.autor)
+  const [fNotas, setFNotas] = useState(filtros.notas)
+  const [fTipo, setFTipo] = useState(filtros.tipo)
   const [borrando, setBorrando] = useState<string | null>(null)
   const [errorBorrar, setErrorBorrar] = useState('')
   const [avisoPlanilla, setAvisoPlanilla] = useState('')
@@ -100,61 +108,36 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   // Columnas de impacto presentes en la página cargada.
   const cols = useMemo(() => IMPACTOS.filter(c => movimientos.some(m => num(m[c.key]) !== 0)), [movimientos])
 
-  // Filtros por columna: refinan (en vivo) las filas de la página, como el mockup.
-  // Monto: un número solo busca ESE monto exacto (en el importe de la operación o en
-  // cualquier impacto); con operador (>, >=, <, <=) compara contra la magnitud del movimiento.
-  const filtrados = useMemo(() => {
-    const qc = fCli.trim().toUpperCase()
+  // El servidor ya devuelve exactamente las filas pedidas: acá no se vuelve a filtrar.
+  const filtrados = movimientos
 
-    const s = fMin.trim()
-    const op = s.match(/^(>=|<=|>|<|=)/)?.[1] ?? '='
-    const val = parseNumAr(s.replace(/^(>=|<=|>|<|=)\s*/, ''))
-    const filtroMonto = (m: Mov): boolean => {
-      if (!s || val === null) return true
-      const mp = montoPrincipal(m)
-      switch (op) {
-        case '>':  return mp > val
-        case '>=': return mp >= val
-        case '<':  return mp < val
-        case '<=': return mp <= val
-        default: {
-          const valores = [Math.abs(num(m.monto)), ...IMPACTOS.map(c => Math.abs(num(m[c.key])))]
-          return valores.some(v => Math.abs(v - val) < 0.005)
-        }
-      }
-    }
-
-    // Autor: busca en quien cargó y en quien editó. "carga inicial" matchea las importadas.
-    const qa = fAutor.trim().toUpperCase()
-    const filtroAutor = (m: Mov): boolean => {
-      if (!qa) return true
-      const autor = esCargaInicial(m.creado_por) ? 'CARGA INICIAL' : (m.creado_por ?? '').toUpperCase()
-      return autor.includes(qa) || (m.editado_por ?? '').toUpperCase().includes(qa)
-    }
-
-    const qn = fNotas.trim().toUpperCase()
-
-    return movimientos.filter(m =>
-      (m.cliente ?? '').toUpperCase().includes(qc) &&
-      (!fOp || m.operacion === fOp) &&
-      (!qn || (m.notas ?? '').toUpperCase().includes(qn)) &&
-      (!fTipo || m.tipo === fTipo) &&
-      filtroAutor(m) &&
-      filtroMonto(m))
-  }, [movimientos, fCli, fOp, fMin, fAutor, fNotas, fTipo])
-
-  // Navegación (rango de fechas y paginación) conservando el estado en la URL.
-  function navegar(p: number, d1v = d1, d2v = d2) {
+  // Navegación: rango de fechas, filtros por columna y paginación, todo en la URL.
+  function navegar(p: number, d1v = d1, d2v = d2, f: Partial<Filtros> = {}) {
+    const actuales: Filtros = { cli: fCli, tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMin, ...f }
     const params = new URLSearchParams()
     if (d1v) params.set('desde', d1v)
     if (d2v) params.set('hasta', d2v)
+    for (const [k, v] of Object.entries(actuales)) if (v) params.set(k, v)
     if (p > 1) params.set('pagina', String(p))
     const qs = params.toString()
     router.replace('/dashboard/transacciones' + (qs ? '?' + qs : ''))
   }
+
+  // Cambiar un filtro siempre vuelve a la página 1: la anterior puede no existir ya.
+  const aplicarFiltro = (f: Partial<Filtros>) => navegar(1, d1, d2, f)
+
+  // Los campos de texto esperan a que se deje de tipear antes de consultar.
+  useEffect(() => {
+    const cambio = fCli !== filtros.cli || fNotas !== filtros.notas
+      || fAutor !== filtros.autor || fMin !== filtros.monto
+    if (!cambio) return
+    const t = setTimeout(() => aplicarFiltro({ cli: fCli, notas: fNotas, autor: fAutor, monto: fMin }), 400)
+    return () => clearTimeout(t)
+  }, [fCli, fNotas, fAutor, fMin])
   const buscar = () => navegar(1)  // cambiar el rango vuelve a la página 1
 
   const ncols = 8 + cols.length + (puedeEditar ? 1 : 0)
+  const hayFiltro = Boolean(fCli || fTipo || fOp || fNotas || fAutor || fMin)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
@@ -215,7 +198,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               <tr className="tx-filtros">
                 <th></th>
                 <th style={{ textAlign: 'left' }}>
-                  <select className="srch" value={fTipo} onChange={e => setFTipo(e.target.value)}
+                  <select className="srch" value={fTipo} onChange={e => { setFTipo(e.target.value); aplicarFiltro({ tipo: e.target.value }) }}
                     style={{ width: 100, minWidth: 0 }}>
                     <option value="">todo</option>
                     <option value="CAJA">CAJA</option>
@@ -226,7 +209,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                   <input className="srch" placeholder="filtrar…" value={fCli} onChange={e => setFCli(e.target.value)} style={{ width: '100%', minWidth: 0 }} />
                 </th>
                 <th style={{ textAlign: 'left' }}>
-                  <select className="srch" value={fOp} onChange={e => setFOp(e.target.value)} style={{ width: '100%', minWidth: 0 }}>
+                  <select className="srch" value={fOp} onChange={e => { setFOp(e.target.value); aplicarFiltro({ op: e.target.value }) }} style={{ width: '100%', minWidth: 0 }}>
                     <option value="">todas</option>
                     {OPERACIONES.map(o => <option key={o} value={o}>{o}</option>)}
                   </select>
@@ -293,16 +276,16 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 </tr>
               ))}
               {filtrados.length === 0 && (
-                <tr><td colSpan={ncols} style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>Sin resultados para estos filtros.</td></tr>
+                <tr><td colSpan={ncols} style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>Sin movimientos que coincidan con el filtro.</td></tr>
               )}
             </tbody>
           </table>
         </div>
         <div style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <span>
-            {filtrados.length.toLocaleString('es-AR')}
-            {filtrados.length !== movimientos.length ? ` de ${movimientos.length}` : ''} en esta página
-            {' · '}{total.toLocaleString('es-AR')} movimientos en total
+            {filtrados.length.toLocaleString('es-AR')} en esta página
+            {' · '}{total.toLocaleString('es-AR')}
+            {hayFiltro ? ' que coinciden con el filtro' : ' movimientos en total'}
           </span>
           <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
             <button className="chip" disabled={pagina <= 1} onClick={() => navegar(pagina - 1)}
