@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import SelectBuscable from '@/components/SelectBuscable'
 import { useAvisoSinGuardar } from '@/lib/useAvisoSinGuardar'
+import { PLANILLA_ACTIVA } from '@/lib/planilla'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 
 // CHEQUES opera igual que el resto, en CAJA y en cuenta corriente: el cheque entra en la
@@ -395,15 +396,21 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     setForm(f => ({ ...f, monto: '', cotizacion: '', costo_porcentaje: '', debe: '', notas: '' }))
   }
 
-  // La transacción ya quedó guardada en el sistema (Supabase). La planilla se actualiza en
-  // segundo plano: este estado se refresca solo cuando esa escritura responde, sin bloquear.
+  // La transacción ya quedó guardada en el sistema (Supabase). La réplica al origen
+  // externo viaja en segundo plano: este estado se refresca solo cuando responde.
+  //
+  // Con las menciones a la planilla apagadas, esa réplica deja de narrarse: la pantalla
+  // confirma que la transacción se guardó y listo. No se está ocultando una falla —el
+  // dato está en el sistema, que es la fuente de verdad—, sino un detalle interno que al
+  // operador no le dice nada y que además nombra un sistema que para él ya no existe.
   if (step === 'done') {
+    const avisaPlanilla = PLANILLA_ACTIVA && !soloApp
     return (
       <div className="card p-6 text-center space-y-4">
-        <div className="text-4xl">{excelOk === false && !soloApp ? '⚠️' : '✅'}</div>
+        <div className="text-4xl">{excelOk === false && avisaPlanilla ? '⚠️' : '✅'}</div>
         <p className="text-gray-800 font-semibold">Transacción guardada</p>
         <div className={`rounded-lg p-3 text-sm text-left ${
-          excelOk === false && !soloApp
+          excelOk === false && avisaPlanilla
             ? 'bg-amber-50 border border-amber-200 text-amber-800'
             : 'bg-green-50 border border-green-200 text-green-800'
         }`}>
@@ -411,21 +418,22 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
             <>
               ✓ Registrado en el sistema
               <p className="mt-1 text-xs opacity-80">
-                USDT existe únicamente en el sistema, no en el origen externo de datos.
+                {PLANILLA_ACTIVA ? 'USDT existe únicamente en el sistema, no en el origen externo de datos.' : ''}
                 {cajaDirecta ? ' ✓ Visible al instante en Transacciones e Inicio.' : ''}
               </p>
             </>
           )}
-          {!soloApp && excelOk === true && '✓ Registrado correctamente'}
-          {!soloApp && excelOk === false && `Registrado en el sistema · no se pudo replicar en el origen externo: ${warning}`}
-          {!soloApp && excelOk !== null && (
+          {!soloApp && !avisaPlanilla && '✓ Registrado correctamente'}
+          {avisaPlanilla && excelOk === true && '✓ Registrado correctamente'}
+          {avisaPlanilla && excelOk === false && `Registrado en el sistema · no se pudo replicar en el origen externo: ${warning}`}
+          {!soloApp && (avisaPlanilla ? excelOk !== null : true) && (
             <p className="mt-1 text-xs opacity-80">
               {cajaDirecta
                 ? '✓ Visible al instante en Transacciones e Inicio'
-                : 'ℹ️ Se verá en Transacciones tras la próxima sincronización (falta la policy de escritura directa)'}
+                : 'ℹ️ Puede tardar unos minutos en aparecer en Transacciones (falta la policy de escritura directa)'}
             </p>
           )}
-          {!soloApp && excelOk === null && (
+          {avisaPlanilla && excelOk === null && (
             <span className="flex items-center gap-2">
               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

@@ -108,7 +108,18 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
       error: `Se borró del sistema, pero falló la limpieza en el origen externo: ${data.warning ?? 'error desconocido'}. Borralo a mano.`,
       deshabilitado: 'Se borró del sistema. La limpieza automática en el origen externo está deshabilitada en este entorno.',
     }
-    if (data.planilla && data.planilla !== 'ok') setAvisoPlanilla(AVISOS[data.planilla] ?? '')
+    // Sin menciones a la planilla el aviso NO se calla del todo: mientras la
+    // sincronización siga corriendo, una limpieza fallida hace que el movimiento
+    // reaparezca solo, y el operador tiene que poder anticiparlo. Se le dice qué esperar,
+    // sin nombrar el sistema externo. 'deshabilitado' sí se omite: ahí no hay riesgo de
+    // que vuelva, simplemente no se tocó nada afuera.
+    const NEUTRO = 'Se borró del sistema. Verificá en unos minutos que no reaparezca en la lista; si vuelve, avisale al administrador.'
+    if (data.planilla && data.planilla !== 'ok') {
+      setAvisoPlanilla(
+        PLANILLA_ACTIVA ? (AVISOS[data.planilla] ?? '')
+          : (data.planilla === 'deshabilitado' ? '' : NEUTRO)
+      )
+    }
     setBorrando(null)
     router.refresh()
   }
