@@ -36,14 +36,36 @@ La función de sync puede leer de dos orígenes, según la env var **`SYNC_SOURC
 
 ## Quién dispara la sincronización
 
-- **Automático: [cron-job.org](https://cron-job.org)** — es el disparador principal (más
-  confiable y puntual que los schedulers de Netlify/GitHub). Tiene dos jobs que pegan
-  (GET) al endpoint de la función:
+> **Estado al 25/8/2026: el sync NO corre solo.** Los dos jobs de cron-job.org están
+> desactivados y no quedó ningún otro disparador automático. La planilla solo se copia a
+> la base si una persona lo pide expresamente por alguno de los caminos manuales.
+>
+> Esto importa para entender el riesgo de la convivencia: las ediciones hechas en la app
+> se pisan con lo que dice la planilla, pero **solo cuando alguien corre un sync**. Antes
+> pasaba cada 15 minutos; hoy no pasa hasta que alguien aprieta el botón.
+
+- **Automático: [cron-job.org](https://cron-job.org)** — era el disparador principal (más
+  confiable y puntual que los schedulers de Netlify/GitHub). Dos jobs que pegaban (GET) al
+  endpoint de la función, **hoy desactivados**:
   - **incremental** cada 15 min
   - **full** una vez al día (horario no laboral)
 - **Manual (app):** botón "Sincronizar ahora" en `/dashboard/admin/sync` → llama a
-  `/api/sync`, que hace un **incremental** (últimos 30 días).
+  `/api/sync`, que hace un **incremental** (últimos 30 días). Desde el 25/8/2026 la
+  pantalla no figura en el menú (la app no menciona la planilla): se entra por la URL.
 - **Manual (respaldo):** GitHub Actions → workflow *Sincronizar CAJA* → Run workflow.
+  Es `workflow_dispatch` puro, sin `schedule:`: nunca corre por su cuenta.
+
+## Lo que sí sigue corriendo solo
+
+El sync copia planilla → base y está frenado. Pero el camino inverso, base → planilla,
+sigue activo en cada operación:
+
+- **Alta de una transacción**: `/api/excel-write` la replica en la planilla (menos USDT,
+  que no existe allá).
+- **Borrado de una transacción**: se limpia la fila en la planilla, si se la puede
+  identificar sin ambigüedad.
+
+O sea: hoy la planilla recibe lo que se carga en la app, pero ya no le devuelve nada.
 
 ## Cómo funciona la función
 
