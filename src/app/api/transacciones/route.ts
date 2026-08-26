@@ -48,9 +48,10 @@ export async function POST(request: Request) {
   if (!OPERACIONES_VALIDAS[tipo]?.includes(operacion))
     return NextResponse.json({ error: 'Operación inválida para el tipo seleccionado' }, { status: 400 })
 
-  // USDT es solo-CAJA (decisión 20/7/2026): no participa de cuentas corrientes.
-  if (tipo === 'CTA CTE' && (mapMoneda(String(propio)) === 'USDT' || mapMoneda(String(externo)) === 'USDT'))
-    return NextResponse.json({ error: 'USDT solo se opera en CAJA, no en cuentas corrientes' }, { status: 400 })
+  // USDT opera en CAJA y en CUENTA CORRIENTE desde el 25/8/2026. Antes era solo-CAJA y
+  // acá se rechazaba el alta; el formulario ya ofrecía USDT en cta cte, así que la
+  // operación se completaba entera y recién al guardar rebotaba con un 400.
+  // Lo que sigue sin contemplarse es TT/SWITCH.
 
   // CTA CTE exige una cuenta corriente REAL: un nombre que no exista rompe las fórmulas
   // de la planilla (decisión 11/7/2026). CAJA es texto libre (clientes eventuales).
