@@ -4,6 +4,7 @@ import FiltrosMovimientos from '@/components/cuenta-corriente/FiltrosMovimientos
 import TablaMovimientos from '@/components/cuenta-corriente/TablaMovimientos'
 import PaginacionCtaCte from '@/components/cuenta-corriente/PaginacionCtaCte'
 import TarjetasSaldos from '@/components/cuenta-corriente/TarjetasSaldos'
+import BotonExtracto from '@/components/cuenta-corriente/BotonExtracto'
 import { esStaff, esCliente } from '@/lib/roles'
 
 // Siempre se renderiza en el momento: es una pantalla de datos que cambian con cada
@@ -158,11 +159,18 @@ export default async function CuentaCorrientePage({
       <TarjetasSaldos saldos={saldos} cuentaCte={cuentaFiltro} />
 
       <div className="card">
-        <div className="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-4 md:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-base font-semibold text-gray-900">
             {cuentaFiltro ? `${cuentaFiltro} — movimientos` : 'Movimientos · todas las cuentas'}
           </h2>
-          <span className="text-sm text-gray-500">{totalMovimientos} registro{totalMovimientos !== 1 ? 's' : ''}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">{totalMovimientos} registro{totalMovimientos !== 1 ? 's' : ''}</span>
+            {/* Solo con UNA cuenta elegida: un extracto de cuentas mezcladas no tiene
+                sentido (no hay saldo acumulado posible). Y no para el rol cliente. */}
+            {cuentaFiltro && !cliente && (
+              <BotonExtracto params={{ cuenta: cuentaFiltro, desde, hasta, operacion }} />
+            )}
+          </div>
         </div>
         <TablaMovimientos movimientos={movimientos} acumulados={acumulados} />
         {totalPaginas > 1 && (
