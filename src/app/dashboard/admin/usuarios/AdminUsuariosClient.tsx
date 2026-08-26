@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { ROLES, ROL_LABEL, ROL_DESCRIPCION, puedeAsignarRol, puedeAdministrarA, veGanancias, type Rol } from '@/lib/roles'
 import { APP_NOMBRE } from '@/lib/marca'
+import { aUsuario, sugerirUsuario } from '@/lib/usuarios'
 
 type Usuario = {
   id: string; email: string; nombre: string; rol: string
@@ -26,12 +27,9 @@ const ROL_COLORS: Record<string, string> = {
   cliente: 'tag tag-green',
 }
 
-function generarEmail(nombre: string) {
-  return nombre.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '.')
-    .replace(/[^a-z0-9.]/g, '') + '@casadecambio.com'
-}
+// El nombre de usuario se propone a partir del nombre completo ("Juan P\u00e9rez" \u2192
+// "juan.perez") y queda editable. Ya no se le pega un dominio: eso lo resuelve el
+// servidor, que es el \u00fanico que necesita una direcci\u00f3n para Supabase Auth.
 
 export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, miRol }: Props) {
   const [usuarios, setUsuarios] = useState<Usuario[]>(usuariosIniciales)
@@ -59,12 +57,12 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
 
   function abrirEditar(u: Usuario) {
     setEditando(u)
-    setForm({ nombre: u.nombre, email: u.email, telefono: u.telefono ?? '', rol: u.rol, cuenta_cte: u.cuenta_cte ?? '', notas: u.notas ?? '' })
+    setForm({ nombre: u.nombre, email: aUsuario(u.email), telefono: u.telefono ?? '', rol: u.rol, cuenta_cte: u.cuenta_cte ?? '', notas: u.notas ?? '' })
     setError(null); setClaveMsg(null); setModal('editar')
   }
 
   function handleNombreChange(nombre: string) {
-    setForm(f => ({ ...f, nombre, email: generarEmail(nombre) }))
+    setForm(f => ({ ...f, nombre, email: sugerirUsuario(nombre) }))
   }
 
   async function handleCrear(e: React.FormEvent) {
@@ -143,7 +141,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
               <div className="flex items-start justify-between mb-1">
                 <div>
                   <p className="font-medium text-gray-900">{u.nombre}</p>
-                  <p className="text-gray-500 text-xs">{u.email}</p>
+                  <p className="text-gray-500 text-xs">{aUsuario(u.email)}</p>
                   {u.telefono && <p className="text-gray-400 text-xs">{u.telefono}</p>}
                 </div>
                 <div className="flex items-center gap-1.5 ml-2 shrink-0">
@@ -202,7 +200,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
                 <tr key={u.id} className={`hover:bg-gray-50 ${!u.activo ? 'opacity-50' : ''}`}>
                   <td className="px-3 py-3">
                     <p className="font-medium text-gray-900 truncate">{u.nombre}</p>
-                    <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                    <p className="text-xs text-gray-400 truncate">{aUsuario(u.email)}</p>
                   </td>
                   <td className="px-3 py-3 text-gray-500 text-xs">{u.telefono ?? '—'}</td>
                   <td className="px-3 py-3">
@@ -283,11 +281,14 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
                     placeholder="ej: Juan Perez" />
                 </div>
                 <div>
-                  <label className="label">Email de acceso</label>
-                  <input type="email" className="input" required
+                  <label className="label">Usuario de acceso *</label>
+                  <input type="text" className="input" required autoComplete="off"
                     value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder="se genera automáticamente" />
-                  <p className="text-xs text-gray-400 mt-1">Generado automáticamente, podés editarlo</p>
+                    placeholder="ej: jperez" />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Se propone a partir del nombre y podés cambiarlo. No hace falta que sea
+                    una dirección de correo; si ponés una, se usa tal cual.
+                  </p>
                 </div>
                 <div>
                   <label className="label">Teléfono</label>
@@ -344,9 +345,9 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
             </div>
             <form onSubmit={handleEditar} className="p-6 space-y-4">
               <div>
-                <label className="label">Email</label>
-                <input type="email" className="input bg-gray-50" value={form.email} disabled />
-                <p className="text-xs text-gray-400 mt-1">El email no se puede modificar</p>
+                <label className="label">Usuario</label>
+                <input type="text" className="input bg-gray-50" value={form.email} disabled />
+                <p className="text-xs text-gray-400 mt-1">El usuario no se puede modificar</p>
               </div>
               <div>
                 <label className="label">Nombre completo *</label>
