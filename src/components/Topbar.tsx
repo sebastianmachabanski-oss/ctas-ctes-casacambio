@@ -1,5 +1,6 @@
 'use client'
 import { usePathname } from 'next/navigation'
+import { APP_NOMBRE } from '@/lib/marca'
 
 // Título de la pantalla en la barra superior (como el mockup). Se deriva de la ruta.
 const TITLES: [string, string][] = [
@@ -18,11 +19,11 @@ const TITLES: [string, string][] = [
 export default function Topbar() {
   const pathname = usePathname()
   const match = TITLES.find(([href]) => pathname.startsWith(href))
-  const title = match ? match[1] : 'Casa de Cambio'
+  const title = match ? match[1] : APP_NOMBRE
   return (
     <>
       <div>
-        <div className="cc-crumb">Casa de Cambio</div>
+        <div className="cc-crumb">{APP_NOMBRE}</div>
         <div className="cc-ptitle">{title}</div>
       </div>
       {/* Acá iba una chapita verde que decía "Sincronizado". No era un estado real: era

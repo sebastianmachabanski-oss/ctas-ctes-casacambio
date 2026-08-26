@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { ROLES, ROL_LABEL, ROL_DESCRIPCION, puedeAsignarRol, puedeAdministrarA, veGanancias, type Rol } from '@/lib/roles'
+import { APP_NOMBRE } from '@/lib/marca'
 
 type Usuario = {
   id: string; email: string; nombre: string; rol: string
@@ -263,7 +264,9 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
                 </div>
                 <button
                   onClick={() => {
-                    const msg = "Bienvenido al sistema de casa de cambio\n\nPara ingresar visita: https://mictacte.netlify.app/\n\nAccede con las siguientes credenciales:\nUsuario: " + form.email + "\nContrasena: " + claveMsg + "\n\nAl ingresar por primera vez deberas cambiar tu contrasena."
+                    // Sin acentos a propósito: el mensaje se pega en WhatsApp o SMS y
+                    // algunos clientes de mensajería los rompen.
+                    const msg = "Bienvenido a " + APP_NOMBRE + "\n\nPara ingresar visita: https://mictacte.netlify.app/\n\nAccede con las siguientes credenciales:\nUsuario: " + form.email + "\nContrasena: " + claveMsg + "\n\nAl ingresar por primera vez deberas cambiar tu contrasena."
                     navigator.clipboard.writeText(msg).then(() => alert("Copiado al portapapeles")).catch(() => alert("No se pudo copiar"))
                   }}
                   className="btn-secondary w-full flex items-center justify-center gap-2">
