@@ -8,11 +8,9 @@ import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 
 // CHEQUES opera igual que el resto, en CAJA y en cuenta corriente: el cheque entra en la
 // columna CHEQUES y la contrapartida en CC PESOS / CC DOLARES (así lo hace la planilla).
-// USDT es solo-CAJA: no participa de cuentas corrientes (decisión 20/7/2026). Por eso la
-// lista de monedas depende del Tipo — ver monedasDisponibles().
+// USDT también opera en las dos desde el 25/8/2026 (antes era solo-CAJA), así que la
+// lista de monedas ya no depende del Tipo.
 const MONEDAS = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT']
-const MONEDAS_CAJA = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT']
-function monedasDisponibles(tipo: string) { return tipo === 'CAJA' ? MONEDAS_CAJA : MONEDAS }
 const SIMBOLOS: Record<string, string> = {
   pesos: '$', cheques: 'CH$', dolares: 'U$S', euros: '€', reales: 'R$', usdt: 'USDT',
   banco: 'BCO', cc_pesos: 'CC $', cc_dolares: 'CC U$S', cc_euros: 'CC €', cc_reales: 'CC R$',
@@ -285,13 +283,8 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     // Al cambiar el Tipo, la Operación puede dejar de ser válida (se resetea a la primera
     // opción) y el cliente elegido tampoco aplica (cuenta corriente ↔ cliente eventual).
     const opciones = OPERACIONES_POR_TIPO[tipo] ?? []
-    // USDT solo existe en CAJA: si venía elegido y se pasa a CTA CTE, se resetea a DÓLARES.
-    const permitidas = monedasDisponibles(tipo)
-    setForm(f => ({
-      ...f, tipo, operacion: opciones[0] ?? '', cuenta_cte: '',
-      propio:  permitidas.includes(f.propio)  ? f.propio  : 'DOLARES',
-      externo: permitidas.includes(f.externo) ? f.externo : 'DOLARES',
-    }))
+    // Las monedas ya no dependen del Tipo, así que las elegidas se conservan tal cual.
+    setForm(f => ({ ...f, tipo, operacion: opciones[0] ?? '', cuenta_cte: '' }))
     setClienteQuery('')
     setClienteOpen(false)
   }
@@ -589,12 +582,12 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
         </div>
         <div>
           <label className="label">Moneda propia<Required /></label>
-          <SelectBuscable id="propio" value={form.propio} opciones={monedasDisponibles(form.tipo)}
+          <SelectBuscable id="propio" value={form.propio} opciones={MONEDAS}
             onChange={v => set('propio', v)} required />
         </div>
         <div>
           <label className="label">Moneda externa<Required /></label>
-          <SelectBuscable id="externo" value={form.externo} opciones={monedasDisponibles(form.tipo)}
+          <SelectBuscable id="externo" value={form.externo} opciones={MONEDAS}
             onChange={v => set('externo', v)} required />
         </div>
         <div>
