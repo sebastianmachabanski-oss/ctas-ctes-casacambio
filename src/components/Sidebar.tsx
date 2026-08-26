@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
+import { APP_NOMBRE } from '@/lib/marca'
 import type { Profile } from '@/lib/supabase/types'
 
 type Item = { href?: string; label: string; icon: string; off?: boolean; section?: string }
@@ -123,7 +124,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         <div className="cc-side-head">
           <div className="cc-logo">CC</div>
           <div style={{ overflow: 'hidden' }}>
-            <div className="t">Casa de Cambio</div>
+            <div className="t">{APP_NOMBRE}</div>
             <div className="r">{profile.rol}</div>
           </div>
           <button className="cc-pin" onClick={togglePin} aria-pressed={pinned}

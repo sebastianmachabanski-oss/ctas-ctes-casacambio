@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { APP_NOMBRE } from '@/lib/marca'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Casa de Cambio',
-  description: 'Portal de casa de cambio',
+  title: APP_NOMBRE,
+  description: 'Consulta de cuentas corrientes y movimientos',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
 }
 
