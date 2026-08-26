@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
 import { APP_NOMBRE } from '@/lib/marca'
+import { aUsuario } from '@/lib/usuarios'
 import type { Profile } from '@/lib/supabase/types'
 
 type Item = { href?: string; label: string; icon: string; off?: boolean; section?: string }
@@ -155,7 +156,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
             <div className="cc-av">{inicial}</div>
             <div style={{ overflow: 'hidden' }}>
               <div className="nm" style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{profile.nombre}</div>
-              <div className="em" style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{profile.email}</div>
+              <div className="em" style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{aUsuario(profile.email)}</div>
             </div>
           </div>
           <button className="cc-logout" onClick={handleLogout}><span>🚪</span>Salir</button>

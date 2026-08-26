@@ -1,5 +1,6 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { esAdmin, puedeAsignarRol, puedeAdministrarA, ROL_LABEL, type Rol } from '@/lib/roles'
+import { aEmail } from '@/lib/usuarios'
 import { NextResponse } from 'next/server'
 
 const CLAVE_INICIAL = 'Cliente1234!'
@@ -25,8 +26,17 @@ export async function POST(request: Request) {
   const rolActor = await rolDe(supabase, user.id)
   if (!esAdmin(rolActor)) return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
-  const { email, nombre, rol, cuenta_cte, telefono, notas } = await request.json()
-  if (!email || !nombre || !rol) return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+  const body = await request.json()
+  const { nombre, rol, cuenta_cte, telefono, notas } = body
+  const usuario = String(body.email ?? '').trim()
+  if (!usuario || !nombre || !rol) return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+
+  // El administrador escribe un nombre de usuario libre ("jperez"); Supabase Auth
+  // necesita una dirección, así que se le agrega el dominio interno. Si ya escribió una
+  // dirección, se respeta. De acá para abajo `email` es SIEMPRE la dirección completa.
+  if (/\s/.test(usuario))
+    return NextResponse.json({ error: 'El usuario no puede tener espacios' }, { status: 400 })
+  const email = aEmail(usuario)
   if (rol === 'cliente' && !cuenta_cte) return NextResponse.json({ error: 'La cuenta corriente es obligatoria para clientes' }, { status: 400 })
 
   // Nadie crea un usuario de un nivel al que no llega: si un administrador pudiera dar
