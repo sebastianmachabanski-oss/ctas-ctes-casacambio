@@ -3,6 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import AdminUsuariosClient from './AdminUsuariosClient'
 import { esAdmin } from '@/lib/roles'
 
+// Siempre fresca: al crear o editar un usuario la pantalla se refresca sola, y con una
+// versión guardada en caché el usuario nuevo no aparecía hasta recargar a mano.
+export const dynamic = 'force-dynamic'
+
 export default async function AdminUsuariosPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
