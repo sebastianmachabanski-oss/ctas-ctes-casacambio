@@ -149,8 +149,9 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .kpi .kr b { color: var(--ink); font-weight: 600; }
 /* Fila "Saldo en caja" (arqueo físico): fondo gris para destacarla, etiqueta azul,
    valor verde/rojo según signo */
-.kpi .kr.kr-encaja { background: var(--page); border-radius: 6px; padding: 3px 6px; margin: 1px -2px; }
-.kpi .kr .lbl-encaja { color: var(--brand); font-weight: 600; }
+/* Leyenda debajo del número grande del KPI: aclara que ese valor es el arqueo físico
+   y no el total de la moneda (26/8/2026, cuando se invirtieron de lugar). */
+.kpi .val-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-top: -2px; margin-bottom: 4px; }
 .kpi .kr b.pos { color: var(--pos-ink); }
 .kpi .kr b.neg { color: var(--neg-ink); }
 .neg { color: var(--neg-ink); }

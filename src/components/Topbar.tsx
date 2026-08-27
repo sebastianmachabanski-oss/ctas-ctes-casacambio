@@ -9,6 +9,7 @@ const TITLES: [string, string][] = [
   ['/dashboard/nueva-transaccion', 'Nueva transacción'],
   ['/dashboard/transacciones', 'Transacciones'],
   ['/dashboard/transferencias', 'Transferencias'],
+  ['/dashboard/gastos', 'Gastos'],
   ['/dashboard/calle', 'Dinero en calle'],
   ['/dashboard/deudores', 'Saldos Pendientes'],
   ['/dashboard/ganancias', 'Ganancias'],

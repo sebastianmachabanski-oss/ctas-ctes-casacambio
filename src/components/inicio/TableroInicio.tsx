@@ -141,21 +141,22 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
         {kpis.map(k => (
           <div className="kpi" key={k.cur}>
             <div className="top"><span className="dot" style={{ background: k.col }} /><span className="cur">{k.cur}</span></div>
-            <div className="val num">{money(k.caja)}</div>
+            {/* El número grande es el SALDO EN CAJA: el arqueo físico, que es el dato con
+                el que se hace la caja todos los días. Antes arriba iba el total de la
+                moneda y el arqueo quedaba abajo en letra chica; se invirtieron el
+                26/8/2026. Banco no tiene arqueo (no hay efectivo que contar), así que
+                ahí sigue mandando su propio total. */}
+            <div className="val num">{money(k.enCaja ?? k.caja)}</div>
+            <div className="val-lbl">{k.enCaja !== null ? 'saldo en caja' : 'saldo'}</div>
             <div className="sub">
               {k.calle === null && k.cc === null ? (
                 <div className="kr"><span>Cta bancaria</span><b>—</b></div>
               ) : (
                 <>
-                  {k.calle !== null && <div className="kr"><span>Calle</span><b className={k.calle < 0 ? 'neg' : ''}>{money(k.calle)}</b></div>}
-                  {/* Arqueo físico = valor en la moneda (número grande, del período) − calle.
-                      Es el dato para hacer la caja; coincide con la planilla filtrada igual. */}
                   {k.enCaja !== null && (
-                    <div className="kr kr-encaja">
-                      <span className="lbl-encaja">Saldo en caja</span>
-                      <b className={k.enCaja < 0 ? 'neg' : 'pos'}>{money(k.enCaja)}</b>
-                    </div>
+                    <div className="kr"><span>Total {k.cur.toLowerCase()}</span><b className={k.caja < 0 ? 'neg' : ''}>{money(k.caja)}</b></div>
                   )}
+                  {k.calle !== null && <div className="kr"><span>Calle</span><b className={k.calle < 0 ? 'neg' : ''}>{money(k.calle)}</b></div>}
                   {k.cc !== null && <div className="kr"><span>Cta cte</span><b className={k.cc < 0 ? 'neg' : ''}>{money(k.cc)}</b></div>}
                 </>
               )}

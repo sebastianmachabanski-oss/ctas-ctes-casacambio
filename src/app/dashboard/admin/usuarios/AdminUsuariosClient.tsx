@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ROLES, ROL_LABEL, ROL_DESCRIPCION, puedeAsignarRol, puedeAdministrarA, veGanancias, type Rol } from '@/lib/roles'
 import { APP_NOMBRE } from '@/lib/marca'
 import { aUsuario, sugerirUsuario } from '@/lib/usuarios'
@@ -32,6 +33,7 @@ const ROL_COLORS: Record<string, string> = {
 // servidor, que es el \u00fanico que necesita una direcci\u00f3n para Supabase Auth.
 
 export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, miRol }: Props) {
+  const router = useRouter()
   const [usuarios, setUsuarios] = useState<Usuario[]>(usuariosIniciales)
   const [modal, setModal] = useState<'nuevo' | 'editar' | null>(null)
   const [editando, setEditando] = useState<Usuario | null>(null)
@@ -40,6 +42,11 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
   const [debugInfo, setDebugInfo] = useState<string | null>(null)
   const [claveMsg, setClaveMsg] = useState<string | null>(null)
   const [form, setForm] = useState({ nombre: '', email: '', telefono: '', rol: 'cliente', cuenta_cte: '', notas: '' })
+
+  // La lista arranca del servidor y después vive en el estado local. `useState` solo
+  // toma el valor inicial al montar, así que sin esto `router.refresh()` traía los datos
+  // nuevos y la tabla seguía mostrando los viejos.
+  useEffect(() => { setUsuarios(usuariosIniciales) }, [usuariosIniciales])
 
   function abrirNuevo() {
     setEditando(null)
@@ -79,6 +86,9 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
       return
     }
     setClaveMsg(data.clave_inicial)
+    // La lista se actualiza YA, aunque el modal siga abierto mostrando la clave inicial:
+    // al cerrarlo el usuario nuevo ya está en la tabla, sin recargar a mano.
+    router.refresh()
   }
 
   async function handleEditar(e: React.FormEvent) {
@@ -98,6 +108,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
       ? { ...u, nombre: form.nombre, rol: form.rol, cuenta_cte: form.rol === 'cliente' ? form.cuenta_cte : null, telefono: form.telefono || null, notas: form.notas || null }
       : u))
     setModal(null)
+    router.refresh()
   }
 
   async function restablecerClave(u: Usuario) {
@@ -113,7 +124,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
     if (!confirm(`Eliminar DEFINITIVAMENTE la cuenta de ${u.nombre}? Esta accion no se puede deshacer.`)) return
     if (!confirm(`Confirma: Eliminar a ${u.nombre}?`)) return
     const res = await fetch(`/api/admin/usuarios/${u.id}`, { method: "DELETE" })
-    if (res.ok) { setUsuarios(prev => prev.filter(x => x.id !== u.id)) }
+    if (res.ok) { setUsuarios(prev => prev.filter(x => x.id !== u.id)); router.refresh() }
     else { const data = await res.json(); alert("Error: " + data.error) }
   }
 
@@ -123,7 +134,7 @@ export default function AdminUsuariosClient({ usuariosIniciales, cuentas, miId, 
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ activo: !u.activo }),
     })
-    if (res.ok) setUsuarios(prev => prev.map(x => x.id === u.id ? { ...x, activo: !x.activo } : x))
+    if (res.ok) { setUsuarios(prev => prev.map(x => x.id === u.id ? { ...x, activo: !x.activo } : x)); router.refresh() }
   }
 
   return (
