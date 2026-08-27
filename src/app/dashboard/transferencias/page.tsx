@@ -14,7 +14,7 @@ import TransferenciasView from '@/components/transferencias/TransferenciasView'
 export const dynamic = 'force-dynamic'
 
 export default async function TransferenciasPage({ searchParams }: {
-  searchParams: { desde?: string; hasta?: string; cliente?: string; caja?: string; q?: string }
+  searchParams: { desde?: string; hasta?: string; cliente?: string; notas?: string | string[] }
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -27,7 +27,12 @@ export default async function TransferenciasPage({ searchParams }: {
   // Es un reporte de la operación: no lo ve el rol cliente.
   if (!esStaff(profile.rol)) redirect('/dashboard/cuenta-corriente')
 
-  const { desde = '', hasta = '', cliente = '', caja = '', q = '' } = searchParams
+  const { desde = '', hasta = '', cliente = '' } = searchParams
+  // Los participantes elegidos viajan como parámetros repetidos (?notas=A&notas=B): las
+  // notas pueden tener comas adentro, así que separarlas por un carácter sería frágil.
+  const notas = Array.isArray(searchParams.notas)
+    ? searchParams.notas
+    : searchParams.notas ? [searchParams.notas] : []
 
   // Se traen TODAS las filas del filtro, no una página: el reporte agrupa y subtotaliza,
   // y un subtotal calculado sobre media página sería falso. PostgREST corta en 1.000 sin
@@ -44,8 +49,7 @@ export default async function TransferenciasPage({ searchParams }: {
     if (desde) qy = qy.gte('fecha', desde)
     if (hasta) qy = qy.lte('fecha', hasta)
     if (cliente) qy = qy.eq('cliente', cliente)
-    if (caja) qy = qy.eq('cuenta', caja)
-    if (q) qy = qy.ilike('notas', `%${q}%`)
+    if (notas.length) qy = qy.in('notas', notas)
     const { data, error } = await qy
     if (error) break
     const tanda = (data ?? []) as any[]
@@ -55,18 +59,23 @@ export default async function TransferenciasPage({ searchParams }: {
 
   // Opciones de los filtros: se sacan del universo de transferencias, no de todos los
   // movimientos — ofrecer un cliente que nunca hizo una TT solo da resultados vacíos.
+  // Y se sacan SIN aplicar los filtros: si no, elegir un participante vaciaría la lista
+  // y no se podría agregar un segundo.
   const { data: universo } = await supabase
-    .from('movimientos_caja').select('cliente,cuenta').eq('op', 'T').limit(20000)
+    .from('movimientos_caja').select('cliente,notas').eq('op', 'T').limit(20000)
   const uni = (universo ?? []) as any[]
-  const clientes = Array.from(new Set(uni.map(r => r.cliente).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'es'))
-  const cajas = Array.from(new Set(uni.map(r => r.cuenta).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'es'))
+  const orden = (a: string, b: string) => a.localeCompare(b, 'es')
+  const clientes = Array.from(new Set(uni.map(r => r.cliente).filter(Boolean))).sort(orden)
+  const participantes = Array.from(new Set(
+    uni.map(r => (r.notas ?? '').trim()).filter(Boolean)
+  )).sort(orden)
 
   return (
     <TransferenciasView
       filas={filas}
       clientes={clientes as string[]}
-      cajas={cajas as string[]}
-      filtros={{ desde, hasta, cliente, caja, q }}
+      participantes={participantes as string[]}
+      filtros={{ desde, hasta, cliente, notas }}
       hayDatos={uni.length > 0}
     />
   )
