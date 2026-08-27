@@ -129,6 +129,9 @@ export async function POST(request: Request) {
   const { error: cajaError } = await supabase.from('movimientos_caja').insert({
     fila_sheet: null,
     origen: involucraUsdt ? 'app' : 'sheet',
+    // Marcador de transferencia: la pantalla lo pide como "Op" (C/T) y hasta ahora se
+    // guardaba solo en `diario`. El listado de transferencias lo lee de acá.
+    op: col_f,
     fecha,
     tipo,
     cliente: cuenta_cte,
