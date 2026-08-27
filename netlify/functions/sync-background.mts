@@ -304,6 +304,11 @@ export function parseMovimientosCaja(rows: any[][]): any[] {
   const iDebe    = colExacta('DEBE')
   const iNotas   = col('NOTAS')
   const iCuenta  = colExacta('CUENTA')
+  // OP: marcador de transferencia ("T") — el cliente lo usa para armar RESULTADO TT.
+  // Va con coincidencia EXACTA a propósito: 'OPERACIÓN', 'OPERACION PROPIA' y
+  // 'OPERACION EXTERNA' empiezan con "OP" y `col()` agarraría la primera que encuentre.
+  const iOpTt    = colExacta('OP')
+  const iOpExt   = col('OPERACION EXTERNA')
   const iCalc: Record<string, number> = {
     pesos: colExacta('PESOS'), cheques: colExacta('CHEQUES'), dolares: colExacta('DOLARES'),
     euros: colExacta('EUROS'), reales: colExacta('REALES'), banco: colExacta('BANCO'),
@@ -344,6 +349,8 @@ export function parseMovimientosCaja(rows: any[][]): any[] {
       debe:  iDebe  >= 0 && String(row[iDebe] ?? '').trim()  ? String(row[iDebe]).trim()  : null,
       notas: iNotas >= 0 && String(row[iNotas] ?? '').trim() ? String(row[iNotas]).trim() : null,
       cuenta: iCuenta >= 0 && String(row[iCuenta] ?? '').trim() ? String(row[iCuenta]).trim().toUpperCase() : null,
+      op:    iOpTt  >= 0 && String(row[iOpTt] ?? '').trim()  ? String(row[iOpTt]).trim().toUpperCase()  : null,
+      operacion_externa: iOpExt >= 0 && String(row[iOpExt] ?? '').trim() ? String(row[iOpExt]).trim().toUpperCase() : null,
       // Procedencia: la planilla no tiene USDT; todo lo que viene del Sheet es 'sheet'
       // (usdt = 0). Las filas 'app' (USDT) las inserta la app y el sync no las toca.
       origen: 'sheet',
