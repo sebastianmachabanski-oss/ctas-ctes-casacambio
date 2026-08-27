@@ -1,6 +1,7 @@
 'use client'
 import { Fragment, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import FiltroMultiple from '@/components/FiltroMultiple'
 
 export type Fila = {
   id: string; fecha: string; fila_sheet: number | null
@@ -13,7 +14,7 @@ export type Fila = {
   euros: number | null; reales: number | null
 }
 
-type Filtros = { desde: string; hasta: string; cliente: string; caja: string; q: string }
+type Filtros = { desde: string; hasta: string; cliente: string; notas: string[] }
 
 const MONEDAS = [
   { key: 'pesos'   as const, label: 'Pesos',   sym: '$'   },
@@ -30,8 +31,8 @@ const fecha = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-AR
 // Las filas sin NOTAS caen todas juntas acá: en la planilla eran el grupo "(en blanco)".
 const SIN_NOTA = '(sin nota)'
 
-export default function TransferenciasView({ filas, clientes, cajas, filtros, hayDatos }: {
-  filas: Fila[]; clientes: string[]; cajas: string[]; filtros: Filtros; hayDatos: boolean
+export default function TransferenciasView({ filas, clientes, participantes, filtros, hayDatos }: {
+  filas: Fila[]; clientes: string[]; participantes: string[]; filtros: Filtros; hayDatos: boolean
 }) {
   const router = useRouter()
   const [f, setF] = useState<Filtros>(filtros)
@@ -41,13 +42,17 @@ export default function TransferenciasView({ filas, clientes, cajas, filtros, ha
     const v = { ...f, ...next }
     setF(v)
     const qs = new URLSearchParams()
-    for (const [k, val] of Object.entries(v)) if (val) qs.set(k, val)
+    if (v.desde) qs.set('desde', v.desde)
+    if (v.hasta) qs.set('hasta', v.hasta)
+    if (v.cliente) qs.set('cliente', v.cliente)
+    // Uno por participante: una nota puede tener comas y separarlas sería frágil.
+    for (const n of v.notas) qs.append('notas', n)
     const s = qs.toString()
     router.push('/dashboard/transferencias' + (s ? '?' + s : ''))
   }
 
   function limpiar() {
-    setF({ desde: '', hasta: '', cliente: '', caja: '', q: '' })
+    setF({ desde: '', hasta: '', cliente: '', notas: [] })
     router.push('/dashboard/transferencias')
   }
 
@@ -101,35 +106,33 @@ export default function TransferenciasView({ filas, clientes, cajas, filtros, ha
       <div className="card p-4 md:p-5">
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <Campo label="Desde">
-            <input type="date" className="srch" value={f.desde}
+            <input type="date" className="srch" value={f.desde} aria-label="Desde"
               onChange={e => aplicar({ desde: e.target.value })} style={{ width: 140 }} />
           </Campo>
           <Campo label="Hasta">
-            <input type="date" className="srch" value={f.hasta}
+            <input type="date" className="srch" value={f.hasta} aria-label="Hasta"
               onChange={e => aplicar({ hasta: e.target.value })} style={{ width: 140 }} />
           </Campo>
           <Campo label="Cliente">
-            <select className="srch" value={f.cliente} onChange={e => aplicar({ cliente: e.target.value })}
-              style={{ minWidth: 150 }}>
+            <select className="srch" value={f.cliente} aria-label="Cliente"
+              onChange={e => aplicar({ cliente: e.target.value })} style={{ minWidth: 150 }}>
               <option value="">Todos</option>
               {clientes.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </Campo>
-          <Campo label="Caja">
-            <select className="srch" value={f.caja} onChange={e => aplicar({ caja: e.target.value })}
-              style={{ minWidth: 140 }}>
-              <option value="">Todas</option>
-              {cajas.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+          <Campo label="Participantes">
+            <div style={{ minWidth: 190 }}>
+              <FiltroMultiple
+                opciones={participantes}
+                seleccionados={f.notas}
+                onChange={notas => aplicar({ notas })}
+                etiqueta="Filtrar por participantes"
+                placeholder="todos…"
+                anchoLista={280}
+              />
+            </div>
           </Campo>
-          <Campo label="Participantes (notas)">
-            <input className="srch" value={f.q} placeholder="ej: BOH"
-              onChange={e => setF(v => ({ ...v, q: e.target.value }))}
-              onKeyDown={e => { if (e.key === 'Enter') aplicar({ q: f.q }) }}
-              onBlur={() => { if (f.q !== filtros.q) aplicar({ q: f.q }) }}
-              style={{ minWidth: 150 }} />
-          </Campo>
-          {(f.desde || f.hasta || f.cliente || f.caja || f.q) && (
+          {(f.desde || f.hasta || f.cliente || f.notas.length > 0) && (
             <button className="chip" onClick={limpiar}>Limpiar filtros</button>
           )}
         </div>
@@ -259,13 +262,16 @@ export default function TransferenciasView({ filas, clientes, cajas, filtros, ha
   )
 }
 
+// Va como div y no como <label>: el filtro de participantes tiene botones adentro, y
+// dentro de una etiqueta un clic en cualquiera de ellos le devuelve el foco al primer
+// campo. Cada control lleva su propio aria-label.
 function Campo({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label style={{ display: 'grid', gap: 3 }}>
+    <div style={{ display: 'grid', gap: 3 }}>
       <span style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--muted)' }}>
         {label}
       </span>
       {children}
-    </label>
+    </div>
   )
 }
