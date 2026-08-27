@@ -1,6 +1,9 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import SelectorPeriodo from '@/components/SelectorPeriodo'
+
+// "COMPRA" -> "Compra" en los chips de operación.
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 // Cálculo de la ganancia del período:
 //   ganancia = calzado × (tasa venta − tasa compra) + valuación del stock + gastos
@@ -40,29 +43,6 @@ const SUPUESTOS_PAR: Record<Cfg['par'], Pick<Cfg, 'resid' | 'margen' | 'cierre'>
   chq:  { resid: 'mtm',  margen: 0.05, cierre: 1 },
 }
 
-function addDays(iso: string, n: number): string {
-  const d = new Date(iso + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-function addMonths(iso: string, n: number): string {
-  const d = new Date(iso + 'T12:00:00Z')
-  d.setUTCMonth(d.getUTCMonth() + n)
-  return d.toISOString().slice(0, 10)
-}
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-function labelPeriodo(p: string, fecha: string): string {
-  const d = new Date(fecha + 'T12:00:00Z')
-  if (p === 'dia') return cap(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))
-  if (p === 'semana') {
-    const dow = (d.getUTCDay() + 6) % 7
-    const ini = addDays(fecha, -dow), fin = addDays(ini, 6)
-    const di = new Date(ini + 'T12:00:00Z'), df = new Date(fin + 'T12:00:00Z')
-    return `Semana del ${di.getUTCDate()}/${di.getUTCMonth() + 1} al ${df.getUTCDate()}/${df.getUTCMonth() + 1}/${df.getUTCFullYear()}`
-  }
-  if (p === 'mes') return cap(d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' }))
-  return `Año ${fecha.slice(0, 4)}`
-}
 
 // Totales del período según la configuración (misma cuenta que el mockup validado).
 function calc(dias: DiaAgg[], cfg: Cfg) {
@@ -105,16 +85,11 @@ function cotizacionUsd(dias: DiaAgg[]): number | null {
   return vol > 0 ? ars / vol : null
 }
 
-const PERIODOS: [string, string][] = [['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes'], ['anio', 'Año']]
 
 export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, hoy }: {
   dias: DiaAgg[]; periodo: string; fecha: string; rDesde: string; rHasta: string; hoy: string
 }) {
-  const router = useRouter()
   const esRango = !!(rDesde && rHasta)
-  const [rangoOpen, setRangoOpen] = useState(esRango)
-  const [r1, setR1] = useState(rDesde)
-  const [r2, setR2] = useState(rHasta)
 
   const [cfg, setCfg] = useState<Cfg>({
     ops: new Set(['COMPRA', 'VENTA', 'GASTOS']), par: 'usd', cc: true,
@@ -140,28 +115,9 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
   const cotUsd = useMemo(() => cotizacionUsd(dias), [dias])
   const netoUsd = cotUsd ? r.neto / cotUsd : null
 
-  function irPeriodo(p: string) {
-    setRangoOpen(false)
-    router.replace(`/dashboard/ganancias?p=${p}&fecha=${fecha}`)
-  }
-  function navegar(dir: 1 | -1) {
-    let f = fecha
-    if (periodo === 'dia') f = addDays(fecha, dir)
-    else if (periodo === 'semana') f = addDays(fecha, 7 * dir)
-    else if (periodo === 'mes') f = addMonths(fecha, dir)
-    else f = addMonths(fecha, 12 * dir)
-    router.replace(`/dashboard/ganancias?p=${periodo}&fecha=${f}`)
-  }
-  function aplicarRango(a: string, b: string) {
-    setR1(a); setR2(b)
-    if (a && b) router.replace(`/dashboard/ganancias?desde=${a}&hasta=${b}`)
-  }
 
   const LEAD: Record<string, string> = { dia: 'Este día ganaste', semana: 'Esta semana ganaste', mes: 'Este mes ganaste', anio: 'Este año ganaste' }
   const lead = esRango ? 'En el período ganaste' : (LEAD[periodo] ?? 'Ganaste')
-  const label = esRango
-    ? `Del ${rDesde.split('-').reverse().join('/')} al ${rHasta.split('-').reverse().join('/')}`
-    : labelPeriodo(periodo, fecha)
   const sinDatos = r.vC === 0 && r.vV === 0 && r.g === 0
   const sym = SYM[cfg.par]
   // Los cheques se valúan contra su valor nominal (1), no contra una cotización de
@@ -171,33 +127,13 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
   return (
     <div className="p-4 md:p-6" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, maxWidth: 760 }}>
       {/* Filtros de período + configuración */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          {PERIODOS.map(([id, lbl]) => (
-            <button key={id} className={`chip ${!esRango && !rangoOpen && periodo === id ? 'on' : ''}`} onClick={() => irPeriodo(id)}>{lbl}</button>
-          ))}
-          <button className={`chip ${esRango || rangoOpen ? 'on' : ''}`} onClick={() => setRangoOpen(true)}>Rango…</button>
-          {rangoOpen && (
-            <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-              <input className="srch" type="date" value={r1} onChange={e => aplicarRango(e.target.value, r2)} style={{ width: 140, minWidth: 0 }} />
-              <span style={{ color: 'var(--muted)' }}>→</span>
-              <input className="srch" type="date" value={r2} onChange={e => aplicarRango(r1, e.target.value)} style={{ width: 140, minWidth: 0 }} />
-            </span>
-          )}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+        <SelectorPeriodo
+          ruta="/dashboard/ganancias"
+          periodo={periodo} fecha={fecha} rDesde={rDesde} rHasta={rHasta} hoy={hoy}
+        />
         <button className="chip" onClick={() => document.body.classList.add('cfg-open')}>⚙ Configuración</button>
       </div>
-
-      {/* Navegación de fecha */}
-      {!esRango && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-2)' }}>
-          <button className="chip" style={{ width: 30, padding: '5px 0', textAlign: 'center' }} onClick={() => navegar(-1)}>‹</button>
-          <b style={{ color: 'var(--ink)' }}>{label}</b>
-          <button className="chip" style={{ width: 30, padding: '5px 0', textAlign: 'center' }} onClick={() => navegar(1)}>›</button>
-          {fecha !== hoy && <button className="chip" onClick={() => router.replace(`/dashboard/ganancias?p=${periodo}&fecha=${hoy}`)}>Hoy</button>}
-        </div>
-      )}
-      {esRango && <b style={{ color: 'var(--ink)' }}>{label}</b>}
 
       {/* Resultado: el mismo número en las dos monedas */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 14 }}>
