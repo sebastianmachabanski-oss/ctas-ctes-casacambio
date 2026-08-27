@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import GananciasView, { type DiaAgg, type ParAgg } from '@/components/ganancias/GananciasView'
 import { veGanancias } from '@/lib/roles'
+import { esPeriodoValido, hoyArgentina, rangoDe } from '@/lib/periodos'
 
 // Módulo de Ganancias — exclusivo del rol superadmin (ver src/lib/roles.ts).
 // Réplica de la solapa COLO: el servidor agrega por día las operaciones COMPRA/VENTA/
@@ -9,30 +10,6 @@ import { veGanancias } from '@/lib/roles'
 // garantizada); el cliente aplica la configuración (par, cta cte, valuación del stock,
 // gastos) sin volver a consultar.
 
-function hoyArgentina(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).format(new Date())
-}
-function addDays(iso: string, n: number): string {
-  const d = new Date(iso + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-// Rango de fechas del período, anclado en la fecha cursor.
-function rangoDe(p: string, cursor: string): [string, string] {
-  const d = new Date(cursor + 'T12:00:00Z')
-  if (p === 'semana') {
-    const dow = (d.getUTCDay() + 6) % 7 // lunes = 0
-    const ini = addDays(cursor, -dow)
-    return [ini, addDays(ini, 6)]
-  }
-  if (p === 'mes') {
-    const ini = cursor.slice(0, 8) + '01'
-    const fin = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0, 12))
-    return [ini, fin.toISOString().slice(0, 10)]
-  }
-  if (p === 'anio') return [cursor.slice(0, 4) + '-01-01', cursor.slice(0, 4) + '-12-31']
-  return [cursor, cursor] // dia
-}
 
 const parVacio = (): ParAgg => ({ vC: 0, aC: 0, vV: 0, aV: 0, vCcc: 0, aCcc: 0, vVcc: 0, aVcc: 0 })
 
@@ -68,7 +45,7 @@ export default async function GananciasPage({
   const hoy = hoyArgentina()
   // Por defecto abre en DÍA (26/8/2026): la pregunta de todos los días es cuánto se ganó
   // hoy, y con el mes por defecto había que cambiar el período en cada visita.
-  const p = ['dia', 'semana', 'mes', 'anio'].includes(searchParams.p ?? '') ? searchParams.p! : 'dia'
+  const p = esPeriodoValido(searchParams.p) ? searchParams.p! : 'dia'
   const fecha = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.fecha ?? '') ? searchParams.fecha! : hoy
   const esRango = !!(searchParams.desde && searchParams.hasta)
   const [ini, fin] = esRango ? [searchParams.desde!, searchParams.hasta!] : rangoDe(p, fecha)

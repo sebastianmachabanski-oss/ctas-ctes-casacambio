@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { esStaff } from '@/lib/roles'
+import { esPeriodoValido, hoyArgentina, rangoDe } from '@/lib/periodos'
 import GastosView from '@/components/gastos/GastosView'
 
 // Listado de GASTOS (26/8/2026).
@@ -8,6 +9,9 @@ import GastosView from '@/components/gastos/GastosView'
 // GASTOS es una operación de caja como cualquier otra y ya aparece en Transacciones
 // mezclada con el resto. Acá tiene pantalla propia porque la pregunta "cuánto gastamos
 // este mes" no se contesta bien scrolleando un listado de miles de movimientos.
+//
+// El período se elige igual que en Ganancias (Día / Semana / Mes / Año / Rango), con el
+// mismo componente: eran dos formas distintas de pedir lo mismo.
 //
 // Regla del dominio: GASTOS solo existe en PESOS.
 
@@ -17,7 +21,7 @@ const POR_PAGINA = 100
 const COLUMNAS = 'id,fecha,cliente,notas,monto,pesos,debe,creado_por,creado_at'
 
 export default async function GastosPage({ searchParams }: {
-  searchParams: { desde?: string; hasta?: string; q?: string; pagina?: string }
+  searchParams: { p?: string; fecha?: string; desde?: string; hasta?: string; q?: string; pagina?: string }
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -28,8 +32,17 @@ export default async function GastosPage({ searchParams }: {
   const rol = (profileData as { rol: string } | null)?.rol
   if (!esStaff(rol)) redirect('/dashboard')
 
-  const desde = searchParams.desde || ''
-  const hasta = searchParams.hasta || ''
+  const hoy = hoyArgentina()
+  // Por defecto, el MES en curso: es el corte con el que se mira un gasto.
+  const p = esPeriodoValido(searchParams.p) ? searchParams.p! : 'mes'
+  const fecha = /^\d{4}-\d{2}-\d{2}$/.test(searchParams.fecha ?? '') ? searchParams.fecha! : hoy
+  const esRango = !!(searchParams.desde && searchParams.hasta)
+
+  // Con un rango libre manda el rango; si no, el período resuelve sus propias fechas.
+  const [desde, hasta] = esRango
+    ? [searchParams.desde!, searchParams.hasta!]
+    : rangoDe(p, fecha)
+
   const q = (searchParams.q || '').trim()
   const pagina = Math.max(1, parseInt(searchParams.pagina ?? '1', 10) || 1)
 
@@ -39,8 +52,8 @@ export default async function GastosPage({ searchParams }: {
     let qy = supabase.from('movimientos_caja')
       .select(columnas, opciones as any)
       .eq('operacion', 'GASTOS')
-    if (desde) qy = qy.gte('fecha', desde)
-    if (hasta) qy = qy.lte('fecha', hasta)
+      .gte('fecha', desde)
+      .lte('fecha', hasta)
     // El concepto del gasto va en CLIENTE (texto libre) y a veces se amplía en NOTAS.
     if (q) qy = qy.or(`cliente.ilike.%${q}%,notas.ilike.%${q}%`)
     return qy
@@ -54,7 +67,7 @@ export default async function GastosPage({ searchParams }: {
   const filas = (data ?? []) as any[]
   const total = count ?? 0
 
-  // El total es de TODO lo filtrado, no de la página: un total de los 100 que entraron en
+  // El total es de TODO el período, no de la página: un total de los 100 que entraron en
   // pantalla no contesta "cuánto gastamos este mes". Se recorre de a 1.000 porque
   // PostgREST corta ahí sin un rango explícito.
   let totalPesos = 0
@@ -78,7 +91,12 @@ export default async function GastosPage({ searchParams }: {
       conDebe={conDebe}
       pagina={pagina}
       totalPaginas={Math.max(1, Math.ceil(total / POR_PAGINA))}
-      filtros={{ desde, hasta, q }}
+      periodo={esRango ? '' : p}
+      fecha={fecha}
+      rDesde={esRango ? desde : ''}
+      rHasta={esRango ? hasta : ''}
+      hoy={hoy}
+      q={q}
     />
   )
 }
