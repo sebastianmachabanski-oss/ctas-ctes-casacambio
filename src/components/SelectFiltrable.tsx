@@ -14,7 +14,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
  *
  * Acá escribir FILTRA. Las flechas recorren lo filtrado y Enter elige. Salir del campo
  * sin elegir vuelve al valor que estaba: nunca queda a medio tipear.
+ *
+ * La búsqueda ignora mayúsculas Y acentos: "maria", "MARIA" y "María" encuentran lo
+ * mismo. Los nombres de cuenta se cargaron a mano durante años y conviven las tres
+ * formas; obligar a escribirlo igual que está guardado sería pedirle al operador que
+ * adivine cómo lo tipeó otro.
  */
+
+/** Uppercase sin acentos, para comparar lo tipeado con las opciones. */
+const norm = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim()
+
 export default function SelectFiltrable({
   value, opciones, onChange, id, placeholder = 'Todos', etiqueta, maxLista = 100,
 }: {
@@ -34,18 +44,18 @@ export default function SelectFiltrable({
   const refMarcada = useRef<HTMLButtonElement | null>(null)
 
   const filtrados = useMemo(() => {
-    const q = query.trim().toUpperCase()
+    const q = norm(query)
     if (!q) return opciones.slice(0, maxLista)
     // Primero los que EMPIEZAN con lo tipeado; después los que lo contienen en el medio.
-    const empiezan = opciones.filter(o => o.toUpperCase().startsWith(q))
-    const contienen = opciones.filter(o => !o.toUpperCase().startsWith(q) && o.toUpperCase().includes(q))
+    const empiezan = opciones.filter(o => norm(o).startsWith(q))
+    const contienen = opciones.filter(o => !norm(o).startsWith(q) && norm(o).includes(q))
     return [...empiezan, ...contienen].slice(0, maxLista)
   }, [opciones, query, maxLista])
 
   const totalCoincidencias = useMemo(() => {
-    const q = query.trim().toUpperCase()
+    const q = norm(query)
     if (!q) return opciones.length
-    return opciones.filter(o => o.toUpperCase().includes(q)).length
+    return opciones.filter(o => norm(o).includes(q)).length
   }, [opciones, query])
 
   useEffect(() => {
