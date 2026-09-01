@@ -2,10 +2,16 @@
 
 type DiarioRow = {
   id: string; fecha: string; cuenta_cte: string; operacion: string
-  concepto: string | null; evento: string | null
+  concepto: string | null; evento: string | null; notas?: string | null
   cc_dolares: number | null; cc_pesos: number | null
   cc_euros: number | null; cc_reales: number | null
 }
+
+// La referencia del movimiento: el sync la deja en `evento` y el alta de la app la
+// escribia solo en `notas`. Se miran las dos para que los movimientos ya cargados no
+// aparezcan sin referencia (1/9/2026).
+const ref = (m: { evento: string | null; notas?: string | null }) =>
+  (m.evento ?? '').trim() || (m.notas ?? '').trim() || null
 
 function fmt(v: number | null, sym: string) {
   if (!v || v === 0) return null
@@ -47,7 +53,7 @@ function MovimientoCard({ m }: { m: DiarioRow }) {
           <p className="font-medium text-gray-900 text-sm">{m.cuenta_cte}</p>
           <p className="text-gray-500 text-xs mt-0.5">
             {new Date(m.fecha + 'T12:00:00').toLocaleDateString('es-AR')}
-            {m.evento ? ` · ${m.evento}` : ''}
+            {ref(m) ? ` · ${ref(m)}` : ''}
           </p>
         </div>
         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium shrink-0 ml-2 ${cls}`}>
@@ -139,7 +145,7 @@ export default function TablaMovimientos({ movimientos, acumulados }: {
                   <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.cuenta_cte}</td>
                   <td style={{ textAlign: 'left' }}><span className={cls}>{label}</span></td>
                   <td style={{ textAlign: 'left', color: 'var(--ink-2)', fontWeight: 400 }}>{m.concepto ?? '—'}</td>
-                  <td style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 400, fontSize: 12 }}>{m.evento ?? '—'}</td>
+                  <td style={{ textAlign: 'left', color: 'var(--muted)', fontWeight: 400, fontSize: 12 }}>{ref(m) ?? '—'}</td>
                   {cols.map(c => {
                     const v = m[c.key]
                     if (!v || v === 0) return <td key={c.key} className="zero">—</td>
