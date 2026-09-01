@@ -31,6 +31,10 @@ const MONEDAS = [
   { acum: 'acum_usdt',    cc: 'cc_usdt',    saldo: 'saldo_usdt',    label: 'USDT',    sym: 'USDT' },
 ] as const
 
+// Misma regla que la pantalla: el sync deja la referencia en `evento` y el alta de la
+// app la escribía solo en `notas`. Se miran las dos.
+const ref = (m: any) => (m.evento ?? '').trim() || (m.notas ?? '').trim() || null
+
 function esIngreso(op: string): boolean {
   const o = (op || '').toUpperCase()
   return o.includes('INGRES') || o === 'DONACION'
@@ -164,7 +168,7 @@ export default async function ExtractoCuentaCorriente({ searchParams }: {
                       <td className="c-fecha">{fecha(m.fecha)}</td>
                       <td className="c-op">{m.operacion}</td>
                       <td className="c-det">{m.concepto ?? '—'}</td>
-                      <td className="c-ref">{m.evento ?? '—'}</td>
+                      <td className="c-ref">{ref(m) ?? '—'}</td>
                       {monedas.map(m2 => {
                         const v = Number(m[m2.cc] ?? 0)
                         if (!v) return <td key={m2.cc} className="num cero">—</td>

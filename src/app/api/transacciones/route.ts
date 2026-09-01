@@ -128,6 +128,12 @@ export async function POST(request: Request) {
     cc_reales,
     cc_usdt,
     origen: involucraUsdt ? 'app' : 'sheet',
+    // La referencia va en `evento`, que es donde la deja el sync al traer la columna
+    // NOTAS de la planilla, y es la que muestra Cuentas Corrientes en la columna "Ref.".
+    // Hasta el 1/9/2026 el alta la escribía solo en `notas`: la pantalla la buscaba en
+    // `evento` y los movimientos cargados desde la app aparecían sin referencia.
+    // Se escriben las dos para que quede igual mire quien mire.
+    evento: notas || null,
     notas: notas || null,
     creado_por: (profile as any).nombre ?? user.email,
     anulado: false,
