@@ -79,19 +79,32 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: e.message ?? 'Operación inválida' }, { status: 400 })
   }
 
-  // Calculate currency deltas for Supabase (view uses SUM). Solo aplica a movimientos de
-  // cuenta corriente (INGRESAN/EGRESAN) — `diario` solo lo consultan las vistas de CTA CTE.
-  // Las operaciones de CAJA (COMPRA/VENTA/GASTOS) no mueven saldo de cta cte: quedan en 0.
+  // Patas de CUENTA CORRIENTE para `diario`: las da el MOTOR, la misma fuente que llena
+  // `movimientos_caja` unas líneas más abajo.
+  //
+  // Antes se calculaban acá a mano —`sign = INGRESAN ? +1 : -1` sobre la moneda PROPIA— y
+  // eso tenía tres errores frente a la planilla (detectado el 1/9/2026):
+  //   1. El signo salía INVERTIDO. En la planilla un INGRESAN deja la cuenta corriente en
+  //      NEGATIVO (el cliente trajo plata: la casa se la debe) y un EGRESAN en positivo.
+  //      Consecuencia visible: en Cuentas Corrientes los movimientos cargados desde la app
+  //      se restaban donde los de la planilla sumaban, y el saldo no cerraba.
+  //   2. Con las dos patas en monedas distintas el importe caía en la MONEDA equivocada y
+  //      sin convertir: un EGRESAN DOLARES → PESOS iba a CC DOLARES por el monto en
+  //      dólares, cuando corresponde CC PESOS por el monto convertido.
+  //   3. Un INGRESAN/EGRESAN de tipo CAJA escribía patas de cuenta corriente, que no le
+  //      tocan.
+  // Es exactamente el mismo error que tenía el sync y que se corrigió el 14/8/2026: leer
+  // las columnas de caja creyendo que eran las de cuenta corriente.
+  //
+  // El motor devuelve las claves con los nombres de la planilla ("CC PESOS") y ya resuelve
+  // moneda, conversión y signo; para CAJA devuelve 0, que es lo correcto.
   const monedaNorm = mapMoneda(propio)
-  let cc_pesos = 0, cc_dolares = 0, cc_euros = 0, cc_reales = 0, cc_usdt = 0
-  if (operacion === 'INGRESAN' || operacion === 'EGRESAN') {
-    const sign = operacion === 'INGRESAN' ? 1 : -1
-    cc_pesos    = monedaNorm === 'PESOS'   ? sign * monto : 0
-    cc_dolares  = monedaNorm === 'DOLARES' ? sign * monto : 0
-    cc_euros    = monedaNorm === 'EUROS'   ? sign * monto : 0
-    cc_reales   = monedaNorm === 'REALES'  ? sign * monto : 0
-    cc_usdt     = monedaNorm === 'USDT'    ? sign * monto : 0
-  }
+  const cc = (col: string) => Number(impacto.valores[col] ?? 0)
+  const cc_pesos   = cc('CC PESOS')
+  const cc_dolares = cc('CC DOLARES')
+  const cc_euros   = cc('CC EUROS')
+  const cc_reales  = cc('CC REALES')
+  const cc_usdt    = cc('CC USDT')
 
   // USDT no existe en la planilla, así que una fila que lo toque solo puede venir de acá:
   // se marca 'app' para que el sync no la borre. En `diario` esa marca es la diferencia
