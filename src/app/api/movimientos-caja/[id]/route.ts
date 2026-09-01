@@ -6,6 +6,7 @@ import {
   registrarAuditoria, calcularHuella, fotoMovimiento, camposCambiados, describirMovimiento,
 } from '@/lib/auditoria'
 import { esAdmin } from '@/lib/roles'
+import { actualizarEnDiario, avisoDiario, borrarDeDiario } from '@/lib/diario'
 
 // Edita un movimiento de caja. NO escribe en el Google Sheet (decisión 5/7/2026):
 // mientras dure la convivencia, el próximo sync pisa estos cambios — comportamiento
@@ -80,6 +81,30 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   if (updError) return NextResponse.json({ error: updError.message }, { status: 500 })
 
+  // La pata de CUENTA CORRIENTE vive en `diario` y hay que editarla igual. Hasta el
+  // 1/9/2026 esto no se hacía: Transacciones mostraba el monto nuevo y el saldo de la
+  // cuenta seguía calculado con el viejo, sin ninguna señal en pantalla.
+  // La fila se ubica con los datos ORIGINALES, que son los que tiene guardados `diario`.
+  const rDiario = await actualizarEnDiario(supabase, original as any, {
+    fecha,
+    cuenta_cte: cliente?.trim() || null,
+    operacion: datos.operacion.trim().toUpperCase(),
+    concepto: `${datos.propio.trim().toUpperCase()} → ${datos.externo.trim().toUpperCase()}`,
+    moneda: datos.propio.trim().toUpperCase(),
+    monto: datos.monto,
+    cotizacion: datos.cotizacion,
+    cc_pesos:   Number(v['CC PESOS']   ?? 0),
+    cc_dolares: Number(v['CC DOLARES'] ?? 0),
+    cc_euros:   Number(v['CC EUROS']   ?? 0),
+    cc_reales:  Number(v['CC REALES']  ?? 0),
+    cc_usdt:    Number(v['CC USDT']    ?? 0),
+    // La referencia va en las dos columnas: el sync usa `evento` y la pantalla cae a
+    // `notas` para los movimientos viejos.
+    evento: notas?.trim() || null,
+    notas: notas?.trim() || null,
+  })
+  const avisoCtaCte = avisoDiario(rDiario, 'editar')
+
   // Auditoría: guarda el antes y el después. `editado_por` en la fila solo conserva al
   // ÚLTIMO editor (y el sync lo borra); el log guarda la secuencia completa.
   const antes = fotoMovimiento(original)
@@ -112,7 +137,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     datosDespues: despues,
   })
 
-  return NextResponse.json({ ok: true, cuenta: resultado.cuenta, valores: v })
+  return NextResponse.json({ ok: true, cuenta: resultado.cuenta, valores: v, cta_cte: rDiario.estado, aviso_cta_cte: avisoCtaCte })
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -307,6 +332,12 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   // count 0 = la RLS lo impidió (falta la policy de DELETE).
   if (!count) return NextResponse.json({ error: 'No se pudo eliminar (¿falta la policy de DELETE?)' }, { status: 404 })
 
+  // La pata de CUENTA CORRIENTE vive en `diario` y hay que sacarla también. Hasta el
+  // 1/9/2026 esto no se hacía: el movimiento desaparecía del listado y en `diario` seguía
+  // sumando al saldo del cliente, sin ninguna señal en pantalla.
+  const rDiario = await borrarDeDiario(supabase, mov)
+  const avisoCtaCte = avisoDiario(rDiario, 'borrar')
+
   // Auditoría del borrado: `datos_antes` lleva la fila ENTERA. Es el caso de uso central
   // ("¿quién borró esto y qué decía?") y lo que hace reconstruible un borrado por error.
   await registrarAuditoria(supabase, {
@@ -322,12 +353,12 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   // Las filas 'app' (USDT) no existen en la planilla: no hay nada que limpiar allá.
   if (mov.origen === 'app') {
-    return NextResponse.json({ ok: true, planilla: 'no_aplica' })
+    return NextResponse.json({ ok: true, planilla: 'no_aplica', cta_cte: rDiario.estado, aviso_cta_cte: avisoCtaCte })
   }
   // Limpieza espejada en la planilla (best effort: si falla, el movimiento ya salió del
   // sistema y se informa para borrarlo a mano allá).
   if (WRITE_SOURCE !== 'sheets') {
-    return NextResponse.json({ ok: true, planilla: 'deshabilitado' })
+    return NextResponse.json({ ok: true, planilla: 'deshabilitado', cta_cte: rDiario.estado, aviso_cta_cte: avisoCtaCte })
   }
   try {
     const r = await limpiarFilaPlanilla({
@@ -335,8 +366,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
       operacion: mov.operacion, monto: Number(mov.monto),
       cot: mov.cot != null ? Number(mov.cot) : null,
     })
-    return NextResponse.json({ ok: true, planilla: r.estado, fila: r.fila, candidatas: r.candidatas })
+    return NextResponse.json({ ok: true, planilla: r.estado, fila: r.fila, candidatas: r.candidatas, cta_cte: rDiario.estado, aviso_cta_cte: avisoCtaCte })
   } catch (e: any) {
-    return NextResponse.json({ ok: true, planilla: 'error', warning: e.message })
+    return NextResponse.json({ ok: true, planilla: 'error', warning: e.message, cta_cte: rDiario.estado, aviso_cta_cte: avisoCtaCte })
   }
 }

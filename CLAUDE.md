@@ -51,6 +51,17 @@ Documentación clave: `docs/SINCRONIZACION.md` (sync Sheet→DB), `docs/MOTOR-CA
   administrador y superadmin es solo Ganancias, y las reglas de contención (nadie cambia
   su propio rol, nadie asigna un rol al que no llega, un administrador no toca la cuenta
   de un superadmin) se validan EN EL SERVIDOR, no en el navegador.
+- DOS TABLAS QUE VAN A LA PAR (1/9/2026): un movimiento de cuenta corriente vive en
+  `movimientos_caja` (espejo de la planilla: Transacciones, Inicio, Ganancias, Gastos)
+  Y en `diario` (de donde sale el saldo del cliente: Cuentas Corrientes, Saldos
+  Pendientes). Todo camino que escriba —alta, edición, borrado, sync— tiene que tocar
+  las dos. El alta y el sync ya lo hacían; el borrado y la edición no, y el saldo quedaba
+  mal SIN NINGUNA SEÑAL en pantalla. Se corrigió con `src/lib/diario.ts`, que ubica la
+  fila gemela por CONTENIDO (cuenta + fecha + operación + monto) y solo la toca si la
+  coincidencia es única — con cero o varias avisa, no adivina.
+  Las patas `cc_*` las calcula SIEMPRE el motor, nunca a mano: hacerlo a mano ya produjo
+  el signo invertido (1/9/2026). Y la referencia va en `evento` Y en `notas`: el sync usa
+  `evento` y las pantallas caen a `notas` para lo cargado antes de esa fecha.
 - BORRAR transacciones en la app SÍ limpia la fila en la planilla (definido 11/7/2026):
   se identifica por contenido y solo se limpia si la coincidencia es única — con cero o
   varias coincidencias se borra solo de la base y se avisa para el borrado manual.

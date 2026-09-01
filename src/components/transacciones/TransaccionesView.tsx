@@ -114,12 +114,17 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
     // sin nombrar el sistema externo. 'deshabilitado' sí se omite: ahí no hay riesgo de
     // que vuelva, simplemente no se tocó nada afuera.
     const NEUTRO = 'Se borró del sistema. Verificá en unos minutos que no reaparezca en la lista; si vuelve, avisale al administrador.'
+    const avisos: string[] = []
     if (data.planilla && data.planilla !== 'ok') {
-      setAvisoPlanilla(
+      avisos.push(
         PLANILLA_ACTIVA ? (AVISOS[data.planilla] ?? '')
           : (data.planilla === 'deshabilitado' ? '' : NEUTRO)
       )
     }
+    // Si la pata de cuenta corriente no se pudo borrar, el saldo del cliente queda mal.
+    // Es lo más grave que puede pasar acá, así que se avisa siempre.
+    if (data.aviso_cta_cte) avisos.push(data.aviso_cta_cte)
+    setAvisoPlanilla(avisos.filter(Boolean).join(' '))
     setBorrando(null)
     router.refresh()
   }
