@@ -75,6 +75,15 @@ export default function FormEditarTransaccion({ movimiento }: { movimiento: Movi
       setGuardando(false)
       return
     }
+    // Si la pata de cuenta corriente no se pudo actualizar, el saldo del cliente queda
+    // desfasado. No se puede volver atrás la edición, así que al menos se avisa acá en
+    // vez de mandar al operador de vuelta al listado como si todo hubiera salido bien.
+    const ok = await res.json().catch(() => ({}))
+    if (ok.aviso_cta_cte) {
+      setError(ok.aviso_cta_cte)
+      setGuardando(false)
+      return
+    }
     router.push('/dashboard/transacciones')
     router.refresh()
   }
