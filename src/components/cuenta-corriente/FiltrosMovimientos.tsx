@@ -1,6 +1,7 @@
 'use client'
 import { useRouter, usePathname } from 'next/navigation'
 import { useState, useTransition } from 'react'
+import SelectFiltrable from '@/components/SelectFiltrable'
 
 interface Props {
   tiposOperacion: { codigo: string; descripcion: string }[]
@@ -52,11 +53,17 @@ export default function FiltrosMovimientos({ tiposOperacion, valoresIniciales, c
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         {esSuperusuarioOOperador && cuentas && cuentas.length > 0 && (
           <div style={{ flex: '1 1 220px', minWidth: 200 }}>
-            <label className="label">Cuenta corriente</label>
-            <select className="input" value={cuenta} onChange={e => setCuenta(e.target.value)}>
-              <option value="">Todas las cuentas</option>
-              {cuentas.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <label className="label" htmlFor="cuenta">Cuenta corriente</label>
+            {/* Combo filtrable: son más de mil cuentas y con un <select> nativo había que
+                buscarlas scrolleando. Acá se escribe y la lista se va achicando. */}
+            <SelectFiltrable
+              id="cuenta"
+              value={cuenta}
+              opciones={cuentas}
+              onChange={setCuenta}
+              placeholder="Todas las cuentas"
+              etiqueta="Cuenta corriente"
+            />
           </div>
         )}
         <div>
