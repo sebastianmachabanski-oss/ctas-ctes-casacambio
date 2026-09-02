@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { calcularMovimiento, validarOperacion, MONEDAS } from '@/lib/motor-calculo'
 import { SIGNOS_OPERACION } from '@/lib/motor-calculo/signos'
+import SelectFiltrable from '@/components/SelectFiltrable'
 
 type Movimiento = {
   id: string; tipo: string; fecha: string; cliente: string | null; operacion: string
@@ -16,9 +17,12 @@ const SIMBOLOS: Record<string, string> = {
   'BANCO': 'BCO', 'CC PESOS': 'CC $', 'CC DOLARES': 'CC U$S', 'CC EUROS': 'CC €', 'CC REALES': 'CC R$',
 }
 
-export default function FormEditarTransaccion({ movimiento }: { movimiento: Movimiento }) {
+export default function FormEditarTransaccion(
+  { movimiento, cuentas = [] }: { movimiento: Movimiento; cuentas?: string[] },
+) {
   const router = useRouter()
   const [f, setF] = useState({
+    tipo: movimiento.tipo,
     fecha: movimiento.fecha,
     cliente: movimiento.cliente ?? '',
     operacion: movimiento.operacion,
@@ -45,7 +49,7 @@ export default function FormEditarTransaccion({ movimiento }: { movimiento: Movi
     if (errorNegocio) return { tipo: 'error' as const, mensaje: errorNegocio }
     try {
       const r = calcularMovimiento({
-        tipo: movimiento.tipo as 'CAJA' | 'CTA CTE',
+        tipo: f.tipo as 'CAJA' | 'CTA CTE',
         operacion: f.operacion, propio: f.propio, externo: f.externo,
         monto, cotizacion: f.cot ? Number(f.cot) : null,
         costoPorcentaje: f.costo_pct ? Number(f.costo_pct) : null,
@@ -55,7 +59,7 @@ export default function FormEditarTransaccion({ movimiento }: { movimiento: Movi
     } catch (e: any) {
       return { tipo: 'error' as const, mensaje: e.message as string }
     }
-  }, [f, movimiento.tipo])
+  }, [f])
 
   async function handleGuardar(e: React.FormEvent) {
     e.preventDefault()
@@ -64,6 +68,7 @@ export default function FormEditarTransaccion({ movimiento }: { movimiento: Movi
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        tipo: f.tipo,
         fecha: f.fecha, cliente: f.cliente, operacion: f.operacion, propio: f.propio,
         externo: f.externo, monto: Number(f.monto), cot: f.cot || null,
         costo_pct: f.costo_pct || null, debe: f.debe, notas: f.notas,
@@ -92,13 +97,36 @@ export default function FormEditarTransaccion({ movimiento }: { movimiento: Movi
     <form onSubmit={handleGuardar} className="card p-4 md:p-6 space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div>
+          <label className="label" htmlFor="tipo">Tipo</label>
+          {/* Editable desde el 1/9/2026: cargar una transacción de cuenta corriente como
+              CAJA por error dejaba el movimiento sin arreglo posible desde la app. */}
+          <select id="tipo" className="input" value={f.tipo} onChange={set('tipo')} required>
+            <option value="CTA CTE">CTA CTE</option>
+            <option value="CAJA">CAJA</option>
+          </select>
+        </div>
+        <div>
           <label className="label" htmlFor="fecha">Fecha</label>
           <input id="fecha" type="date" className="input" value={f.fecha} onChange={set('fecha')} required />
         </div>
         <div>
           <label className="label" htmlFor="cliente">Cliente</label>
-          <input id="cliente" type="text" className="input" value={f.cliente} onChange={set('cliente')}
-            placeholder={movimiento.tipo === 'CTA CTE' ? 'Cuenta corriente' : 'Cliente eventual (texto libre)'} />
+          {/* En CTA CTE el nombre tiene que ser una cuenta REAL —el servidor lo valida—,
+              así que se elige de la lista. En CAJA es texto libre: son clientes
+              eventuales y no se normalizan (regla del 5/7/2026). */}
+          {f.tipo === 'CTA CTE' ? (
+            <SelectFiltrable
+              id="cliente"
+              value={f.cliente}
+              opciones={cuentas}
+              onChange={v => setF(prev => ({ ...prev, cliente: v }))}
+              placeholder="Elegir cuenta corriente…"
+              etiqueta="Cuenta corriente"
+            />
+          ) : (
+            <input id="cliente" type="text" className="input" value={f.cliente} onChange={set('cliente')}
+              placeholder="Cliente eventual (texto libre)" />
+          )}
         </div>
         <div>
           <label className="label" htmlFor="operacion">Operación</label>

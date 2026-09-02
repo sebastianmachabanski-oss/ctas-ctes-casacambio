@@ -19,6 +19,13 @@ export default async function EditarTransaccionPage({ params }: { params: { id: 
     .from('movimientos_caja').select('*').eq('id', params.id).single()
   if (!mov) notFound()
 
+  // Las cuentas corrientes activas: si el movimiento pasa a ser de CTA CTE hay que elegir
+  // una que exista. Con el campo libre, cualquier diferencia de tipeo rebotaba del
+  // servidor y el operador no tenía cómo saber el nombre exacto.
+  const { data: cuentasData } = await supabase
+    .from('cuentas_corrientes').select('nombre').eq('activo', true).order('nombre')
+  const cuentas = (cuentasData ?? []).map((c: any) => c.nombre as string)
+
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl">
       <div>
@@ -41,7 +48,7 @@ export default async function EditarTransaccionPage({ params }: { params: { id: 
         </div>
       )}
 
-      <FormEditarTransaccion movimiento={mov as any} />
+      <FormEditarTransaccion movimiento={mov as any} cuentas={cuentas} />
     </div>
   )
 }

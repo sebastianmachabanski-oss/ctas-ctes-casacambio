@@ -6,7 +6,7 @@ import {
   registrarAuditoria, calcularHuella, fotoMovimiento, camposCambiados, describirMovimiento,
 } from '@/lib/auditoria'
 import { esAdmin } from '@/lib/roles'
-import { actualizarEnDiario, avisoDiario, borrarDeDiario } from '@/lib/diario'
+import { avisoDiario, borrarDeDiario, sincronizarDiario } from '@/lib/diario'
 
 // Edita un movimiento de caja. NO escribe en el Google Sheet (decisión 5/7/2026):
 // mientras dure la convivencia, el próximo sync pisa estos cambios — comportamiento
@@ -25,7 +25,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: 'Solo un administrador puede editar transacciones' }, { status: 403 })
 
   const body = await request.json()
-  const { fecha, cliente, operacion, propio, externo, monto, cot, costo_pct, debe, notas } = body
+  const { fecha, cliente, operacion, propio, externo, monto, cot, costo_pct, debe, notas, tipo } = body
 
   if (!fecha || !operacion || !propio || monto == null || isNaN(Number(monto)))
     return NextResponse.json({ error: 'Faltan campos requeridos (fecha, operación, moneda, monto)' }, { status: 400 })
@@ -37,8 +37,32 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (getError || !original)
     return NextResponse.json({ error: 'Movimiento no encontrado' }, { status: 404 })
 
+  // El TIPO ahora sí se edita (1/9/2026): cargar una transacción de cuenta corriente como
+  // CAJA por error era irreparable desde la app y había que tocar la base a mano.
+  // Cambiarlo no es un campo más — decide si el movimiento existe o no en `diario`—, así
+  // que se valida con las mismas reglas que el alta antes de tocar nada.
+  const tipoNuevo = (tipo ? String(tipo) : (original as any).tipo).toUpperCase()
+  if (!['CAJA', 'CTA CTE'].includes(tipoNuevo))
+    return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
+
+  if (tipoNuevo === 'CTA CTE') {
+    const OPS_CTA_CTE = ['INGRESAN', 'EGRESAN']
+    if (!OPS_CTA_CTE.includes(String(operacion).trim().toUpperCase()))
+      return NextResponse.json(
+        { error: 'En cuenta corriente la operación solo puede ser INGRESAN o EGRESAN' }, { status: 400 })
+
+    // El nombre tiene que ser una cuenta REAL: si no, el movimiento queda colgado de una
+    // cuenta que no existe y no aparece en ningún saldo.
+    const nombre = String(cliente ?? '').trim()
+    const { data: cta } = await supabase.from('cuentas_corrientes')
+      .select('nombre').eq('nombre', nombre).eq('activo', true).maybeSingle()
+    if (!cta)
+      return NextResponse.json(
+        { error: `"${nombre}" no es una cuenta corriente activa: elegila de la lista` }, { status: 400 })
+  }
+
   const datos = {
-    tipo: (original as any).tipo as 'CAJA' | 'CTA CTE',
+    tipo: tipoNuevo as 'CAJA' | 'CTA CTE',
     operacion: String(operacion),
     propio: String(propio),
     externo: String(externo ?? ''),
@@ -61,6 +85,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const v = resultado.valores
   const { error: updError } = await supabase.from('movimientos_caja').update({
     fecha,
+    tipo: tipoNuevo,
     cliente: cliente?.trim() || null,
     operacion: datos.operacion.trim().toUpperCase(),
     propio: datos.propio.trim().toUpperCase(),
@@ -85,7 +110,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   // 1/9/2026 esto no se hacía: Transacciones mostraba el monto nuevo y el saldo de la
   // cuenta seguía calculado con el viejo, sin ninguna señal en pantalla.
   // La fila se ubica con los datos ORIGINALES, que son los que tiene guardados `diario`.
-  const rDiario = await actualizarEnDiario(supabase, original as any, {
+  const rDiario = await sincronizarDiario(supabase, original as any, tipoNuevo, {
     fecha,
     cuenta_cte: cliente?.trim() || null,
     operacion: datos.operacion.trim().toUpperCase(),
@@ -102,7 +127,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     // `notas` para los movimientos viejos.
     evento: notas?.trim() || null,
     notas: notas?.trim() || null,
-  })
+  }, (profile as any)?.nombre ?? user.email ?? 'app')
   const avisoCtaCte = avisoDiario(rDiario, 'editar')
 
   // Auditoría: guarda el antes y el después. `editado_por` en la fila solo conserva al
