@@ -79,7 +79,7 @@ export async function borrarDeDiario(
   return encontrada
 }
 
-/** Campos de `diario` que cambian al editar un movimiento. */
+/** Campos de `diario` que cambian al editar un movimiento (y con los que se crea uno). */
 export type CambiosDiario = {
   fecha: string
   cuenta_cte: string | null
@@ -95,6 +95,46 @@ export type CambiosDiario = {
   cc_usdt: number
   evento: string | null
   notas: string | null
+}
+
+/**
+ * Deja `diario` como corresponda cuando una edición puede cambiar el TIPO del movimiento.
+ *
+ * Cambiar CAJA ↔ CTA CTE no es editar un campo más: decide si el movimiento existe o no
+ * en `diario`. Son cuatro casos y los cuatro tienen que estar cubiertos, porque olvidarse
+ * de uno deja el saldo del cliente mal en silencio:
+ *
+ *   CAJA    → CAJA      no hay nada que hacer
+ *   CTA CTE → CTA CTE   se actualiza la fila
+ *   CAJA    → CTA CTE   se CREA la fila (antes no existía)
+ *   CTA CTE → CAJA      se BORRA la fila (el movimiento ya no toca la cuenta)
+ */
+export async function sincronizarDiario(
+  supabase: SupabaseClient<any, any, any>,
+  original: Movimiento & { op?: string | null; origen?: string | null },
+  tipoNuevo: string,
+  cambios: CambiosDiario,
+  creadoPor: string,
+): Promise<ResultadoDiario> {
+  const era = esCtaCte(original)
+  const es = (tipoNuevo ?? '').toUpperCase() === 'CTA CTE'
+
+  if (!era && !es) return { estado: 'no_aplica' }
+  if (era && es) return actualizarEnDiario(supabase, original, cambios)
+  if (era && !es) return borrarDeDiario(supabase, original)
+
+  // CAJA → CTA CTE: el movimiento pasa a tocar la cuenta del cliente y necesita su fila.
+  const { data, error } = await supabase.from('diario').insert({
+    ...cambios,
+    tipo: 'CTA CTE',
+    detalle: original.op ?? 'C',
+    origen: original.origen ?? 'sheet',
+    creado_por: creadoPor,
+    anulado: false,
+  }).select('id').single()
+
+  if (error) return { estado: 'error', error: error.message }
+  return { estado: 'ok', id: (data as { id: string }).id }
 }
 
 /**
