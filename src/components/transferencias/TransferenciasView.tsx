@@ -2,6 +2,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import FiltroMultiple from '@/components/FiltroMultiple'
+import SelectFiltrable from '@/components/SelectFiltrable'
 
 export type Fila = {
   id: string; fecha: string; fila_sheet: number | null
@@ -114,11 +115,18 @@ export default function TransferenciasView({ filas, clientes, participantes, fil
               onChange={e => aplicar({ hasta: e.target.value })} style={{ width: 140 }} />
           </Campo>
           <Campo label="Cliente">
-            <select className="srch" value={f.cliente} aria-label="Cliente"
-              onChange={e => aplicar({ cliente: e.target.value })} style={{ minWidth: 150 }}>
-              <option value="">Todos</option>
-              {clientes.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            {/* Combo filtrable: son cientos de clientes y con un <select> nativo había que
+                buscarlos scrolleando. Se escribe y la lista se va achicando. */}
+            <div style={{ minWidth: 170 }}>
+              <SelectFiltrable
+                value={f.cliente}
+                opciones={clientes}
+                onChange={cliente => aplicar({ cliente })}
+                placeholder="Todos"
+                etiqueta="Cliente"
+                className="srch"
+              />
+            </div>
           </Campo>
           <Campo label="Participantes">
             <div style={{ minWidth: 190 }}>

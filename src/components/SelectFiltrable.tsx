@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { filtrarPorTexto, norm } from '@/lib/texto'
 
 /**
  * Desplegable de UNA opción sobre una lista larga: se escribe para ir achicando hasta
@@ -21,17 +22,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
  * adivine cómo lo tipeó otro.
  */
 
-/** Uppercase sin acentos, para comparar lo tipeado con las opciones. */
-const norm = (s: string) =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim()
-
 export default function SelectFiltrable({
-  value, opciones, onChange, id, placeholder = 'Todos', etiqueta, maxLista = 100,
+  value, opciones, onChange, id, placeholder = 'Todos', etiqueta, maxLista = 100, className = 'input',
 }: {
   value: string
   opciones: string[]
   onChange: (v: string) => void
   id?: string
+  /** Clase del campo: 'input' en los formularios, 'srch' en las barras de filtros. */
+  className?: string
   /** Qué se muestra —y qué significa— cuando no hay nada elegido. */
   placeholder?: string
   etiqueta?: string
@@ -43,14 +42,10 @@ export default function SelectFiltrable({
   const cont = useRef<HTMLDivElement>(null)
   const refMarcada = useRef<HTMLButtonElement | null>(null)
 
-  const filtrados = useMemo(() => {
-    const q = norm(query)
-    if (!q) return opciones.slice(0, maxLista)
-    // Primero los que EMPIEZAN con lo tipeado; después los que lo contienen en el medio.
-    const empiezan = opciones.filter(o => norm(o).startsWith(q))
-    const contienen = opciones.filter(o => !norm(o).startsWith(q) && norm(o).includes(q))
-    return [...empiezan, ...contienen].slice(0, maxLista)
-  }, [opciones, query, maxLista])
+  const filtrados = useMemo(
+    () => filtrarPorTexto(opciones, query, maxLista),
+    [opciones, query, maxLista],
+  )
 
   const totalCoincidencias = useMemo(() => {
     const q = norm(query)
@@ -104,7 +99,7 @@ export default function SelectFiltrable({
       <input
         id={id}
         type="text"
-        className="input"
+        className={className}
         // Mientras está abierto se ve lo que se escribe; cerrado, el valor elegido.
         value={abierto ? query : value}
         placeholder={value ? value : placeholder}
