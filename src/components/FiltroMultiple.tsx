@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { filtrarPorTexto } from '@/lib/texto'
 
 /**
  * Filtro de selección múltiple con etiquetas.
@@ -29,14 +30,8 @@ export default function FiltroMultiple({
   const cont = useRef<HTMLDivElement>(null)
   const refMarcada = useRef<HTMLButtonElement | null>(null)
 
-  const filtrados = useMemo(() => {
-    const q = query.trim().toUpperCase()
-    if (!q) return opciones.slice(0, 100)
-    // Primero los que EMPIEZAN con lo tipeado; después los que lo contienen.
-    const empiezan = opciones.filter(c => c.toUpperCase().startsWith(q))
-    const contienen = opciones.filter(c => !c.toUpperCase().startsWith(q) && c.toUpperCase().includes(q))
-    return [...empiezan, ...contienen].slice(0, 100)
-  }, [opciones, query])
+  // Ignora mayúsculas y acentos: los nombres se cargaron a mano y conviven las variantes.
+  const filtrados = useMemo(() => filtrarPorTexto(opciones, query, 100), [opciones, query])
 
   useEffect(() => {
     if (!abierto) return
