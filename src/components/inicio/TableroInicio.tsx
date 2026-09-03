@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type KPI = { cur: string; col: string; caja: number; calle: number | null; enCaja: number | null; cc: number | null }
@@ -63,11 +63,13 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
   }, [hoy])
 
   const fuente = vista === 'caja' ? clientesCaja : clientesCC
-  // Los más recientes arriba; los que no tienen fecha, al final y por nombre.
+  // Orden ALFABÉTICO (3/9/2026). Antes mandaba la fecha del último movimiento, de la más
+  // reciente a la más vieja, y el nombre solo desempataba. En pantalla eso se leía como la
+  // lista repitiéndose: cada fecha distinta arrancaba de nuevo por la A, así que un listado
+  // de dos meses eran veinte bloques alfabéticos encadenados y encontrar una cuenta a ojo
+  // significaba recorrerlos todos. La fecha sigue estando en su columna, que es donde sirve.
   const ordenados = useMemo(() => (
-    [...fuente].sort((a, b) =>
-      (b.ultimo ?? '').localeCompare(a.ultimo ?? '') ||
-      (a.nombre || '').localeCompare(b.nombre || '', 'es'))
+    [...fuente].sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'))
   ), [fuente])
 
   // Caja responde al período elegido: con Día/Semana/Mes la consulta ya trae solo a los
@@ -77,7 +79,7 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
   // siempre.
   const cortaPorActividad = vista === 'cc' || esTodo
 
-  const { filtrados, ocultos } = useMemo(() => {
+  const { filtrados, ocultos, desdeInactivos } = useMemo(() => {
     const q = busca.trim().toUpperCase()
     const coinciden = q
       ? ordenados.filter(c => (c.nombre || '').toUpperCase().includes(q))
@@ -86,11 +88,20 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
     // no opere hace un año. El corte solo aplica a la lista sin buscar.
     // Si ninguna fila trae fecha, la migración todavía no corrió: se muestra todo antes
     // que dejar la tabla vacía.
-    if (q || verTodos || !cortaPorActividad || !coinciden.some(c => c.ultimo)) {
-      return { filtrados: coinciden, ocultos: 0 }
+    if (q || !cortaPorActividad || !coinciden.some(c => c.ultimo)) {
+      return { filtrados: coinciden, ocultos: 0, desdeInactivos: null }
     }
-    const activos = coinciden.filter(c => (c.ultimo ?? '') >= corte)
-    return { filtrados: activos, ocultos: coinciden.length - activos.length }
+    const activos: Cliente[] = [], inactivos: Cliente[] = []
+    for (const c of coinciden) ((c.ultimo ?? '') >= corte ? activos : inactivos).push(c)
+    if (!verTodos) return { filtrados: activos, ocultos: inactivos.length, desdeInactivos: null }
+    // Con "Ver todos" los inactivos van DETRÁS, en su propio bloque alfabético y separados
+    // por un renglón que lo dice. Intercalarlos por nombre volvería a enterrar a los que
+    // operan, que es justo lo que el corte de 60 días viene a evitar.
+    return {
+      filtrados: [...activos, ...inactivos],
+      ocultos: 0,
+      desdeInactivos: inactivos.length ? activos.length : null,
+    }
   }, [ordenados, busca, corte, verTodos, cortaPorActividad])
 
   // Auto-ajuste del tamaño de letra de los KPIs de caja: si un número no entra en una
@@ -185,12 +196,23 @@ export default function TableroInicio({ kpis, clientesCaja, clientesCC, serieUSD
               <thead><tr><th>Cliente</th><th>Pesos</th><th>Dólares</th><th>Euros</th><th>Reales</th><th>Último mov.</th></tr></thead>
               <tbody>
                 {filtrados.slice(0, 400).map((c, i) => (
-                  <tr key={c.nombre + i}>
-                    <td>{c.nombre}</td>{cell(c.pesos)}{cell(c.dolares)}{cell(c.euros)}{cell(c.reales)}
-                    <td className={cortaPorActividad && c.ultimo && c.ultimo < corte ? 'zero' : ''} style={{ whiteSpace: 'nowrap' }}>
-                      {c.ultimo ? fecha(c.ultimo) : '—'}
-                    </td>
-                  </tr>
+                  <Fragment key={c.nombre + i}>
+                    {/* Sin este renglón, el segundo bloque vuelve a empezar por la A y se
+                        lee como si la lista se repitiera. */}
+                    {i === desdeInactivos && (
+                      <tr>
+                        <td colSpan={6} style={{ background: 'var(--soft, #f1f5f9)', color: 'var(--muted)', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600 }}>
+                          Sin movimientos en {DIAS_ACTIVO} días
+                        </td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td>{c.nombre}</td>{cell(c.pesos)}{cell(c.dolares)}{cell(c.euros)}{cell(c.reales)}
+                      <td className={cortaPorActividad && c.ultimo && c.ultimo < corte ? 'zero' : ''} style={{ whiteSpace: 'nowrap' }}>
+                        {c.ultimo ? fecha(c.ultimo) : '—'}
+                      </td>
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
