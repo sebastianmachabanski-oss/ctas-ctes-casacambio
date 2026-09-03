@@ -13,11 +13,15 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 // vendido, así que una compra no genera ganancia hasta que se vende. Ver docs/GANANCIAS.md.
 
 export type ParAgg = { vC: number; aC: number; vV: number; aV: number; vCcc: number; aCcc: number; vVcc: number; aVcc: number }
-export type DiaAgg = { f: string; usd: ParAgg; eur: ParAgg; brl: ParAgg; usdt: ParAgg; chq: ParAgg; g: number; gcc: number }
+/** Neto de las transferencias (op = 'T') del día, por moneda: lo que entra menos lo que sale. */
+export type TTAgg = { usd: number; eur: number; brl: number; usdt: number; chq: number; pesos: number }
+export type DiaAgg = { f: string; usd: ParAgg; eur: ParAgg; brl: ParAgg; usdt: ParAgg; chq: ParAgg; g: number; gcc: number; tt: TTAgg }
 
 type Cfg = {
   ops: Set<string>; par: 'usd' | 'eur' | 'brl' | 'usdt' | 'chq'; cc: boolean
   resid: 'fijo' | 'costo' | 'mtm'; margen: number; cierre: number; gastos: boolean
+  /** Sumar el resultado de las transferencias (op = 'T'). */
+  transferencias: boolean
 }
 
 const fmt0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
@@ -45,7 +49,10 @@ const SUPUESTOS_PAR: Record<Cfg['par'], Pick<Cfg, 'resid' | 'margen' | 'cierre'>
 
 
 // Totales del período según la configuración (misma cuenta que el mockup validado).
-function calc(dias: DiaAgg[], cfg: Cfg) {
+//
+// `cotPar` es la cotización implícita del par en el período; se necesita para expresar en
+// pesos el resultado de las transferencias, que nace en la moneda de la operación.
+function calc(dias: DiaAgg[], cfg: Cfg, cotPar: number | null) {
   let vC = 0, aC = 0, vV = 0, aV = 0, g = 0
   for (const d of dias) {
     const p = d[cfg.par]
@@ -53,14 +60,32 @@ function calc(dias: DiaAgg[], cfg: Cfg) {
     if (cfg.ops.has('VENTA')) { vV += p.vV + (cfg.cc ? p.vVcc : 0); aV += p.aV + (cfg.cc ? p.aVcc : 0) }
     if (cfg.ops.has('GASTOS') && cfg.gastos) g += d.g + (cfg.cc ? d.gcc : 0)
   }
+  // TRANSFERENCIAS (op = 'T'): la ganancia es lo que entra menos lo que sale, sin calce
+  // ni spread — no tienen pata en pesos de la que sacar una tasa. El neto nace en la
+  // moneda de la operación, así que para sumarlo al total en pesos hay que convertirlo
+  // con la cotización del período. Las transferencias que YA son en pesos entran directo.
+  let ttMoneda = 0, ttEnPesosDirecto = 0
+  for (const d of dias) { ttMoneda += d.tt[cfg.par]; ttEnPesosDirecto += d.tt.pesos }
+  const ttConvertible = cotPar != null
+  const ttEnPesos = cfg.transferencias
+    ? (ttConvertible ? ttMoneda * cotPar! : 0) + ttEnPesosDirecto
+    : 0
+
   const t1 = vC ? aC / vC : 0, t2 = vV ? aV / vV : 0
   const spread = (vC && vV) ? t2 - t1 : 0
   const calzado = Math.min(vC, vV), stock = Math.abs(vC - vV)
   let gResid = 0
   if (cfg.resid === 'fijo') gResid = stock * cfg.margen
   else if (cfg.resid === 'mtm') gResid = vC >= vV ? stock * (cfg.cierre - t1) : stock * (t2 - cfg.cierre)
-  const neto = calzado * spread + gResid + g
-  return { vC, aC, vV, aV, t1, t2, spread, calzado, stock, gResid, g, neto }
+  const neto = calzado * spread + gResid + g + ttEnPesos
+  return {
+    vC, aC, vV, aV, t1, t2, spread, calzado, stock, gResid, g, neto,
+    ttMoneda, ttEnPesos,
+    // Hubo transferencias pero no se pudieron pasar a pesos: sin operaciones del par en
+    // el período no hay cotización de la cual tomarla. Se avisa en vez de sumar cero
+    // como si no hubiera pasado nada.
+    ttSinCotizacion: cfg.transferencias && ttMoneda !== 0 && !ttConvertible,
+  }
 }
 
 /**
@@ -75,15 +100,16 @@ function calc(dias: DiaAgg[], cfg: Cfg) {
  *
  * Devuelve null si en el período no hubo operaciones en dólares de las que derivarla.
  */
-function cotizacionUsd(dias: DiaAgg[]): number | null {
+function cotizacionPar(dias: DiaAgg[], par: Cfg['par']): number | null {
   let vol = 0, ars = 0
   for (const d of dias) {
-    const p = d.usd
+    const p = d[par]
     vol += p.vC + p.vCcc + p.vV + p.vVcc
     ars += p.aC + p.aCcc + p.aV + p.aVcc
   }
   return vol > 0 ? ars / vol : null
 }
+const cotizacionUsd = (dias: DiaAgg[]) => cotizacionPar(dias, 'usd')
 
 
 export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, hoy }: {
@@ -93,7 +119,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
 
   const [cfg, setCfg] = useState<Cfg>({
     ops: new Set(['COMPRA', 'VENTA', 'GASTOS']), par: 'usd', cc: true,
-    resid: 'fijo', margen: 0.05, cierre: 1500, gastos: true,
+    resid: 'fijo', margen: 0.05, cierre: 1500, gastos: true, transferencias: true,
   })
   const setC = (patch: Partial<Cfg>) => setCfg(c => ({ ...c, ...patch }))
   const toggleOp = (op: string) => setCfg(c => {
@@ -101,7 +127,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
     return { ...c, ops }
   })
   const esDefault = cfg.ops.size === 3 && cfg.par === 'usd' && cfg.cc && cfg.resid === 'fijo'
-    && Math.abs(cfg.margen - 0.05) < 1e-9 && cfg.gastos
+    && Math.abs(cfg.margen - 0.05) < 1e-9 && cfg.gastos && cfg.transferencias
 
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') document.body.classList.remove('cfg-open') }
@@ -109,7 +135,8 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
     return () => { window.removeEventListener('keydown', onEsc); document.body.classList.remove('cfg-open') }
   }, [])
 
-  const r = useMemo(() => calc(dias, cfg), [dias, cfg])
+  const cotPar = useMemo(() => cotizacionPar(dias, cfg.par), [dias, cfg.par])
+  const r = useMemo(() => calc(dias, cfg, cotPar), [dias, cfg, cotPar])
   // Equivalente en dólares del mismo resultado. Por construcción se cumple exacto que
   // netoUsd × cotUsd = neto en pesos, así que los dos paneles nunca se contradicen.
   const cotUsd = useMemo(() => cotizacionUsd(dias), [dias])
@@ -118,7 +145,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
 
   const LEAD: Record<string, string> = { dia: 'Este día ganaste', semana: 'Esta semana ganaste', mes: 'Este mes ganaste', anio: 'Este año ganaste' }
   const lead = esRango ? 'En el período ganaste' : (LEAD[periodo] ?? 'Ganaste')
-  const sinDatos = r.vC === 0 && r.vV === 0 && r.g === 0
+  const sinDatos = r.vC === 0 && r.vV === 0 && r.g === 0 && r.ttMoneda === 0
   const sym = SYM[cfg.par]
   // Los cheques se valúan contra su valor nominal (1), no contra una cotización de
   // mercado: el rótulo y el paso del campo cambian para que se lea como lo que es.
@@ -166,6 +193,14 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
         </div>
       </div>
 
+      {r.ttSinCotizacion && (
+        <div className="card" style={{ padding: '12px 16px', fontSize: 13, lineHeight: 1.5, borderLeft: '3px solid var(--warn-ink)' }}>
+          ⚠️ En el período hay <b>{sym} {fmt0.format(Math.round(r.ttMoneda))}</b> de resultado por
+          transferencias, pero <b>no se pudieron sumar al total</b>: no hubo compras ni ventas de
+          {' '}{NOMBRE_PAR[cfg.par].toLowerCase()} de las que tomar una cotización para pasarlos a pesos.
+        </div>
+      )}
+
       {!esDefault && (
         <div style={{ display: 'inline-block', fontSize: 12.5, fontWeight: 600, background: 'var(--warn-bg)', color: 'var(--warn-ink)', padding: '5px 11px', borderRadius: 8 }}>
           Cálculo con configuración modificada
@@ -185,6 +220,11 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
             ['Vendiste', `${sym} ${fmt0.format(r.vV)}`, r.vV ? `a $ ${fmt0.format(r.t2)} promedio` : 'sin ventas'],
             ['Te quedaron en stock', `${sym} ${fmt0.format(r.stock)}`, 'comprados sin vender'],
             ['Gastos', ars(Math.round(r.g)), cfg.gastos && cfg.ops.has('GASTOS') ? 'descontados del total' : 'no descontados'],
+            ['Transferencias', `${sym} ${fmt0.format(Math.round(r.ttMoneda))}`,
+              !cfg.transferencias ? 'no sumadas'
+                : r.ttMoneda === 0 ? 'sin transferencias del par'
+                : r.ttSinCotizacion ? '⚠️ sin cotización para pasarlas a pesos'
+                : `${ars(Math.round(r.ttEnPesos))} sumados al total`],
           ].map(([k, v, s]) => (
             <div className="kpi" key={k as string}>
               <span className="cur">{k}</span>
@@ -210,6 +250,13 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
               por volumen—, la diferencia se multiplica por el volumen que se compró <i>y</i> se
               vendió, y a eso se le suma la valuación de lo que quedó en stock y se le restan los
               gastos.
+            </p>
+            <p style={{ margin: '0 0 8px' }}>
+              <b>Transferencias.</b> Las operaciones marcadas con <b>Op = T</b> no pasan por ese
+              calce: no tienen pata en pesos, así que no hay tasa de compra ni de venta de la que
+              sacar un spread. Su ganancia es lo que <b>entra menos lo que sale</b> de cada par de
+              movimientos, en la moneda de la operación, y se suma al total convertida con la misma
+              cotización del período. Se puede desactivar en ⚙ Configuración.
             </p>
             <p style={{ margin: '0 0 8px' }}>
               <b>En dólares.</b> Es el mismo resultado, convertido con la cotización promedio
@@ -326,6 +373,19 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
               <span className="track" />Descontar gastos del período
             </label>
             <div className="param-what">Qué modifica: <b>si el número grande resta los gastos</b>. Apagado muestra la ganancia bruta.</div>
+          </div>
+          <div className="card param">
+            <p className="param-name">Transferencias</p>
+            <label className="switch">
+              <input type="checkbox" checked={cfg.transferencias} onChange={e => setC({ transferencias: e.target.checked })} />
+              <span className="track" />Sumar el resultado de las transferencias
+            </label>
+            <div className="param-what">
+              Qué modifica: <b>si el número grande incluye las transferencias</b> (las operaciones
+              marcadas con Op = T). Su ganancia es lo que ENTRA menos lo que SALE de cada par, sin
+              calce ni spread: no tienen pata en pesos y por eso no entran en el cálculo de
+              compras y ventas. El neto se convierte a pesos con la cotización del período.
+            </div>
           </div>
         </div>
       </aside>
