@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import GananciasView, { type DiaAgg, type ParAgg } from '@/components/ganancias/GananciasView'
+import GananciasView, { type DiaAgg, type ParAgg, type TTAgg } from '@/components/ganancias/GananciasView'
 import { veGanancias } from '@/lib/roles'
 import { esPeriodoValido, hoyArgentina, rangoDe } from '@/lib/periodos'
 
@@ -12,6 +12,7 @@ import { esPeriodoValido, hoyArgentina, rangoDe } from '@/lib/periodos'
 
 
 const parVacio = (): ParAgg => ({ vC: 0, aC: 0, vV: 0, aV: 0, vCcc: 0, aCcc: 0, vVcc: 0, aVcc: 0 })
+const ttVacio = (): TTAgg => ({ usd: 0, eur: 0, brl: 0, usdt: 0, chq: 0, pesos: 0 })
 
 export default async function GananciasPage({
   searchParams,
@@ -57,6 +58,11 @@ export default async function GananciasPage({
     const { data: pg } = await supabase.from('movimientos_caja')
       .select('fecha,operacion,pesos,cheques,dolares,euros,reales,usdt,cc_pesos,cc_dolares,cc_euros,cc_reales')
       .in('operacion', ['COMPRA', 'VENTA', 'GASTOS'])
+      // Las transferencias se miden con su propia regla (más abajo), no con el calce de
+      // compras y ventas. Si alguna vez una COMPRA se marcara con T, contarla en los dos
+      // lados la duplicaría. Va con `or` y no con `neq` porque `op` es NULL en casi todo
+      // el histórico y un `neq` dejaría afuera justamente esas filas.
+      .or('op.is.null,op.neq.T')
       .gte('fecha', ini)
       .lte('fecha', fin)
       .order('fecha', { ascending: true })
@@ -76,7 +82,7 @@ export default async function GananciasPage({
   const porDia = new Map<string, DiaAgg>()
   const diaDe = (f: string): DiaAgg => {
     let d = porDia.get(f)
-    if (!d) { d = { f, usd: parVacio(), eur: parVacio(), brl: parVacio(), usdt: parVacio(), chq: parVacio(), g: 0, gcc: 0 }; porDia.set(f, d) }
+    if (!d) { d = { f, usd: parVacio(), eur: parVacio(), brl: parVacio(), usdt: parVacio(), chq: parVacio(), g: 0, gcc: 0, tt: ttVacio() }; porDia.set(f, d) }
     return d
   }
   for (const m of filas) {
@@ -103,6 +109,39 @@ export default async function GananciasPage({
         }
       }
     }
+  }
+
+  // ── Transferencias (op = 'T') ────────────────────────────────────────────
+  // La ganancia de una transferencia NO sale del calce de compras y ventas: no hay pata
+  // en pesos y por lo tanto no hay tasa de la que sacar un spread. Es, simplemente, lo
+  // que ENTRA menos lo que SALE de cada par de movimientos — criterio confirmado por el
+  // cliente el 1/9/2026.
+  //
+  // Las columnas de caja ya traen el signo puesto (INGRESAN suma, EGRESAN resta), así que
+  // sumarlas da la diferencia directamente. Se suma la pata de CAJA y no la de cuenta
+  // corriente: en una fila de cta cte las dos son la misma plata con signo opuesto y
+  // sumar ambas daría siempre cero.
+  const filasTT: any[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data: pg } = await supabase.from('movimientos_caja')
+      .select('fecha,pesos,dolares,euros,reales,usdt,cheques')
+      .eq('op', 'T')
+      .gte('fecha', ini)
+      .lte('fecha', fin)
+      .order('fecha', { ascending: true })
+      .range(from, from + PAGE - 1)
+    const rows = (pg ?? []) as any[]
+    filasTT.push(...rows)
+    if (rows.length < PAGE) break
+  }
+  for (const m of filasTT) {
+    const tt = diaDe(m.fecha).tt
+    tt.usd   += Number(m.dolares) || 0
+    tt.eur   += Number(m.euros)   || 0
+    tt.brl   += Number(m.reales)  || 0
+    tt.usdt  += Number(m.usdt)    || 0
+    tt.chq   += Number(m.cheques) || 0
+    tt.pesos += Number(m.pesos)   || 0
   }
 
   const dias = Array.from(porDia.values()).sort((a, b) => a.f.localeCompare(b.f))

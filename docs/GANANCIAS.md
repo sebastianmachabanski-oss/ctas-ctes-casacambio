@@ -85,6 +85,43 @@ operación (COMPRA / VENTA / GASTOS) ya deja afuera INGRESAN, EGRESAN, SWITCH y 
 11/8/2026 la operatoria de cta cte es exclusivamente INGRESAN/EGRESAN, así que el módulo
 está midiendo todo lo que hay que medir.
 
+> **Corrección del 1/9/2026.** El párrafo de arriba se quedó corto en un punto: hablaba de
+> las OPERACIONES llamadas TT (`ENTRA TT` / `SALE TT`), no del marcador `op = 'T'`, que son
+> cosas distintas. Las transferencias del negocio se marcan con `op = 'T'` y su operación es
+> INGRESAN o EGRESAN, así que quedaban afuera del cálculo — y su ganancia no se medía en
+> ningún lado. Ver la sección siguiente.
+
+## Transferencias (`op = 'T'`)
+
+**La ganancia de una transferencia es lo que ENTRA menos lo que SALE de cada par de
+movimientos** (criterio confirmado por el cliente el 1/9/2026).
+
+No pasa por el calce de compras y ventas, y no es una omisión: **no tienen pata en pesos**.
+Al 1/9/2026 las 1.683 filas con `op = 'T'` tienen `pesos = 0` y todo el movimiento en
+dólares. Sin pata en pesos no hay tasa de compra ni de venta, y sin tasas no hay spread que
+calcular. Aunque se les sacara el filtro de operación, la agregación las ignoraría igual:
+exige que volumen e importe en pesos estén en la misma pata.
+
+Cómo se calcula:
+
+1. Se suman las **columnas de caja** de las filas con `op = 'T'` del período. Ya traen el
+   signo puesto —INGRESAN suma, EGRESAN resta—, así que la suma **es** la diferencia.
+2. Ese neto nace en la moneda de la operación. Para sumarlo al total en pesos se convierte
+   con la **cotización implícita del par en el período**, la misma que usa el panel de
+   dólares. Las transferencias que ya son en pesos entran directo, sin convertir.
+3. Si en el período no hubo compras ni ventas del par, no hay cotización: el resultado **no
+   se suma** y la pantalla lo avisa en un cartel, en vez de sumar cero como si nada.
+
+Dos decisiones que conviene tener presentes:
+
+- **Se suma la pata de CAJA, no la de cuenta corriente.** En una fila de cta cte las dos son
+  la misma plata con signo opuesto; sumar ambas daría siempre cero.
+- **La consulta principal excluye `op = 'T'`.** Hoy ninguna transferencia tiene operación
+  COMPRA o VENTA, así que no cambia ningún número; es una guarda para que, si alguna vez se
+  marcara una compra con T, no se cuente en los dos lados.
+
+Se puede desactivar desde ⚙ Configuración, igual que los gastos.
+
 Queda anotado, para cuando eso cambie, que **una COMPRA o VENTA con `tipo = 'CTA CTE'`
 hoy quedaría afuera del cálculo**. El motor le da patas cruzadas —la moneda en la columna
 de caja y la contrapartida en `cc_pesos`, o al revés— y la agregación exige que volumen y
