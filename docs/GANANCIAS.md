@@ -104,13 +104,37 @@ exige que volumen e importe en pesos estén en la misma pata.
 
 Cómo se calcula:
 
-1. Se suman las **columnas de caja** de las filas con `op = 'T'` del período. Ya traen el
-   signo puesto —INGRESAN suma, EGRESAN resta—, así que la suma **es** la diferencia.
-2. Ese neto nace en la moneda de la operación. Para sumarlo al total en pesos se convierte
+1. Se agrupan las filas con `op = 'T'` por **NOTAS**, que es donde el cliente anota los
+   participantes. Un grupo está **CERRADO** cuando tiene sus dos puntas: al menos un
+   INGRESAN y al menos un EGRESAN. Solo los grupos cerrados entran al resultado.
+2. Se suman las **columnas de caja** de las filas cerradas del período. Ya traen el signo
+   puesto —INGRESAN suma, EGRESAN resta—, así que la suma **es** la diferencia.
+3. Ese neto nace en la moneda de la operación. Para sumarlo al total en pesos se convierte
    con la **cotización implícita del par en el período**, la misma que usa el panel de
    dólares. Las transferencias que ya son en pesos entran directo, sin convertir.
-3. Si en el período no hubo compras ni ventas del par, no hay cotización: el resultado **no
+4. Si en el período no hubo compras ni ventas del par, no hay cotización: el resultado **no
    se suma** y la pantalla lo avisa en un cartel, en vez de sumar cero como si nada.
+
+### Transferencias con una sola punta (1/9/2026)
+
+Hay grupos con el ingreso cargado y sin el egreso, o al revés. Eso **no es ganancia**: es
+plata que entró y todavía no se entregó. Contarla como resultado sería dar por ganado algo
+que puede no volver nunca; esconderla sería peor, porque es plata real inmovilizada.
+
+Se resolvió mostrándola aparte, como **posición abierta**: un panel propio, acumulado hasta
+el cierre del período (no del período: es un saldo, no un flujo) y rotulado como posición.
+Entra al resultado apenas se carga la punta que falta.
+
+**Por qué no se imputa todo al movimiento que cierra el grupo.** Los grupos se REPITEN:
+"JOACO SIZOKO" no es una transferencia, es una contraparte que aparece decenas de veces —
+1.683 movimientos en pocas decenas de grupos. Llevar la ganancia de toda esa historia a la
+fecha del último movimiento inventaría un pico enorme en un día y vaciaría todos los meses
+anteriores. Por eso **cada movimiento cuenta en SU fecha**; lo único que decide el grupo es
+si cuenta o no.
+
+Para saber si un grupo está cerrado hay que mirar su historia completa, no solo el período:
+una punta puede haberse cargado meses antes. Por eso la consulta de transferencias trae
+todo hasta el fin del período (`lte('fecha', fin)`), no solo el rango.
 
 Dos decisiones que conviene tener presentes:
 

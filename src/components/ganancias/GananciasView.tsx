@@ -28,8 +28,14 @@ const fmt0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
 const fmt3 = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 const ars = (n: number) => `$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
 const usd = (n: number) => `US$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
-const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$', usdt: 'USDT', chq: 'CH$' }
+const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$', usdt: 'USDT', chq: 'CH$', pesos: '$' }
 const NOMBRE_PAR: Record<string, string> = { usd: 'Dólares', eur: 'Euros', brl: 'Reales', usdt: 'USDT', chq: 'Cheques' }
+
+/** Las monedas de un neto de transferencias que efectivamente tienen algo, para listarlas. */
+const monedasConSaldo = (t: TTAgg) =>
+  (['usd', 'eur', 'brl', 'usdt', 'chq', 'pesos'] as const)
+    .map(k => [k, t[k]] as const)
+    .filter(([, v]) => Math.round(v) !== 0)
 
 // Supuestos de valuación del stock, por par. En divisas el estándar del negocio es el
 // margen fijo. CHEQUES es distinto: la ganancia del descuento de documentos se reconoce
@@ -112,8 +118,13 @@ function cotizacionPar(dias: DiaAgg[], par: Cfg['par']): number | null {
 const cotizacionUsd = (dias: DiaAgg[]) => cotizacionPar(dias, 'usd')
 
 
-export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, hoy }: {
-  dias: DiaAgg[]; periodo: string; fecha: string; rDesde: string; rHasta: string; hoy: string
+export default function GananciasView({ dias, abiertas, gruposAbiertos, periodo, fecha, rDesde, rHasta, hoy }: {
+  dias: DiaAgg[]
+  /** Posición de las transferencias con una sola punta cargada (acumulada, no del período). */
+  abiertas: TTAgg
+  /** Cuántos grupos de transferencia están sin cerrar. */
+  gruposAbiertos: number
+  periodo: string; fecha: string; rDesde: string; rHasta: string; hoy: string
 }) {
   const esRango = !!(rDesde && rHasta)
 
@@ -201,6 +212,33 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
         </div>
       )}
 
+      {/* Transferencias en curso: NO son ganancia todavía. Mostrarlas como resultado sería
+          contar como ganado algo que puede no volver nunca; esconderlas sería peor, porque
+          es plata real inmovilizada. Van acá, rotuladas como posición. */}
+      {gruposAbiertos > 0 && (
+        <div className="card" style={{ padding: '14px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+            <b style={{ fontSize: 13.5 }}>Transferencias en curso</b>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+              {gruposAbiertos} grupo{gruposAbiertos !== 1 ? 's' : ''} con una sola punta cargada
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '10px 0 8px' }}>
+            {monedasConSaldo(abiertas).map(([k, v]) => (
+              <span key={k} className={`num ${v >= 0 ? 'pos' : 'neg'}`} style={{ fontSize: 17, fontWeight: 700 }}>
+                {SYM[k]} {v < 0 ? `(${fmt0.format(-Math.round(v))})` : fmt0.format(Math.round(v))}
+              </span>
+            ))}
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}>
+            No suman al resultado: son transferencias donde se cargó el ingreso y falta el egreso
+            (o al revés), así que todavía no hay ganancia que medir. Es una <b>posición</b> acumulada
+            al cierre del período, no un resultado del período. Entran al cálculo apenas se carga
+            la punta que falta.
+          </div>
+        </div>
+      )}
+
       {!esDefault && (
         <div style={{ display: 'inline-block', fontSize: 12.5, fontWeight: 600, background: 'var(--warn-bg)', color: 'var(--warn-ink)', padding: '5px 11px', borderRadius: 8 }}>
           Cálculo con configuración modificada
@@ -220,7 +258,7 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
             ['Vendiste', `${sym} ${fmt0.format(r.vV)}`, r.vV ? `a $ ${fmt0.format(r.t2)} promedio` : 'sin ventas'],
             ['Te quedaron en stock', `${sym} ${fmt0.format(r.stock)}`, 'comprados sin vender'],
             ['Gastos', ars(Math.round(r.g)), cfg.gastos && cfg.ops.has('GASTOS') ? 'descontados del total' : 'no descontados'],
-            ['Transferencias', `${sym} ${fmt0.format(Math.round(r.ttMoneda))}`,
+            ['Transferencias cerradas', `${sym} ${fmt0.format(Math.round(r.ttMoneda))}`,
               !cfg.transferencias ? 'no sumadas'
                 : r.ttMoneda === 0 ? 'sin transferencias del par'
                 : r.ttSinCotizacion ? '⚠️ sin cotización para pasarlas a pesos'
@@ -257,6 +295,13 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
               sacar un spread. Su ganancia es lo que <b>entra menos lo que sale</b> de cada par de
               movimientos, en la moneda de la operación, y se suma al total convertida con la misma
               cotización del período. Se puede desactivar en ⚙ Configuración.
+            </p>
+            <p style={{ margin: '0 0 8px' }}>
+              <b>Solo cuentan las transferencias cerradas.</b> Una transferencia recién tiene
+              resultado cuando están cargadas <b>sus dos puntas</b>: el ingreso y el egreso. Si
+              falta una, lo cargado no es ganancia sino plata en tránsito, y se muestra aparte
+              como <b>transferencias en curso</b>. Cuando se carga la punta que falta, el grupo
+              pasa a contar — cada movimiento en la fecha en que ocurrió, no en la del cierre.
             </p>
             <p style={{ margin: '0 0 8px' }}>
               <b>En dólares.</b> Es el mismo resultado, convertido con la cotización promedio
@@ -385,6 +430,8 @@ export default function GananciasView({ dias, periodo, fecha, rDesde, rHasta, ho
               marcadas con Op = T). Su ganancia es lo que ENTRA menos lo que SALE de cada par, sin
               calce ni spread: no tienen pata en pesos y por eso no entran en el cálculo de
               compras y ventas. El neto se convierte a pesos con la cotización del período.
+              Solo cuentan las que tienen <b>sus dos puntas cargadas</b>; las que están a medio
+              cargar se muestran aparte como transferencias en curso y este interruptor no las toca.
             </div>
           </div>
         </div>
