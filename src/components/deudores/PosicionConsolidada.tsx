@@ -27,9 +27,13 @@ import { useMemo, useState } from 'react'
  *    se presta a leerla mal.
  *
  * UNA CUENTA PUEDE ESTAR EN LOS DOS LADOS A LA VEZ: deber dólares y tener pesos a favor.
- * Por eso "nos deben" y "le debemos" no parten el listado en dos mitades excluyentes, y
- * por eso existe el filtro "Mixtas": son justamente las que el listado viejo mostraba
- * a medias.
+ * Esas cuentas aparecen en las DOS listas, cada vez con el lado que corresponde: en "Nos
+ * deben" se ven solo sus saldos positivos, en "Le debemos" solo los negativos. Se marcan
+ * con ⇄ para que se sepa que la otra mitad existe y está del otro lado.
+ *
+ * La alternativa —mostrarlas enteras en las dos listas— rompía la cuenta: el subtotal de
+ * "Nos deben" arrastraba las patas negativas y no daba lo mismo que la tarjeta de arriba.
+ * Partiéndolas por lado, cada vista cierra contra su tarjeta.
  */
 
 export type Saldo = {
@@ -58,13 +62,14 @@ const money = (v: number) => (v < 0 ? `(${nf.format(-v)})` : nf.format(v))
 const fecha = (s: string | null) => (s ? new Date(s + 'T12:00:00').toLocaleDateString('es-AR') : '—')
 const val = (s: Saldo, k: ClaveMoneda) => Number(s[k]) || 0
 
-type Modo = 'todas' | 'favor' | 'contra' | 'mixtas'
+type Modo = 'todas' | 'favor' | 'contra'
 const MODOS: { key: Modo; label: string; ayuda: string }[] = [
-  { key: 'todas',  label: 'Todas',       ayuda: 'Todas las cuentas con saldo' },
-  { key: 'favor',  label: 'Nos deben',   ayuda: 'Cuentas con saldo pendiente en alguna moneda' },
-  { key: 'contra', label: 'Le debemos',  ayuda: 'Cuentas con saldo a favor del cliente en alguna moneda' },
-  { key: 'mixtas', label: 'Mixtas',      ayuda: 'Deben en una moneda y tienen a favor en otra' },
+  { key: 'todas',  label: 'Todas',      ayuda: 'Todas las cuentas con saldo, con su posición neta' },
+  { key: 'favor',  label: 'Nos deben',  ayuda: 'Solo los saldos pendientes' },
+  { key: 'contra', label: 'Le debemos', ayuda: 'Solo los saldos a favor del cliente' },
 ]
+/** Signo que deja pasar cada vista: +1 solo positivos, −1 solo negativos, 0 todo. */
+const LADO: Record<Modo, 1 | -1 | 0> = { todas: 0, favor: 1, contra: -1 }
 
 export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
   const [modo, setModo] = useState<Modo>('todas')
@@ -90,25 +95,41 @@ export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
     return { ...m, favor, contra, neto: favor + contra }
   }).filter(p => p.favor !== 0 || p.contra !== 0), [saldos])
 
+  // Importe tal como lo muestra la vista activa: en "Nos deben" los negativos se ocultan
+  // y en "Le debemos" los positivos. Así el subtotal de la tabla da lo mismo que la
+  // tarjeta de arriba, en vez de arrastrar la otra pata de las cuentas mixtas.
+  const lado = LADO[modo]
+  const visto = (s: Saldo, k: ClaveMoneda) => {
+    const v = val(s, k)
+    return lado === 0 || Math.sign(v) === lado ? v : 0
+  }
+
   const visibles = useMemo(() => {
     const q = busca.trim().toUpperCase()
     const filas = saldos.filter(s => {
       if (q && !(s.cuenta_cte || '').toUpperCase().includes(q)) return false
-      const debe = MONEDAS.some(m => val(s, m.key) > 0)
-      const aFavor = MONEDAS.some(m => val(s, m.key) < 0)
-      if (modo === 'favor') return debe
-      if (modo === 'contra') return aFavor
-      if (modo === 'mixtas') return debe && aFavor
-      return debe || aFavor
+      // Entra si tiene algo DEL LADO que se está mirando. Una cuenta mixta entra en las
+      // dos vistas, cada vez con su mitad.
+      return MONEDAS.some(m => {
+        const v = val(s, m.key)
+        return lado === 0 ? v !== 0 : Math.sign(v) === lado
+      })
     })
     const { col, dir } = orden
     return filas.sort((a, b) => {
       if (col === 'cuenta_cte') return dir * (a.cuenta_cte || '').localeCompare(b.cuenta_cte || '', 'es')
       if (col === 'ultimo_movimiento') return dir * (a.ultimo_movimiento ?? '').localeCompare(b.ultimo_movimiento ?? '')
-      return dir * (val(a, col as ClaveMoneda) - val(b, col as ClaveMoneda))
+      // Se ordena por lo que se ve, no por el saldo entero: si no, en "Le debemos" una
+      // cuenta se ubicaría por un importe que en esa vista está oculto.
+      return dir * (visto(a, col as ClaveMoneda) - visto(b, col as ClaveMoneda))
         || (a.cuenta_cte || '').localeCompare(b.cuenta_cte || '', 'es')
     })
-  }, [saldos, busca, modo, orden])
+  }, [saldos, busca, modo, orden, lado])
+
+  /** La cuenta tiene saldo de los dos signos: aparece también en la otra vista. */
+  const esMixta = (s: Saldo) =>
+    MONEDAS.some(m => val(s, m.key) > 0) && MONEDAS.some(m => val(s, m.key) < 0)
+  const mixtasVisibles = useMemo(() => visibles.filter(esMixta).length, [visibles])
 
   // Un clic ordena por la columna; el segundo da vuelta el sentido. Los importes y la
   // fecha arrancan de mayor a menor (lo grande y lo reciente es lo que se busca); el
@@ -122,7 +143,7 @@ export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
 
   // Subtotales de lo que está en pantalla. Van rotulados como tales para que no se
   // confundan con la posición de arriba, que es de todas las cuentas.
-  const subtotal = (k: ClaveMoneda) => visibles.reduce((a, s) => a + val(s, k), 0)
+  const subtotal = (k: ClaveMoneda) => visibles.reduce((a, s) => a + visto(s, k), 0)
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -144,7 +165,8 @@ export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
         <p style={{ margin: '8px 2px 0', fontSize: 12, color: 'var(--muted)' }}>
           Posición de <b>todas</b> las cuentas: no cambia con los filtros de la tabla. Cada moneda
           va por su cuenta — no se suman dólares con pesos, porque eso exigiría una cotización y el
-          número saldría de un supuesto, no de los datos.
+          número saldría de un supuesto, no de los datos. Una cuenta que debe en una moneda y tiene
+          a favor en otra figura en las dos solapas, cada vez con la mitad que corresponde.
         </p>
       </div>
 
@@ -177,9 +199,21 @@ export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
             <tbody>
               {visibles.map(s => (
                 <tr key={s.cuenta_cte}>
-                  <td>{s.cuenta_cte}</td>
+                  <td>
+                    {s.cuenta_cte}
+                    {/* La cuenta también figura en la otra vista con su otra mitad. Sin
+                        esta marca, "nos debe 5.000" se leería como toda su posición. */}
+                    {esMixta(s) && (
+                      <span title={modo === 'contra'
+                        ? 'Esta cuenta además tiene saldo pendiente: se ve en «Nos deben»'
+                        : 'Esta cuenta además tiene saldo a favor: se ve en «Le debemos»'}
+                        style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: 'var(--muted)', cursor: 'help' }}>
+                        ⇄
+                      </span>
+                    )}
+                  </td>
                   {columnas.map(c => {
-                    const v = val(s, c.key)
+                    const v = visto(s, c.key)
                     return (
                       <td key={c.key} className={`num ${v < 0 ? 'neg' : ''}`}>
                         {v === 0 ? <span className="zero">—</span> : money(v)}
@@ -217,6 +251,12 @@ export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
         <div style={{ padding: '10px 16px 12px', color: 'var(--muted)', fontSize: 12 }}>
           {visibles.length} cuenta{visibles.length !== 1 ? 's' : ''} · {MODOS.find(m => m.key === modo)!.ayuda.toLowerCase()}
           {' · '}los importes entre paréntesis son saldos <b>a favor del cliente</b>
+          {mixtasVisibles > 0 && (
+            <>
+              {' · '}<b>⇄</b> {mixtasVisibles} cuenta{mixtasVisibles !== 1 ? 's' : ''} con saldo de los dos
+              signos{modo === 'todas' ? '' : ': acá se ve solo esta mitad, la otra está en la otra solapa'}
+            </>
+          )}
         </div>
       </div>
     </div>
