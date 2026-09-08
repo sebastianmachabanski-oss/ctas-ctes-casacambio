@@ -11,7 +11,7 @@ const TITLES: [string, string][] = [
   ['/dashboard/transferencias', 'Transferencias'],
   ['/dashboard/gastos', 'Gastos'],
   ['/dashboard/calle', 'Dinero en calle'],
-  ['/dashboard/deudores', 'Saldos Pendientes'],
+  ['/dashboard/deudores', 'Posición Ctas Ctes'],
   ['/dashboard/ganancias', 'Ganancias'],
   ['/dashboard/admin/usuarios', 'Usuarios'],
   ['/dashboard/admin/sync', 'Sincronizar'],
