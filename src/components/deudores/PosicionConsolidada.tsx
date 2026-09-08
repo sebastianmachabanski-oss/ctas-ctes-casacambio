@@ -36,40 +36,17 @@ import { useMemo, useState } from 'react'
  * Partiéndolas por lado, cada vista cierra contra su tarjeta.
  */
 
-export type Saldo = {
-  cuenta_cte: string
-  saldo_pesos: number | null
-  saldo_dolares: number | null
-  saldo_euros: number | null
-  saldo_reales: number | null
-  saldo_usdt: number | null
-  ultimo_movimiento: string | null
-}
+import {
+  MONEDAS, MODOS, LADO, val, visto, esMixta, posicionPorMoneda,
+  filtrarPorLado, subtotales, ordenarPor,
+  type Saldo, type ClaveMoneda, type Modo,
+} from '@/lib/posicion'
 
-type ClaveMoneda = 'saldo_dolares' | 'saldo_pesos' | 'saldo_euros' | 'saldo_reales' | 'saldo_usdt'
-
-const MONEDAS: { key: ClaveMoneda; label: string; sym: string; color: string }[] = [
-  { key: 'saldo_dolares', label: 'Dólares', sym: 'U$S',  color: '#16a34a' },
-  { key: 'saldo_pesos',   label: 'Pesos',   sym: '$',    color: '#2563eb' },
-  { key: 'saldo_euros',   label: 'Euros',   sym: '€',    color: '#7c3aed' },
-  { key: 'saldo_reales',  label: 'Reales',  sym: 'R$',   color: '#eab308' },
-  // USDT solo puede venir de la app: en la planilla no existe (25/8/2026).
-  { key: 'saldo_usdt',    label: 'USDT',    sym: 'USDT', color: '#26a17b' },
-]
+export type { Saldo }
 
 const nf = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const money = (v: number) => (v < 0 ? `(${nf.format(-v)})` : nf.format(v))
 const fecha = (s: string | null) => (s ? new Date(s + 'T12:00:00').toLocaleDateString('es-AR') : '—')
-const val = (s: Saldo, k: ClaveMoneda) => Number(s[k]) || 0
-
-type Modo = 'todas' | 'favor' | 'contra'
-const MODOS: { key: Modo; label: string; ayuda: string }[] = [
-  { key: 'todas',  label: 'Todas',      ayuda: 'Todas las cuentas con saldo, con su posición neta' },
-  { key: 'favor',  label: 'Nos deben',  ayuda: 'Solo los saldos pendientes' },
-  { key: 'contra', label: 'Le debemos', ayuda: 'Solo los saldos a favor del cliente' },
-]
-/** Signo que deja pasar cada vista: +1 solo positivos, −1 solo negativos, 0 todo. */
-const LADO: Record<Modo, 1 | -1 | 0> = { todas: 0, favor: 1, contra: -1 }
 
 export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
   const [modo, setModo] = useState<Modo>('todas')
@@ -83,52 +60,14 @@ export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
     return activas.length ? activas : MONEDAS.slice(0, 2)
   }, [saldos])
 
-  // La posición: por moneda, lo que nos deben, lo que debemos y el neto. Sobre TODAS las
-  // cuentas — ver el comentario de arriba sobre por qué no depende de los filtros.
-  const posicion = useMemo(() => MONEDAS.map(m => {
-    let favor = 0, contra = 0
-    for (const s of saldos) {
-      const v = val(s, m.key)
-      if (v > 0) favor += v
-      else contra += v
-    }
-    return { ...m, favor, contra, neto: favor + contra }
-  }).filter(p => p.favor !== 0 || p.contra !== 0), [saldos])
-
-  // Importe tal como lo muestra la vista activa: en "Nos deben" los negativos se ocultan
-  // y en "Le debemos" los positivos. Así el subtotal de la tabla da lo mismo que la
-  // tarjeta de arriba, en vez de arrastrar la otra pata de las cuentas mixtas.
+  const posicion = useMemo(() => posicionPorMoneda(saldos), [saldos])
   const lado = LADO[modo]
-  const visto = (s: Saldo, k: ClaveMoneda) => {
-    const v = val(s, k)
-    return lado === 0 || Math.sign(v) === lado ? v : 0
-  }
+  const ver = (s: Saldo, k: ClaveMoneda) => visto(s, k, lado)
 
-  const visibles = useMemo(() => {
-    const q = busca.trim().toUpperCase()
-    const filas = saldos.filter(s => {
-      if (q && !(s.cuenta_cte || '').toUpperCase().includes(q)) return false
-      // Entra si tiene algo DEL LADO que se está mirando. Una cuenta mixta entra en las
-      // dos vistas, cada vez con su mitad.
-      return MONEDAS.some(m => {
-        const v = val(s, m.key)
-        return lado === 0 ? v !== 0 : Math.sign(v) === lado
-      })
-    })
-    const { col, dir } = orden
-    return filas.sort((a, b) => {
-      if (col === 'cuenta_cte') return dir * (a.cuenta_cte || '').localeCompare(b.cuenta_cte || '', 'es')
-      if (col === 'ultimo_movimiento') return dir * (a.ultimo_movimiento ?? '').localeCompare(b.ultimo_movimiento ?? '')
-      // Se ordena por lo que se ve, no por el saldo entero: si no, en "Le debemos" una
-      // cuenta se ubicaría por un importe que en esa vista está oculto.
-      return dir * (visto(a, col as ClaveMoneda) - visto(b, col as ClaveMoneda))
-        || (a.cuenta_cte || '').localeCompare(b.cuenta_cte || '', 'es')
-    })
-  }, [saldos, busca, modo, orden, lado])
-
-  /** La cuenta tiene saldo de los dos signos: aparece también en la otra vista. */
-  const esMixta = (s: Saldo) =>
-    MONEDAS.some(m => val(s, m.key) > 0) && MONEDAS.some(m => val(s, m.key) < 0)
+  const visibles = useMemo(
+    () => ordenarPor(filtrarPorLado(saldos, lado, busca), orden.col, orden.dir, lado),
+    [saldos, busca, orden, lado],
+  )
   const mixtasVisibles = useMemo(() => visibles.filter(esMixta).length, [visibles])
 
   // Un clic ordena por la columna; el segundo da vuelta el sentido. Los importes y la
@@ -143,7 +82,7 @@ export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
 
   // Subtotales de lo que está en pantalla. Van rotulados como tales para que no se
   // confundan con la posición de arriba, que es de todas las cuentas.
-  const subtotal = (k: ClaveMoneda) => visibles.reduce((a, s) => a + visto(s, k), 0)
+  const subs = subtotales(visibles, lado)
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -213,7 +152,7 @@ export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
                     )}
                   </td>
                   {columnas.map(c => {
-                    const v = visto(s, c.key)
+                    const v = ver(s, c.key)
                     return (
                       <td key={c.key} className={`num ${v < 0 ? 'neg' : ''}`}>
                         {v === 0 ? <span className="zero">—</span> : money(v)}
@@ -234,7 +173,7 @@ export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
                 <tr style={{ borderTop: '2px solid var(--grid)' }}>
                   <td style={{ fontWeight: 700 }}>Subtotal de lo listado</td>
                   {columnas.map(c => {
-                    const v = subtotal(c.key)
+                    const v = subs[c.key]
                     return (
                       <td key={c.key} className={`num ${v < 0 ? 'neg' : ''}`} style={{ fontWeight: 700 }}>
                         {v === 0 ? <span className="zero">—</span> : money(v)}
