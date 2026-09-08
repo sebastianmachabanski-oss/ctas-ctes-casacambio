@@ -27,7 +27,7 @@ Cada fila indica cuál es su caso:
 | **Login, shell y navegación** | Autenticación, sidebar por rol, topbar, responsive, loaders de transición | 📊 | **3 – 3,5** |
 | **Auditoría** | Tabla inmutable append-only, registro de alta/edición/borrado/ingreso de calle, columna "Registró" en Transacciones, pantalla global filtrable con antes/después | 📊 | **2,5 – 3** |
 | **Transacciones** | Listado con filtros por columna y paginación, editar, borrar | ✅ | **1,5 – 2** |
-| **Saldos Pendientes** | Listado de deudores con totales | 📊 | **1,5 – 2** |
+| **Posición Ctas Ctes** (entonces "Saldos Pendientes") | Listado de deudores con totales | 📊 | **1,5 – 2** |
 | **Ganancias** | Réplica de COLO parametrizable, rango de fechas, configuración en drawer | ✅ | **1,5** |
 | **Sincronizar (admin)** | Botón de sync manual, polling de confirmación, estado de última corrida | 📊 | **1 – 1,5** |
 | **Dinero en calle** | Listado de dinero en la calle, marcar ingreso | ✅ | **0,5** |

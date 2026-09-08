@@ -149,7 +149,9 @@ export default function PosicionConsolidada({ saldos }: { saldos: Saldo[] }) {
       </div>
 
       <div className="card">
-        <div className="card-h"><h2 className="card-t">Cuentas corrientes</h2></div>
+        {/* "Cuentas con saldo" y no "Cuentas corrientes": ese nombre ya es el de otra
+            pantalla del menú y tenerlo dos veces confunde. */}
+        <div className="card-h"><h2 className="card-t">Cuentas con saldo</h2></div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 16px 10px', flexWrap: 'wrap' }}>
           <div className="tabs">
             {MODOS.map(m => (
