@@ -28,6 +28,10 @@ Documentación clave: `docs/SINCRONIZACION.md` (sync Sheet→DB), `docs/MOTOR-CA
 - GASTOS solo existe en PESOS. El campo DEBE cargado = dinero "en la calle".
 - El motor de cálculo (`src/lib/motor-calculo`) está validado contra la planilla:
   ante cualquier cambio correr `npx tsx scripts/validar-motor-calculo.mts`.
+- La posición de cuentas corrientes (`src/lib/posicion.ts`) muestra los mismos importes en
+  dos lugares —las tarjetas y el subtotal de cada solapa— y tienen que dar lo mismo: ante
+  cualquier cambio correr `npx tsx scripts/validar-posicion.mts`. El cálculo vive en `lib`
+  y no en el componente justamente para poder correrlo sin montar un navegador.
 - Editar transacciones en la app NO escribe al Sheet (definido 5/7/2026): mientras
   dure la convivencia, el sync puede pisar esos cambios y es un comportamiento asumido.
 - La interfaz NO menciona la planilla ni el sync (definido 25/8/2026): la app se presenta
