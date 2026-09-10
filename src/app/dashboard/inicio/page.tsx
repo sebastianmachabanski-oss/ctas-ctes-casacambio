@@ -1,7 +1,18 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import TableroInicio from '@/components/inicio/TableroInicio'
-import { esStaff } from '@/lib/roles'
+import TransaccionesView from '@/components/transacciones/TransaccionesView'
+import { traerTransacciones } from '@/lib/consultas/transacciones'
+import { esAdmin, esStaff } from '@/lib/roles'
+
+// Desde el 10/9/2026 Inicio es la pantalla OPERATIVA: saldos de caja, cotizaciones y el
+// listado completo de transacciones, que dejó de tener pantalla propia en el menú. Los
+// reportes de análisis que estaban acá —saldos por cliente y gráficos de dólares— se
+// mudaron a Ganancias.
+//
+// Los parámetros del listado viajan con el prefijo `t` (tdesde, thasta, tpagina, tcli…)
+// porque `desde`/`hasta` ya estaban tomados por el período de los saldos. Sin el prefijo,
+// filtrar el listado por fecha movería los totales de caja de arriba.
 
 // Siempre se renderiza en el momento: es una pantalla de datos que cambian con cada
 // carga. Sin esto, Next puede servir una versión guardada y mostrar información vieja.
@@ -47,7 +58,11 @@ function inicioPeriodo(p: string, hoy: string): string {
 export default async function InicioPage({
   searchParams,
 }: {
-  searchParams: { p?: string; desde?: string; hasta?: string }
+  searchParams: {
+    p?: string; desde?: string; hasta?: string
+    tdesde?: string; thasta?: string; tpagina?: string
+    tcli?: string; ttipo?: string; top?: string; tnotas?: string; tautor?: string; tmonto?: string
+  }
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -86,44 +101,12 @@ export default async function InicioPage({
   const calle: Record<string, number> = {}
   for (const col of COLS_CALLE) calle[col] = calleRows.reduce((s, m) => s + Math.max(0, m[col] ?? 0), 0)
 
-  // 3) Clientes — pestaña Caja (totales por cliente EN EL PERÍODO) y pestaña Cta cte.
-  // OJO: Postgrest corta CUALQUIER respuesta (también las RPC) en 1.000 filas y hay más
-  // de 1.000 clientes — hay que paginar con order + range, si no la lista llega
-  // incompleta y clientes enteros "desaparecen" del tablero.
-  let clientesCaja: any[] = []
-  let rpcOk = true
-  const PAGE = 1000
-  for (let from = 0; ; from += PAGE) {
-    const { data: pg, error } = await (supabase as any)
-      .rpc('caja_clientes_periodo', { p_desde: desde, p_hasta: hasta })
-      .order('cliente')
-      .range(from, from + PAGE - 1)
-    if (error) { rpcOk = false; break }
-    const rows = (pg ?? []) as any[]
-    clientesCaja.push(...rows)
-    if (rows.length < PAGE) break
-  }
-  if (!rpcOk) {
-    // Si la migración de la RPC aún no corrió, cae a la vista sin filtro de período.
-    clientesCaja = await traerTodo<any>(async (from, to) => {
-      const { data } = await supabase.from('caja_clientes')
-        .select('cliente,pesos,dolares,euros,reales,ultimo_movimiento')
-        .order('cliente')
-        .range(from, to)
-      return (data ?? []) as any[]
-    })
-  }
-  const clientesCC = await traerTodo<any>(async (from, to) => {
-    const { data } = await supabase.from('saldos_cuenta_corriente')
-      .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales,ultimo_movimiento')
-      .order('cuenta_cte')
-      .range(from, to)
-    return (data ?? []) as any[]
+  // 3) El listado de transacciones, con sus propios filtros y su propia paginación.
+  const tx = await traerTransacciones(supabase, {
+    desde: searchParams.tdesde, hasta: searchParams.thasta, pagina: searchParams.tpagina,
+    cli: searchParams.tcli, tipo: searchParams.ttipo, op: searchParams.top,
+    notas: searchParams.tnotas, autor: searchParams.tautor, monto: searchParams.tmonto,
   })
-
-  // 4) Serie diaria del saldo en dólares (para el gráfico de línea y los deltas mensuales).
-  const { data: serieData } = await (supabase as any).rpc('caja_saldo_diario', { p_moneda: 'dolares' })
-  const serie = ((serieData ?? []) as any[]).map(r => ({ fecha: r.fecha as string, saldo: Number(r.saldo) }))
 
   // "Saldo en caja" = valor en la moneda (el número grande de la tarjeta, del período
   // elegido) − calle: el efectivo físico que debería haber en la caja (fila "Saldo en
@@ -138,30 +121,44 @@ export default async function InicioPage({
     { cur: 'Banco',   col: '#8a94a6', caja: t.banco ?? 0,   calle: null,          enCaja: null,                              cc: null },
   ]
 
-  // `ultimo` es la fecha del último movimiento del cliente: con ella el tablero pone
-  // primero a los que operan y esconde —sin perderlos— a los que no aparecen hace meses.
-  // Puede venir vacío si la migración todavía no corrió: en ese caso nadie se oculta.
-  const clientesCajaN = clientesCaja.map(c => ({
-    nombre: c.cliente, pesos: Number(c.pesos) || 0, dolares: Number(c.dolares) || 0,
-    euros: Number(c.euros) || 0, reales: Number(c.reales) || 0,
-    ultimo: (c.ultimo_movimiento as string | null) ?? null,
-  }))
-  const clientesCCN = clientesCC.map(c => ({
-    nombre: c.cuenta_cte, pesos: Number(c.saldo_pesos) || 0, dolares: Number(c.saldo_dolares) || 0,
-    euros: Number(c.saldo_euros) || 0, reales: Number(c.saldo_reales) || 0,
-    ultimo: (c.ultimo_movimiento as string | null) ?? null,
-  }))
-
   return (
-    <TableroInicio
-      kpis={kpis}
-      clientesCaja={clientesCajaN}
-      clientesCC={clientesCCN}
-      serieUSD={serie}
-      hoy={hoyArgentina()}
-      periodo={(PERIODOS as readonly string[]).includes(p) ? p : ''}
-      rDesde={searchParams.desde ?? ''}
-      rHasta={searchParams.hasta ?? ''}
-    />
+    <>
+      <TableroInicio
+        kpis={kpis}
+        periodo={(PERIODOS as readonly string[]).includes(p) ? p : ''}
+        rDesde={searchParams.desde ?? ''}
+        rHasta={searchParams.hasta ?? ''}
+      />
+
+      <div className="px-4 md:px-6 pb-4 md:pb-6">
+        <div className="sec-lbl" style={{ margin: '0 0 10px' }}>
+          Transacciones{' '}
+          <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--muted)' }}>
+            · con su propio filtro de fechas, independiente del período de arriba
+          </span>
+        </div>
+        {tx.error ? (
+          <div className="card p-6 text-center text-red-600 text-sm">
+            No se pudieron cargar los movimientos: {tx.error.message}
+          </div>
+        ) : (
+          <TransaccionesView
+            ruta="/dashboard/inicio"
+            pref="t"
+            filtros={tx.filtros}
+            totales={tx.totales}
+            clientes={tx.clientes}
+            clientesSel={tx.clientesSel}
+            movimientos={tx.movimientos}
+            puedeEditar={esAdmin(profile.rol)}
+            desde={tx.desde}
+            hasta={tx.hasta}
+            total={tx.total}
+            pagina={tx.pagina}
+            totalPaginas={tx.totalPaginas}
+          />
+        )}
+      </div>
+    </>
   )
 }

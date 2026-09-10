@@ -440,7 +440,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
           <button className="btn-secondary" onClick={resetForm}>
             Nueva transacción
           </button>
-          <button className="btn-primary" onClick={() => router.push('/dashboard/transacciones')}>
+          <button className="btn-primary" onClick={() => router.push('/dashboard/inicio')}>
             Ver movimientos
           </button>
         </div>

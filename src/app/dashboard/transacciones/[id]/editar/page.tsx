@@ -13,7 +13,7 @@ export default async function EditarTransaccionPage({ params }: { params: { id: 
     .from('profiles').select('rol').eq('id', user.id).single()
   const rol = (profileData as { rol: string } | null)?.rol
   // Editar es exclusivo de administrador/superadmin; el operador vuelve al listado.
-  if (!esAdmin(rol)) redirect('/dashboard/transacciones')
+  if (!esAdmin(rol)) redirect('/dashboard/inicio')
 
   const { data: mov } = await supabase
     .from('movimientos_caja').select('*').eq('id', params.id).single()
