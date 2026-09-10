@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import SelectorPeriodo from '@/components/SelectorPeriodo'
+import ReportesCaja, { type Cliente, type Punto } from '@/components/reportes/ReportesCaja'
 
 // "COMPRA" -> "Compra" en los chips de operación.
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -118,8 +119,10 @@ function cotizacionPar(dias: DiaAgg[], par: Cfg['par']): number | null {
 const cotizacionUsd = (dias: DiaAgg[]) => cotizacionPar(dias, 'usd')
 
 
-export default function GananciasView({ dias, abiertas, gruposAbiertos, periodo, fecha, rDesde, rHasta, hoy }: {
+export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD, abiertas, gruposAbiertos, periodo, fecha, rDesde, rHasta, hoy }: {
   dias: DiaAgg[]
+  /** Reportes de caja que hasta el 10/9/2026 vivían en Inicio. */
+  clientesCaja: Cliente[]; clientesCC: Cliente[]; serieUSD: Punto[]
   /** Posición de las transferencias con una sola punta cargada (acumulada, no del período). */
   abiertas: TTAgg
   /** Cuántos grupos de transferencia están sin cerrar. */
@@ -163,6 +166,7 @@ export default function GananciasView({ dias, abiertas, gruposAbiertos, periodo,
   const esChq = cfg.par === 'chq'
 
   return (
+    <>
     <div className="p-4 md:p-6" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, maxWidth: 760 }}>
       {/* Filtros de período + configuración */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
@@ -437,5 +441,27 @@ export default function GananciasView({ dias, abiertas, gruposAbiertos, periodo,
         </div>
       </aside>
     </div>
+
+      {/* Reportes de caja (venían de Inicio, 10/9/2026): el detalle detrás del número de
+          arriba. Van fuera de la columna de 760px del cálculo —que ya cerró— porque la
+          tabla de clientes y los gráficos van lado a lado y ahí no entrarían. */}
+      <div className="px-4 md:px-6 pb-4 md:pb-6">
+        <div className="sec-lbl" style={{ margin: '0 0 10px' }}>
+          Reportes de caja{' '}
+          <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--muted)' }}>
+            · responden al período elegido arriba
+          </span>
+        </div>
+        <ReportesCaja
+          clientesCaja={clientesCaja}
+          clientesCC={clientesCC}
+          serieUSD={serieUSD}
+          hoy={hoy}
+          periodo={esRango ? '' : periodo}
+          rDesde={rDesde}
+          rHasta={rHasta}
+        />
+      </div>
+    </>
   )
 }

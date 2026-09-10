@@ -7,12 +7,14 @@ const TITLES: [string, string][] = [
   ['/dashboard/inicio', 'Inicio'],
   ['/dashboard/cuenta-corriente', 'Cuentas Corrientes'],
   ['/dashboard/nueva-transaccion', 'Nueva transacción'],
-  ['/dashboard/transacciones', 'Transacciones'],
   ['/dashboard/transferencias', 'Transferencias'],
   ['/dashboard/gastos', 'Gastos'],
   ['/dashboard/calle', 'Dinero en calle'],
   ['/dashboard/deudores', 'Posición Ctas Ctes'],
   ['/dashboard/ganancias', 'Ganancias'],
+  // El listado se mudó a Inicio (10/9/2026) y esta ruta solo sirve a la pantalla de
+  // edición; sin esta línea, editar mostraba el nombre de la app en vez de un título.
+  ['/dashboard/transacciones', 'Editar transacción'],
   ['/dashboard/admin/usuarios', 'Usuarios'],
   ['/dashboard/admin/sync', 'Sincronizar'],
   ['/dashboard/mi-cuenta', 'Mi cuenta'],

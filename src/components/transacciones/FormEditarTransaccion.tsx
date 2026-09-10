@@ -89,7 +89,7 @@ export default function FormEditarTransaccion(
       setGuardando(false)
       return
     }
-    router.push('/dashboard/transacciones')
+    router.push('/dashboard/inicio')
     router.refresh()
   }
 
@@ -204,7 +204,7 @@ export default function FormEditarTransaccion(
           {guardando ? 'Guardando…' : 'Guardar cambios'}
         </button>
         <button type="button" className="btn-secondary" disabled={guardando}
-          onClick={() => router.push('/dashboard/transacciones')}>
+          onClick={() => router.push('/dashboard/inicio')}>
           Cancelar
         </button>
       </div>

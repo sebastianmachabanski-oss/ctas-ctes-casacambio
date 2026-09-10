@@ -50,20 +50,43 @@ function parseNumAr(s: string): number | null {
   const n = Number(norm)
   return isFinite(n) ? n : null
 }
+// Color de cada operación.
+//
+// COMPRA y VENTA salieron del par verde/rojo el 10/9/2026 y pasaron a naranja y azul. El
+// verde y el rojo quedan para el dinero que entra y sale de la cuenta del cliente
+// (INGRESAN / EGRESAN) y para los ajustes de caja. Así el color dice de qué TIPO de
+// operación se trata, en vez de repetir el signo que ya se lee en las columnas de importe.
+//
+// El naranja de COMPRA es ámbar, no naranja rojizo: al lado del rojo de EGRESAN un
+// naranja rojizo se confunde en una etiqueta de 11px (ver .tag-orange en globals.css).
 function badge(op: string) {
   const o = (op || '').toUpperCase()
-  if (['COMPRA', 'INGRESAN', 'SOBRANTE', 'GANANCIA'].includes(o)) return 'tag-green'
-  if (['VENTA', 'EGRESAN', 'GASTOS', 'FALTANTE'].includes(o)) return 'tag-red'
+  if (o === 'COMPRA') return 'tag-orange'
+  if (o === 'VENTA') return 'tag-blue'
+  if (['INGRESAN', 'SOBRANTE', 'GANANCIA'].includes(o)) return 'tag-green'
+  if (['EGRESAN', 'GASTOS', 'FALTANTE'].includes(o)) return 'tag-red'
   return 'tag-gray'
 }
 
 type Filtros = { cli: string; tipo: string; op: string; notas: string; autor: string; monto: string }
 type Totales = { monto: number; pesos: number; dolares: number }
 
-export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas, filtros, totales, clientes, clientesSel }: {
+/** Los parámetros que este listado maneja en la URL. Lo demás no se toca al navegar. */
+const MIOS = ['desde', 'hasta', 'pagina', 'cli', 'tipo', 'op', 'notas', 'autor', 'monto'] as const
+
+export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas, filtros, totales, clientes, clientesSel, ruta = '/dashboard/inicio', pref = 't' }: {
   movimientos: Mov[]; puedeEditar: boolean; desde: string; hasta: string
   total: number; pagina: number; totalPaginas: number; filtros: Filtros; totales: Totales
   clientes: string[]; clientesSel: string[]
+  /** Pantalla que contiene el listado. Desde el 10/9/2026 es Inicio. */
+  ruta?: string
+  /**
+   * Prefijo de los parámetros en la URL. Inicio ya usa `desde`, `hasta` y `p` para el
+   * período de los saldos: sin prefijo, filtrar el listado por fecha movería también los
+   * totales de caja de arriba, y elegir un período reiniciaría la paginación del listado.
+   * Con `t` los dos controles conviven sin pisarse.
+   */
+  pref?: string
 }) {
   const router = useRouter()
   const [d1, setD1] = useState(desde)
@@ -138,13 +161,17 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   // Navegación: rango de fechas, filtros por columna y paginación, todo en la URL.
   function navegar(p: number, d1v = d1, d2v = d2, f: Partial<Filtros> = {}) {
     const actuales: Filtros = { cli: cliSel.join('|'), tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMin, ...f }
-    const params = new URLSearchParams()
-    if (d1v) params.set('desde', d1v)
-    if (d2v) params.set('hasta', d2v)
-    for (const [k, v] of Object.entries(actuales)) if (v) params.set(k, v)
-    if (p > 1) params.set('pagina', String(p))
+    // Se parte de la URL actual y se reemplazan SOLO los parámetros del listado. Los que
+    // no son suyos —el período de los saldos de Inicio— quedan intactos: sin esto,
+    // filtrar el listado devolvía los KPIs de arriba a "Todo".
+    const params = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search)
+    for (const k of MIOS) params.delete(pref + k)
+    if (d1v) params.set(pref + 'desde', d1v)
+    if (d2v) params.set(pref + 'hasta', d2v)
+    for (const [k, v] of Object.entries(actuales)) if (v) params.set(pref + k, v)
+    if (p > 1) params.set(pref + 'pagina', String(p))
     const qs = params.toString()
-    router.replace('/dashboard/transacciones' + (qs ? '?' + qs : ''))
+    router.replace(ruta + (qs ? '?' + qs : ''))
   }
 
   // Cambiar un filtro siempre vuelve a la página 1: la anterior puede no existir ya.
