@@ -53,7 +53,7 @@ export default function TableroInicio({ kpis, periodo, rDesde, rHasta }: {
   }, [kpis])
 
   return (
-    <div className="px-4 md:px-6 pt-3 md:pt-4 pb-2" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10 }}>
+    <div className="px-4 md:px-6 pt-3 pb-1" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div className="sec-lbl" style={{ margin: 0 }}>
           {esTodo ? 'Situación de caja — ahora' : 'Caja — movimiento del período'}{' '}

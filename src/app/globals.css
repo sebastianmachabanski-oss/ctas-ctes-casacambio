@@ -147,11 +147,15 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
    y no sobre .kpi porque esa clase la comparten Ganancias y Posición Ctas Ctes, donde no
    hay nada abajo que ganar. */
 .kpis-caja.densa { gap: 8px; padding-bottom: 4px; }
-.kpis-caja.densa .kpi { flex-basis: 208px; padding: 9px 11px; gap: 3px; }
-.kpis-caja.densa .kpi .val { font-size: 19px; }
+.kpis-caja.densa .kpi { flex-basis: 210px; padding: 8px 11px; gap: 2px; }
+.kpis-caja.densa .kpi .val { font-size: 19px; line-height: 1.2; }
 .kpis-caja.densa .kpi .val-lbl { margin-top: -3px; margin-bottom: 1px; }
-.kpis-caja.densa .kpi .sub { padding-top: 5px; gap: 1px; }
-.kpis-caja.densa .kpi .kr { font-size: 10.5px; }
+.kpis-caja.densa .kpi .sub { padding-top: 4px; gap: 0; }
+/* Se probó poner las filas de detalle en dos columnas para bajar el alto: no sirvió.
+   Con importes de siete y ocho cifras cada celda envuelve a dos renglones y la tarjeta
+   queda igual de alta, con las etiquetas partidas. Se aprieta el interlineado, que es
+   lo que sí rinde sin romper nada. */
+.kpis-caja.densa .kpi .kr { font-size: 10.5px; line-height: 1.3; }
 @media (max-width: 560px) { .kpis-caja.densa .kpi { flex-basis: 78%; } }
 .kpi .top { display: flex; align-items: center; gap: 8px; }
 .kpi .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
