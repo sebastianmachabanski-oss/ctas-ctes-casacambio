@@ -132,14 +132,9 @@ export default async function InicioPage({
 
       {/* El listado arranca donde estaba la banda de cotizaciones, que se mudó a la barra
           superior (10/9/2026): es la razón de ser de la pantalla y tiene que verse sin
-          scrollear. */}
+          scrollear. Va sin título de sección: la tabla se explica sola y el rótulo eran
+          dos renglones menos de listado a la vista. */}
       <div className="px-4 md:px-6 pb-4 md:pb-6">
-        <div className="sec-lbl" style={{ margin: '0 0 8px' }}>
-          Transacciones{' '}
-          <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--muted)' }}>
-            · con su propio filtro de fechas, independiente del período de arriba
-          </span>
-        </div>
         {tx.error ? (
           <div className="card p-6 text-center text-red-600 text-sm">
             No se pudieron cargar los movimientos: {tx.error.message}

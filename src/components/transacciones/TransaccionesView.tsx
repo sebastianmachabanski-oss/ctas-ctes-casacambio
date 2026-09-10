@@ -197,10 +197,10 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const hayFiltro = Boolean(cliSel.length || fTipo || fOp || fNotas || fAutor || fMin)
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10 }}>
       {/* Rango de fechas (compacto) + totales del resultado filtrado */}
-      <div className="card" style={{ padding: '10px 14px' }}>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="card" style={{ padding: '7px 12px' }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <label className="label" style={{ margin: 0, fontSize: 11 }}>Desde</label>
             <input className="input" type="date" value={d1} onChange={e => setD1(e.target.value)}
@@ -218,7 +218,11 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
           </div>
 
           {/* Totales de TODO lo que coincide con los filtros, no solo de esta página. */}
-          <div style={{ display: 'flex', gap: 22, marginLeft: 'auto', flexWrap: 'wrap' }}>
+          <div
+            title={hayFiltro
+              ? `Totales de los ${total.toLocaleString('es-AR')} movimientos que coinciden con el filtro, no solo de esta página.`
+              : 'Totales de todos los movimientos del rango, no solo de esta página.'}
+            style={{ display: 'flex', gap: 18, marginLeft: 'auto', flexWrap: 'wrap' }}>
             {([
               ['Total monto', nf0.format(totales.monto), 'var(--ink)'],
               ['Total imp. $', ars(Math.round(totales.pesos)), totales.pesos >= 0 ? 'var(--pos-ink)' : 'var(--neg-ink)'],
@@ -226,15 +230,10 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
             ] as [string, string, string][]).map(([lbl, val, col]) => (
               <div key={lbl} style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', fontWeight: 650 }}>{lbl}</div>
-                <div className="num" style={{ fontSize: 15, fontWeight: 700, color: col }}>{val}</div>
+                <div className="num" style={{ fontSize: 14, fontWeight: 700, color: col }}>{val}</div>
               </div>
             ))}
           </div>
-        </div>
-        <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 11 }}>
-          {hayFiltro
-            ? `Totales de los ${total.toLocaleString('es-AR')} movimientos que coinciden con el filtro.`
-            : 'Totales de todos los movimientos del rango. Filtrá por columna abajo ↓'}
         </div>
       </div>
 
