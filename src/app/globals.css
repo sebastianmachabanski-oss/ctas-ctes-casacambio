@@ -140,6 +140,19 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
   padding: 12px 13px; display: flex; flex-direction: column; gap: 6px;
 }
 @media (max-width: 560px) { .kpi { flex-basis: 78%; } }
+/* Variante compacta, solo en Inicio (10/9/2026). Abajo de estas tarjetas arranca el
+   listado de transacciones, que es la razón de ser de la pantalla: cada píxel que se
+   ahorra acá es listado visible sin scrollear. Se aprieta el interlineado, no el tamaño
+   de los números —el saldo tiene que seguir leyéndose de un vistazo—. Va como modificador
+   y no sobre .kpi porque esa clase la comparten Ganancias y Posición Ctas Ctes, donde no
+   hay nada abajo que ganar. */
+.kpis-caja.densa { gap: 8px; padding-bottom: 4px; }
+.kpis-caja.densa .kpi { flex-basis: 208px; padding: 9px 11px; gap: 3px; }
+.kpis-caja.densa .kpi .val { font-size: 19px; }
+.kpis-caja.densa .kpi .val-lbl { margin-top: -3px; margin-bottom: 1px; }
+.kpis-caja.densa .kpi .sub { padding-top: 5px; gap: 1px; }
+.kpis-caja.densa .kpi .kr { font-size: 10.5px; }
+@media (max-width: 560px) { .kpis-caja.densa .kpi { flex-basis: 78%; } }
 .kpi .top { display: flex; align-items: center; gap: 8px; }
 .kpi .dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 .kpi .cur { font-size: 10px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
@@ -156,6 +169,35 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .kpi .kr b.neg { color: var(--neg-ink); }
 .neg { color: var(--neg-ink); }
 .pos { color: var(--pos-ink); }
+
+/* Banda de cotizaciones EN LA BARRA SUPERIOR (10/9/2026), a la derecha del título.
+   Una sola línea y letra chica: tiene que entrar al lado del título sin empujarlo y sin
+   estirar la barra a dos renglones. Si no entra, se desplaza con scroll horizontal en vez
+   de romper el alto — la barra es sticky y crecer le come pantalla a todo lo de abajo. */
+.mkt-bar {
+  margin-left: auto; display: flex; align-items: baseline; gap: 9px;
+  min-width: 0; /* sin esto el contenido estira la barra en vez de scrollear */
+  border: 1px dashed rgba(37,99,235,.3); background: rgba(37,99,235,.05);
+  border-radius: 9px; padding: 4px 10px; max-width: 78%;
+}
+.mkt-bar-tag { font-size: 9.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--brand-ink); white-space: nowrap; flex: 0 0 auto; }
+.mkt-bar-row {
+  display: flex; gap: 0 11px; align-items: baseline; min-width: 0;
+  flex: 1 1 auto; flex-wrap: nowrap;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+}
+.mkt-bar-row::-webkit-scrollbar { display: none; }
+.mkt-bar-row .it { display: flex; align-items: baseline; gap: 3px; flex: 0 0 auto; white-space: nowrap; }
+.mkt-bar-row .n { font-size: 10px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .03em; }
+.mkt-bar-row .v { font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mkt-bar-row .sep { font-size: 10px; color: var(--muted); }
+.mkt-bar-src { font-size: 9.5px; color: var(--muted); white-space: nowrap; flex: 0 0 auto; }
+.mkt-bar-src.live::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--pos); margin-right: 4px; vertical-align: 1px; }
+/* En pantallas chicas se cae primero lo prescindible: la hora de actualización y el
+   rótulo. Los números, que son a lo que se viene, se quedan. */
+@media (max-width: 1500px) { .mkt-bar-src { display: none; } }
+@media (max-width: 900px) { .mkt-bar-tag { display: none; } }
+@media (max-width: 700px) { .mkt-bar { display: none; } }
 
 /* banda de mercado (fuente externa) */
 /* Compacta: título en una línea y las cotizaciones en OTRA, en una sola fila. Si no
@@ -290,5 +332,18 @@ body.cfg-open .cfg-drawer { transform: none; }
 .switch input:checked + .track::after { left: 17px; }
 @media (prefers-reduced-motion: reduce) { .track, .track::after { transition: none; } }
 .hero-num { font-size: 40px; font-weight: 800; letter-spacing: -.02em; }
+/* Ganancias: tarjetas de resultado (10/9/2026). Antes eran dos bloques de 40px de número
+   y 24px de padding que se comían la primera pantalla entera, con la mitad derecha vacía
+   porque la columna estaba limitada a 760px. Ahora van en una fila que usa todo el ancho,
+   con el número más chico —sigue siendo el elemento dominante, pero deja ver lo de abajo
+   sin scrollear—. */
+.gn-res { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 12px; align-items: stretch; }
+.gn-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.gn-card .gn-lbl { color: var(--muted); font-size: 12px; }
+.gn-card .gn-num { font-size: 27px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+.gn-card .gn-pie { font-size: 11.5px; color: var(--muted); line-height: 1.45; margin-top: 2px; }
+/* La prosa del desglose no sigue al ancho de la pantalla: a 1.900px una línea de texto
+   corrida es ilegible. Las filas de números sí ocupan todo. */
+.gn-prosa { max-width: 82ch; }
 .banner { border-radius: 11px; padding: 13px 16px; font-size: 13px; line-height: 1.5; }
 .banner-info { background: var(--wash); border: 1px solid var(--ring); color: var(--ink-2); }

@@ -167,7 +167,7 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
 
   return (
     <>
-    <div className="p-4 md:p-6" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 14, maxWidth: 760 }}>
+    <div className="px-4 md:px-6 pt-4 pb-2" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
       {/* Filtros de período + configuración */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
         <SelectorPeriodo
@@ -177,20 +177,22 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
         <button className="chip" onClick={() => document.body.classList.add('cfg-open')}>⚙ Configuración</button>
       </div>
 
-      {/* Resultado: el mismo número en las dos monedas */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 14 }}>
-        <div className="card" style={{ padding: 24 }}>
-          <div style={{ color: 'var(--muted)', fontSize: 13.5 }}>{sinDatos ? 'Sin operaciones del par en el período' : lead}</div>
-          <div className={`hero-num num ${r.neto >= 0 ? 'pos' : 'neg'}`}>{ars(Math.round(r.neto))}</div>
-          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>en pesos</div>
+      {/* Resultado: el mismo número en las dos monedas y, al lado, la posición abierta.
+          Las tres en una fila (10/9/2026) para que el ancho se aproveche y el desglose
+          quede a la vista sin scrollear. */}
+      <div className="gn-res">
+        <div className="card gn-card">
+          <div className="gn-lbl">{sinDatos ? 'Sin operaciones del par en el período' : lead}</div>
+          <div className={`gn-num num ${r.neto >= 0 ? 'pos' : 'neg'}`}>{ars(Math.round(r.neto))}</div>
+          <div className="gn-pie">en pesos</div>
         </div>
 
-        <div className="card" style={{ padding: 24 }}>
-          <div style={{ color: 'var(--muted)', fontSize: 13.5 }}>El mismo resultado, en dólares</div>
+        <div className="card gn-card">
+          <div className="gn-lbl">El mismo resultado, en dólares</div>
           {netoUsd === null ? (
             <>
-              <div className="hero-num num" style={{ color: 'var(--muted)' }}>—</div>
-              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
+              <div className="gn-num num" style={{ color: 'var(--muted)' }}>—</div>
+              <div className="gn-pie">
                 {sinDatos
                   ? 'sin operaciones en el período'
                   : 'no hubo operaciones en dólares en el período de las que tomar la cotización'}
@@ -198,14 +200,36 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
             </>
           ) : (
             <>
-              <div className={`hero-num num ${netoUsd >= 0 ? 'pos' : 'neg'}`}>{usd(Math.round(netoUsd))}</div>
-              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
+              <div className={`gn-num num ${netoUsd >= 0 ? 'pos' : 'neg'}`}>{usd(Math.round(netoUsd))}</div>
+              <div className="gn-pie">
                 convertido a <b>$ {fmt3.format(cotUsd!)}</b> — cotización promedio de las
                 operaciones en dólares del período
               </div>
             </>
           )}
         </div>
+
+        {/* Transferencias en curso: NO son ganancia todavía. Mostrarlas como resultado
+            sería contar como ganado algo que puede no volver nunca; esconderlas sería
+            peor, porque es plata real inmovilizada. Van acá, rotuladas como posición. */}
+        {gruposAbiertos > 0 && (
+          <div className="card gn-card" style={{ borderLeft: '3px solid var(--warn-ink)' }}>
+            <div className="gn-lbl">
+              Transferencias en curso · {gruposAbiertos} grupo{gruposAbiertos !== 1 ? 's' : ''} sin cerrar
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}>
+              {monedasConSaldo(abiertas).map(([k, v]) => (
+                <span key={k} className={`gn-num num ${v >= 0 ? 'pos' : 'neg'}`}>
+                  {SYM[k]} {v < 0 ? `(${fmt0.format(-Math.round(v))})` : fmt0.format(Math.round(v))}
+                </span>
+              ))}
+            </div>
+            <div className="gn-pie">
+              <b>No suman al resultado</b>: falta cargar la otra punta. Es una posición
+              acumulada al cierre del período, no un resultado del período.
+            </div>
+          </div>
+        )}
       </div>
 
       {r.ttSinCotizacion && (
@@ -213,33 +237,6 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
           ⚠️ En el período hay <b>{sym} {fmt0.format(Math.round(r.ttMoneda))}</b> de resultado por
           transferencias, pero <b>no se pudieron sumar al total</b>: no hubo compras ni ventas de
           {' '}{NOMBRE_PAR[cfg.par].toLowerCase()} de las que tomar una cotización para pasarlos a pesos.
-        </div>
-      )}
-
-      {/* Transferencias en curso: NO son ganancia todavía. Mostrarlas como resultado sería
-          contar como ganado algo que puede no volver nunca; esconderlas sería peor, porque
-          es plata real inmovilizada. Van acá, rotuladas como posición. */}
-      {gruposAbiertos > 0 && (
-        <div className="card" style={{ padding: '14px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-            <b style={{ fontSize: 13.5 }}>Transferencias en curso</b>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-              {gruposAbiertos} grupo{gruposAbiertos !== 1 ? 's' : ''} con una sola punta cargada
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '10px 0 8px' }}>
-            {monedasConSaldo(abiertas).map(([k, v]) => (
-              <span key={k} className={`num ${v >= 0 ? 'pos' : 'neg'}`} style={{ fontSize: 17, fontWeight: 700 }}>
-                {SYM[k]} {v < 0 ? `(${fmt0.format(-Math.round(v))})` : fmt0.format(Math.round(v))}
-              </span>
-            ))}
-          </div>
-          <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}>
-            No suman al resultado: son transferencias donde se cargó el ingreso y falta el egreso
-            (o al revés), así que todavía no hay ganancia que medir. Es una <b>posición</b> acumulada
-            al cierre del período, no un resultado del período. Entran al cálculo apenas se carga
-            la punta que falta.
-          </div>
         </div>
       )}
 
@@ -284,7 +281,7 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
         </summary>
         <div style={{ borderTop: '1px solid var(--grid)', padding: '6px 18px 14px' }}>
           {/* Explicación del método, para que el número no sea una caja negra. */}
-          <div style={{ padding: '12px 0 6px', fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55 }}>
+          <div className="gn-prosa" style={{ padding: '12px 0 6px', fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55 }}>
             <p style={{ margin: '0 0 8px' }}>
               <b>En pesos.</b> La ganancia surge del <b>calce</b> entre lo que compraste y lo que
               vendiste en el período, no de cada transacción por separado: una compra no genera
