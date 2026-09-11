@@ -323,6 +323,17 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .tx-totales { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; }
 /* En la computadora las etiquetas "Desde" y "Hasta" alcanzan; la flecha sobra. */
 .tx-flecha { display: none; }
+/* Botón de icono: quitar el rango de fechas. Era "Limpiar fechas" en texto y en el
+   teléfono se comía el ancho de un campo entero. El tamaño no baja de 32px: es el mínimo
+   para acertarle con el dedo. */
+.btn-icono {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; flex: none; padding: 0;
+  border: 1px solid var(--ring); border-radius: 8px;
+  background: var(--card); color: var(--muted);
+  font-size: 15px; line-height: 1; cursor: pointer;
+}
+.btn-icono:hover { color: var(--neg-ink); border-color: rgba(185,28,28,.35); }
 @media (max-width: 620px) {
   /* En el teléfono cada renglón que se gana arriba es listado visible sin scrollear, así
      que la barra se comprime todo lo que se puede sin romperla.
@@ -333,12 +344,17 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
      renglón de más se paga con tres del listado. Las etiquetas siguen estando para el
      lector de pantalla (aria-label en el campo). */
   .tx-campo > .label { display: none; }
-  .tx-campo { flex: 1 1 96px; max-width: none; }
-  .tx-campo .input { font-size: 11.5px !important; padding: 4px 4px !important; }
+  /* 128px es el MÍNIMO medido para que un campo de fecha con valor puesto no recorte el
+     texto (a 12,5px de letra necesita 136px; a 11,5px, 127px). Con menos, el operador ve
+     "11/09/20…" y no sabe qué filtró. Por eso acá la fila SÍ puede envolver: en 360px no
+     entran dos campos legibles más los botones, y un campo que no se lee es peor que un
+     renglón de más. */
+  .tx-campo { flex: 1 1 128px; min-width: 128px; max-width: none; }
+  .tx-campo .input { font-size: 12.5px !important; padding: 4px 6px !important; }
   .tx-flecha { display: inline; color: var(--muted); font-size: 12px; flex: none; }
   .sec-nota { display: none; }
-  .tx-fechas { gap: 6px; flex-wrap: nowrap; }
-  .tx-fechas .btn-primary { flex: none; padding: 5px 10px !important; }
+  .tx-fechas { gap: 6px; }
+  .tx-fechas .btn-primary { flex: none; padding: 5px 12px !important; }
 
   /* Los totales dejan de ir pegados a la derecha: en una línea propia se leen mejor que
      desalineados contra el borde. Se achican para que las tres entren en un renglón. */
