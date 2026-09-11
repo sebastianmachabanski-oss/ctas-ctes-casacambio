@@ -57,7 +57,10 @@ export default function TableroInicio({ kpis, periodo, rDesde, rHasta }: {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div className="sec-lbl" style={{ margin: 0 }}>
           {esTodo ? 'Situación de caja — ahora' : 'Caja — movimiento del período'}{' '}
-          <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--muted)' }}>
+          {/* En el teléfono esta aclaración ocupa un renglón entero —a veces dos— y lo
+              que se gana arriba es listado visible. Se oculta por CSS, no se borra: en la
+              computadora sigue explicando qué está midiendo el número. */}
+          <span className="sec-nota" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--muted)' }}>
             {esTodo ? '· incluye todos los movimientos registrados' : '· los importes de esta sección responden al período elegido'}
           </span>
         </div>

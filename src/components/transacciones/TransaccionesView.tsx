@@ -205,12 +205,15 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
             <label className="tx-campo">
               <span className="label" style={{ margin: 0, fontSize: 11, whiteSpace: 'nowrap' }}>Desde</span>
               <input className="input" type="date" value={d1} onChange={e => setD1(e.target.value)}
-                style={{ fontSize: 12, padding: '4px 8px' }} />
+                aria-label="Desde" style={{ fontSize: 12, padding: '4px 8px' }} />
             </label>
+            {/* Solo se ve cuando las etiquetas se ocultan, en el teléfono: sin ellas los
+                dos campos sueltos no se leen como un rango. */}
+            <span aria-hidden className="tx-flecha">→</span>
             <label className="tx-campo">
               <span className="label" style={{ margin: 0, fontSize: 11, whiteSpace: 'nowrap' }}>Hasta</span>
               <input className="input" type="date" value={d2} onChange={e => setD2(e.target.value)}
-                style={{ fontSize: 12, padding: '4px 8px' }} />
+                aria-label="Hasta" style={{ fontSize: 12, padding: '4px 8px' }} />
             </label>
             <button className="btn-primary" onClick={buscar}
               style={{ fontSize: 12, padding: '5px 14px' }}>Buscar</button>
