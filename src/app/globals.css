@@ -387,7 +387,12 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
     align-items: center;
   }
   .tx-campo { display: block; min-width: 0; max-width: none; }
-  .tx-campo .input { width: 100%; min-width: 0; font-size: 12.5px !important; padding: 4px 6px !important; }
+  /* Letra chica a propósito. En el teléfono del usuario la fecha se cortaba aunque en la
+     simulación entraba holgada: casi seguro por el tamaño de fuente del SISTEMA, que
+     Android aplica por encima del CSS y no se puede medir desde acá. Con 11px hay margen
+     para ese agrandado; el campo se sigue leyendo bien porque es un dato corto y de
+     formato conocido. */
+  .tx-campo .input { width: 100%; min-width: 0; font-size: 11px !important; padding: 4px 4px !important; }
   .tx-campo .input::-webkit-calendar-picker-indicator { display: none; }
   .tx-flecha { display: inline; color: var(--muted); font-size: 12px; flex: none; }
   .tx-acciones { gap: 6px; }
@@ -427,6 +432,9 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
    un segundo renglón. Un punto menos de letra y dos de padding lo meten en la misma fila. */
 @media (max-width: 380px) {
   .chip { font-size: 10.5px; padding: 4px 7px; }
+  /* Un escalón más abajo: en 360px el campo es más angosto y el margen contra el
+     agrandado de fuente del sistema se achica. */
+  .tx-campo .input { font-size: 10.5px !important; }
 }
 
 /* ── drawer de configuración (Ganancias) — mismo panel que el mockup ── */
