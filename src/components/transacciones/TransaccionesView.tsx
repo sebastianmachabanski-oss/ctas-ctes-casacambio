@@ -215,6 +215,10 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               <input className="input" type="date" value={d2} onChange={e => setD2(e.target.value)}
                 aria-label="Hasta" style={{ fontSize: 12, padding: '4px 8px' }} />
             </label>
+            {/* Los dos botones van juntos en un envoltorio para que la fila sea siempre de
+                CUATRO columnas —campo, flecha, campo, acciones— aparezca o no el de
+                limpiar. Con cinco columnas y una vacía quedaba un hueco a la derecha. */}
+            <span className="tx-acciones">
             {/* Un solo botón: en la computadora dice "Buscar" y en el teléfono muestra una
                 lupa. Duplicarlo y ocultar uno por CSS dejaría dos controles de buscar para
                 el lector de pantalla. */}
@@ -234,6 +238,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 aria-label="Quitar el rango de fechas"
                 title="Quitar el rango de fechas y ver todo el historial">✕</button>
             )}
+            </span>
           </div>
 
           {/* Totales de TODO lo que coincide con los filtros, no solo de esta página. */}
