@@ -321,11 +321,30 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .tx-campo { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 190px; min-width: 0; max-width: 230px; }
 .tx-campo .input { flex: 1 1 auto; min-width: 0; width: auto; }
 .tx-totales { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; }
+/* En la computadora las etiquetas "Desde" y "Hasta" alcanzan; la flecha sobra. */
+.tx-flecha { display: none; }
 @media (max-width: 620px) {
+  /* En el teléfono cada renglón que se gana arriba es listado visible sin scrollear, así
+     que la barra se comprime todo lo que se puede sin romperla.
+
+     Las etiquetas "Desde" y "Hasta" se van y queda la forma de rango —fecha → fecha—, la
+     misma que ya usa el selector de período. Con las etiquetas puestas, los dos campos
+     más el botón no entran en una línea de 360px por mucho que se los achique, y ese
+     renglón de más se paga con tres del listado. Las etiquetas siguen estando para el
+     lector de pantalla (aria-label en el campo). */
+  .tx-campo > .label { display: none; }
+  .tx-campo { flex: 1 1 96px; max-width: none; }
+  .tx-campo .input { font-size: 11.5px !important; padding: 4px 4px !important; }
+  .tx-flecha { display: inline; color: var(--muted); font-size: 12px; flex: none; }
+  .sec-nota { display: none; }
+  .tx-fechas { gap: 6px; flex-wrap: nowrap; }
+  .tx-fechas .btn-primary { flex: none; padding: 5px 10px !important; }
+
   /* Los totales dejan de ir pegados a la derecha: en una línea propia se leen mejor que
-     desalineados contra el borde. */
-  .tx-totales { margin-left: 0; width: 100%; gap: 14px; }
+     desalineados contra el borde. Se achican para que las tres entren en un renglón. */
+  .tx-totales { margin-left: 0; width: 100%; gap: 10px; justify-content: space-between; }
   .tx-totales > div { text-align: left; }
+  .tx-totales .num { font-size: 12.5px !important; }
 }
 
 /* segunda fila de encabezado: filtros por columna */
@@ -333,6 +352,17 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 
 .chip { appearance: none; border: 1px solid var(--ring); background: var(--card); color: var(--ink-2); font: inherit; font-size: 12.5px; font-weight: 550; padding: 6px 13px; border-radius: 999px; cursor: pointer; }
 .chip.on { background: var(--ink); color: var(--card); border-color: var(--ink); }
+/* En el teléfono los chips se aprietan para que los seis períodos —Día, Semana, Mes, Año,
+   Todo y Rango— entren en UN renglón. Con el tamaño de escritorio, "Rango…" caía solo a
+   una segunda línea y se comía espacio del listado. */
+@media (max-width: 620px) {
+  .chip { font-size: 11.5px; padding: 5px 9px; }
+}
+/* Teléfonos angostos (Android de 360px): con el tamaño de arriba "Rango" todavía caía a
+   un segundo renglón. Un punto menos de letra y dos de padding lo meten en la misma fila. */
+@media (max-width: 380px) {
+  .chip { font-size: 10.5px; padding: 4px 7px; }
+}
 
 /* ── drawer de configuración (Ganancias) — mismo panel que el mockup ── */
 .cfg-scrim { position: fixed; inset: 0; background: rgba(11,11,11,.35); opacity: 0; pointer-events: none; transition: opacity .18s; z-index: 84; }
