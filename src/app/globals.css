@@ -316,6 +316,14 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
    "Buscar" fuera de pantalla (11/9/2026). Ahora los campos se encogen y el grupo envuelve. */
 .tx-bar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .tx-fechas { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+/* En la computadora los campos toman su ancho natural y la fila no envuelve: con campos
+   elásticos, el botón de limpiar —que aparece recién cuando hay fechas puestas— se caía
+   a un segundo renglón. En el teléfono mandan las reglas de más abajo. */
+@media (min-width: 621px) {
+  .tx-fechas { flex-wrap: nowrap; }
+  .tx-campo { flex: 0 0 auto; }
+  .tx-campo .input { width: 138px; flex: 0 0 auto; }
+}
 /* Etiqueta y campo van pegados: sin este envoltorio, al envolver quedaba "Hasta" solo al
    final de un renglón y su campo al principio del siguiente. */
 .tx-campo { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 190px; min-width: 0; max-width: 230px; }
@@ -334,6 +342,8 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
   font-size: 15px; line-height: 1; cursor: pointer;
 }
 .btn-icono:hover { color: var(--neg-ink); border-color: rgba(185,28,28,.35); }
+/* En la computadora el botón de buscar es texto; la lupa solo aparece en el teléfono. */
+.btn-buscar .lupa { display: none; }
 @media (max-width: 620px) {
   /* En el teléfono cada renglón que se gana arriba es listado visible sin scrollear, así
      que la barra se comprime todo lo que se puede sin romperla.
@@ -358,17 +368,23 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
        ✓ sin flecha + "Buscar" + sin el ícono de calendario del campo
        ✗ con flecha + "Buscar" + sin el ícono
 
-     Se eligió la cuarta porque conserva la palabra "Buscar", que dice qué hace mejor que
-     una lupa. Lo que se sacrifica es el dibujito de calendario DENTRO del campo: en el
-     teléfono es decorativo —tocar cualquier parte del campo abre el calendario igual— y
-     son los ~20px por campo que faltaban. En la computadora sigue estando.
+     Con "Buscar" en texto hay lugar para UNA de las dos cosas; con la lupa, tampoco para
+     las dos: o la flecha o el ícono de calendario del campo.
 
-     También se va la flecha entre los dos campos: son 16px más. El orden y el aria-label
-     dicen cuál es desde y cuál es hasta. */
+     Se eligió la FLECHA. Que los campos son fechas ya se ve —muestran una fecha—; cuál es
+     desde y cuál es hasta no lo dice nada más. Y el ícono de calendario, en el teléfono,
+     es decorativo: tocar cualquier parte del campo abre el calendario igual. En la
+     computadora sigue estando. */
   .tx-campo { flex: 1 1 0; min-width: 0; max-width: none; }
   .tx-campo .input { font-size: 12.5px !important; padding: 4px 6px !important; }
   .tx-campo .input::-webkit-calendar-picker-indicator { display: none; }
-  .tx-flecha { display: none; }
+  .tx-flecha { display: inline; color: var(--muted); font-size: 12px; flex: none; }
+  /* El botón pasa de "Buscar" a una lupa: son ~30px que van a los campos. Es el MISMO
+     botón, no otro — solo cambia qué se ve adentro— así que sigue habiendo un único
+     control de buscar y conserva su aria-label. */
+  .btn-buscar .txt { display: none; }
+  .btn-buscar .lupa { display: block; }
+  .btn-buscar { width: 32px; height: 32px; padding: 0 !important; flex: none; }
   .sec-nota { display: none; }
   .tx-fechas { gap: 6px; flex-wrap: nowrap; }
   .tx-fechas .btn-primary { flex: none; padding: 5px 12px !important; }

@@ -215,8 +215,17 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               <input className="input" type="date" value={d2} onChange={e => setD2(e.target.value)}
                 aria-label="Hasta" style={{ fontSize: 12, padding: '4px 8px' }} />
             </label>
-            <button className="btn-primary" onClick={buscar}
-              style={{ fontSize: 12, padding: '5px 14px' }}>Buscar</button>
+            {/* Un solo botón: en la computadora dice "Buscar" y en el teléfono muestra una
+                lupa. Duplicarlo y ocultar uno por CSS dejaría dos controles de buscar para
+                el lector de pantalla. */}
+            <button className="btn-primary btn-buscar" onClick={buscar} aria-label="Buscar"
+              style={{ fontSize: 12, padding: '5px 14px' }}>
+              <span className="txt">Buscar</span>
+              <svg className="lupa" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+                <circle cx="11" cy="11" r="7" /><path d="M20 20l-4.2-4.2" />
+              </svg>
+            </button>
             {/* Icono y no texto: "Limpiar fechas" ocupaba en el teléfono el ancho de un
                 campo de fecha entero, y aparece justo cuando los campos están llenos y
                 más se necesita leerlos. */}
