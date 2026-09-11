@@ -217,10 +217,13 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
             </label>
             <button className="btn-primary" onClick={buscar}
               style={{ fontSize: 12, padding: '5px 14px' }}>Buscar</button>
+            {/* Icono y no texto: "Limpiar fechas" ocupaba en el teléfono el ancho de un
+                campo de fecha entero, y aparece justo cuando los campos están llenos y
+                más se necesita leerlos. */}
             {(d1 || d2) && (
-              <button className="btn-secondary" onClick={limpiarFechas}
-                title="Quitar el rango de fechas y ver todo el historial"
-                style={{ fontSize: 12, padding: '5px 12px' }}>Limpiar fechas</button>
+              <button className="btn-icono" onClick={limpiarFechas}
+                aria-label="Quitar el rango de fechas"
+                title="Quitar el rango de fechas y ver todo el historial">✕</button>
             )}
           </div>
 
