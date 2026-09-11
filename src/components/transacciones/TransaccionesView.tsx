@@ -230,13 +230,18 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               ? `Totales de los ${total.toLocaleString('es-AR')} movimientos que coinciden con el filtro, no solo de esta página.`
               : 'Totales de todos los movimientos del rango, no solo de esta página.'}
             className="tx-totales">
+            {/* La palabra "Total" va aparte porque en el teléfono se oculta: repetida tres
+                veces son ~120px, justo lo que falta para que los tres entren en un renglón.
+                El rótulo de la tarjeta ya dice que son totales. */}
             {([
-              ['Total monto', nf0.format(totales.monto), 'var(--ink)'],
-              ['Total imp. $', ars(Math.round(totales.pesos)), totales.pesos >= 0 ? 'var(--pos-ink)' : 'var(--neg-ink)'],
-              ['Total imp. U$S', usdTot(Math.round(totales.dolares)), totales.dolares >= 0 ? 'var(--pos-ink)' : 'var(--neg-ink)'],
+              ['monto', nf0.format(totales.monto), 'var(--ink)'],
+              ['imp. $', ars(Math.round(totales.pesos)), totales.pesos >= 0 ? 'var(--pos-ink)' : 'var(--neg-ink)'],
+              ['imp. U$S', usdTot(Math.round(totales.dolares)), totales.dolares >= 0 ? 'var(--pos-ink)' : 'var(--neg-ink)'],
             ] as [string, string, string][]).map(([lbl, val, col]) => (
               <div key={lbl} style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', fontWeight: 650 }}>{lbl}</div>
+                <div style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--muted)', fontWeight: 650, whiteSpace: 'nowrap' }}>
+                  <span className="tx-tot-pre">Total </span>{lbl}
+                </div>
                 <div className="num" style={{ fontSize: 14, fontWeight: 700, color: col }}>{val}</div>
               </div>
             ))}

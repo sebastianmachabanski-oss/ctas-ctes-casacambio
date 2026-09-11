@@ -342,9 +342,13 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 
   /* Los totales dejan de ir pegados a la derecha: en una línea propia se leen mejor que
      desalineados contra el borde. Se achican para que las tres entren en un renglón. */
-  .tx-totales { margin-left: 0; width: 100%; gap: 10px; justify-content: space-between; }
-  .tx-totales > div { text-align: left; }
-  .tx-totales .num { font-size: 12.5px !important; }
+  .tx-totales { margin-left: 0; width: 100%; gap: 8px; flex-wrap: nowrap; justify-content: space-between; }
+  .tx-totales > div { text-align: left; min-width: 0; }
+  /* El importe no se parte: sin esto "$ 89.531.650" quedaba con el símbolo en un renglón
+     y el número en el siguiente. */
+  .tx-totales .num { font-size: 12.5px !important; white-space: nowrap; }
+  /* "Total" tres veces son ~120px que no sobran. El rótulo de la tarjeta ya lo dice. */
+  .tx-tot-pre { display: none; }
 }
 
 /* segunda fila de encabezado: filtros por columna */
