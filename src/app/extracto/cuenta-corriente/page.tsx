@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { esCliente } from '@/lib/roles'
 import BotonImprimir from './BotonImprimir'
+import { traerExtracto, esIngreso, ref, TOPE, type Moneda } from '@/lib/consultas/extracto'
 
 // Extracto imprimible de una cuenta corriente (26/8/2026).
 //
@@ -14,31 +15,9 @@ import BotonImprimir from './BotonImprimir'
 
 export const dynamic = 'force-dynamic'
 
-// La pantalla pagina de a 200; el extracto NO: sale el período entero. Un tope alto por
-// las dudas —la cuenta más grande tiene ~7.700 movimientos— y si se pasa, se avisa en el
-// documento en vez de recortar en silencio.
-const TOPE = 20000
-
 const nf = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 })
 const money = (v: number) => (v < 0 ? `(${nf.format(-v)})` : nf.format(v))
 const fecha = (s: string) => new Date(s + 'T12:00:00').toLocaleDateString('es-AR')
-
-const MONEDAS = [
-  { acum: 'acum_dolares', cc: 'cc_dolares', saldo: 'saldo_dolares', label: 'Dólares', sym: 'U$S' },
-  { acum: 'acum_pesos',   cc: 'cc_pesos',   saldo: 'saldo_pesos',   label: 'Pesos',   sym: '$'   },
-  { acum: 'acum_euros',   cc: 'cc_euros',   saldo: 'saldo_euros',   label: 'Euros',   sym: '€'   },
-  { acum: 'acum_reales',  cc: 'cc_reales',  saldo: 'saldo_reales',  label: 'Reales',  sym: 'R$'  },
-  { acum: 'acum_usdt',    cc: 'cc_usdt',    saldo: 'saldo_usdt',    label: 'USDT',    sym: 'USDT' },
-] as const
-
-// Misma regla que la pantalla: el sync deja la referencia en `evento` y el alta de la
-// app la escribía solo en `notas`. Se miran las dos.
-const ref = (m: any) => (m.evento ?? '').trim() || (m.notas ?? '').trim() || null
-
-function esIngreso(op: string): boolean {
-  const o = (op || '').toUpperCase()
-  return o.includes('INGRES') || o === 'DONACION'
-}
 
 export default async function ExtractoCuentaCorriente({ searchParams }: {
   searchParams: { desde?: string; hasta?: string; operacion?: string; cuenta?: string }
@@ -59,48 +38,15 @@ export default async function ExtractoCuentaCorriente({ searchParams }: {
   const cuenta = searchParams.cuenta?.trim()
   if (!cuenta) redirect('/dashboard/cuenta-corriente')
 
-  const desde = searchParams.desde || ''
-  const hasta = searchParams.hasta || ''
-  const operacion = searchParams.operacion || ''
-
-  const { data } = await (supabase as any).rpc('cta_cte_movimientos', {
-    p_cuenta: cuenta,
-    p_desde: desde || null,
-    p_hasta: hasta || null,
-    p_operacion: operacion || null,
-    p_limit: TOPE,
-    p_offset: 0,
+  // MISMA consulta que el PDF. Si cada uno armara la suya, con el tiempo el documento
+  // que se descarga y el que se ve en pantalla dirían cosas distintas.
+  const d = await traerExtracto(supabase, {
+    cuenta,
+    desde: searchParams.desde || '',
+    hasta: searchParams.hasta || '',
+    operacion: searchParams.operacion || '',
   })
-  const movimientos = (data ?? []) as any[]
-  const total = Number(movimientos[0]?.total_filas ?? 0)
-
-  const { data: saldosData } = await supabase
-    .from('saldos_cuenta_corriente').select('*').eq('cuenta_cte', cuenta).maybeSingle()
-  const saldos = (saldosData ?? {}) as any
-
-  // Solo se imprimen las monedas que la cuenta realmente mueve: sin esto el extracto de
-  // una cuenta que opera en dólares arrastra cuatro columnas de ceros.
-  const activas = MONEDAS.filter(m =>
-    Number(saldos[m.saldo] ?? 0) !== 0 || movimientos.some(x => Number(x[m.cc] ?? 0) !== 0)
-  )
-  const monedas = activas.length ? activas : [MONEDAS[0], MONEDAS[1]]
-
-  // Totales del período (lo listado), distinto del saldo de la cuenta, que es histórico.
-  const totales = Object.fromEntries(
-    monedas.map(m => [m.cc, movimientos.reduce((a, x) => a + (Number(x[m.cc]) || 0), 0)])
-  )
-
-  const periodo = desde && hasta ? `${fecha(desde)} al ${fecha(hasta)}`
-    : desde ? `desde el ${fecha(desde)}`
-    : hasta ? `hasta el ${fecha(hasta)}`
-    : 'todos los movimientos'
-
-  const filtroOp = operacion === 'INGRESO' ? 'solo ingresos'
-    : operacion === 'EGRESO' ? 'solo egresos' : ''
-
-  // El saldo acumulado se calcula sobre la cuenta completa; con un filtro de dirección la
-  // columna mentiría (le faltarían los movimientos del otro signo), así que no se imprime.
-  const conAcumulado = !operacion
+  const { movimientos, saldos, monedas, totales, periodo, filtroOp, conAcumulado, total } = d
 
   return (
     <>
