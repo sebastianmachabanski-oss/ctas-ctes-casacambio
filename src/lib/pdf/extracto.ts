@@ -183,11 +183,17 @@ export function generarExtractoPdf(d: DatosExtracto): Uint8Array {
     theme: 'striped',
     styles: { font: 'helvetica', fontSize: 7.5, cellPadding: 1.4, overflow: 'linebreak' },
     alternateRowStyles: { fillColor: 247 },
-    headStyles: { fillColor: 238, textColor: 60, fontStyle: 'bold', fontSize: 7 },
+    headStyles: { fillColor: 238, textColor: 60, fontStyle: 'bold', fontSize: 8.5 },
     footStyles: { fillColor: 238, textColor: TINTA, fontSize: 7.5, fontStyle: 'bold' },
     columnStyles: fijas,
     // El encabezado se repite en cada hoja: un extracto de 7.700 movimientos son decenas
     // de páginas y sin esto, de la segunda en adelante, no se sabe qué columna es cuál.
+    // Los encabezados van CENTRADOS sobre su columna, no pegados al borde. Se hace acá y
+    // no en `headStyles` porque `columnStyles` —que alinea los importes a la derecha—
+    // tiene más precedencia y se los llevaba puestos; el estilo por celda gana sobre los dos.
+    didParseCell: (data: any) => {
+      if (data.section === 'head') data.cell.styles.halign = 'center'
+    },
     showHead: 'everyPage',
     // Una fila NO se parte entre dos hojas. Por defecto autoTable la corta donde cae, y
     // en el extracto eso deja el arranque de la página siguiente con media fila suelta:
