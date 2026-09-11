@@ -200,14 +200,18 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10 }}>
       {/* Rango de fechas (compacto) + totales del resultado filtrado */}
       <div className="card" style={{ padding: '7px 12px' }}>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <label className="label" style={{ margin: 0, fontSize: 11 }}>Desde</label>
-            <input className="input" type="date" value={d1} onChange={e => setD1(e.target.value)}
-              style={{ width: 138, fontSize: 12, padding: '4px 8px' }} />
-            <label className="label" style={{ margin: 0, fontSize: 11 }}>Hasta</label>
-            <input className="input" type="date" value={d2} onChange={e => setD2(e.target.value)}
-              style={{ width: 138, fontSize: 12, padding: '4px 8px' }} />
+        <div className="tx-bar">
+          <div className="tx-fechas">
+            <label className="tx-campo">
+              <span className="label" style={{ margin: 0, fontSize: 11, whiteSpace: 'nowrap' }}>Desde</span>
+              <input className="input" type="date" value={d1} onChange={e => setD1(e.target.value)}
+                style={{ fontSize: 12, padding: '4px 8px' }} />
+            </label>
+            <label className="tx-campo">
+              <span className="label" style={{ margin: 0, fontSize: 11, whiteSpace: 'nowrap' }}>Hasta</span>
+              <input className="input" type="date" value={d2} onChange={e => setD2(e.target.value)}
+                style={{ fontSize: 12, padding: '4px 8px' }} />
+            </label>
             <button className="btn-primary" onClick={buscar}
               style={{ fontSize: 12, padding: '5px 14px' }}>Buscar</button>
             {(d1 || d2) && (
@@ -222,7 +226,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
             title={hayFiltro
               ? `Totales de los ${total.toLocaleString('es-AR')} movimientos que coinciden con el filtro, no solo de esta página.`
               : 'Totales de todos los movimientos del rango, no solo de esta página.'}
-            style={{ display: 'flex', gap: 18, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            className="tx-totales">
             {([
               ['Total monto', nf0.format(totales.monto), 'var(--ink)'],
               ['Total imp. $', ars(Math.round(totales.pesos)), totales.pesos >= 0 ? 'var(--pos-ink)' : 'var(--neg-ink)'],

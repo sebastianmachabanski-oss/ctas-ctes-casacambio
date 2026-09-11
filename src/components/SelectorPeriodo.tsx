@@ -69,13 +69,19 @@ export default function SelectorPeriodo({ ruta, periodo, fecha, rDesde, rHasta, 
 
       {!esRango ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ink-2)', flexWrap: 'wrap' }}>
-          <button className="chip" style={{ width: 30, padding: '5px 0', textAlign: 'center' }}
-            aria-label="Período anterior"
-            onClick={() => ir({ p: periodo, fecha: navegarPeriodo(periodo, fecha, -1) })}>‹</button>
-          <b style={{ color: 'var(--ink)' }}>{label}</b>
-          <button className="chip" style={{ width: 30, padding: '5px 0', textAlign: 'center' }}
-            aria-label="Período siguiente"
-            onClick={() => ir({ p: periodo, fecha: navegarPeriodo(periodo, fecha, 1) })}>›</button>
+          {/* Las dos flechas y la fecha NO se separan: en el teléfono, con el renglón
+              envolviendo, "Jueves, 10 de septiembre de 2026" empujaba la flecha de
+              siguiente a una línea sola (11/9/2026). Acá el grupo no envuelve y el que
+              cede es el texto, que se parte en dos renglones entre sus flechas. */}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', minWidth: 0 }}>
+            <button className="chip" style={{ width: 30, padding: '5px 0', textAlign: 'center', flex: 'none' }}
+              aria-label="Período anterior"
+              onClick={() => ir({ p: periodo, fecha: navegarPeriodo(periodo, fecha, -1) })}>‹</button>
+            <b style={{ color: 'var(--ink)', minWidth: 0 }}>{label}</b>
+            <button className="chip" style={{ width: 30, padding: '5px 0', textAlign: 'center', flex: 'none' }}
+              aria-label="Período siguiente"
+              onClick={() => ir({ p: periodo, fecha: navegarPeriodo(periodo, fecha, 1) })}>›</button>
+          </span>
           {fecha !== hoy && <button className="chip" onClick={() => ir({ p: periodo, fecha: hoy })}>Hoy</button>}
         </div>
       ) : (

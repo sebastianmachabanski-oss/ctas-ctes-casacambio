@@ -121,6 +121,12 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 
 /* ═══════════════ Tablero / cards de datos ═══════════════ */
 .sec-lbl { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+/* Fila de tarjetas que se acomoda sola al ancho disponible. Se usa en Posición Ctas Ctes.
+   Hasta el 11/9/2026 esta clase no tenía NINGUNA regla: las tarjetas se apilaban a ancho
+   completo, una por renglón, desperdiciando media pantalla en la computadora. No se notaba
+   porque en el teléfono una columna es justo lo que corresponde. */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(228px, 1fr)); gap: 12px; }
+
 /* Carrusel horizontal: las tarjetas mantienen un ancho fijo y, cuando no entran,
    se desplazan hacia la derecha con scroll (pensado para sumar monedas como USDT). */
 .kpis-caja {
@@ -304,6 +310,24 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
 .imp { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
 .imp.p { background: var(--pos-bg); color: var(--pos-ink); }
 .imp.n { background: var(--neg-bg); color: var(--neg-ink); }
+/* Barra de filtros del listado de transacciones.
+   En el teléfono el grupo "Desde / Hasta / Buscar" medía 444px fijos y no envolvía: la
+   PÁGINA entera scrolleaba 113px de más en un Android de 360px, con "Hasta" cortado y
+   "Buscar" fuera de pantalla (11/9/2026). Ahora los campos se encogen y el grupo envuelve. */
+.tx-bar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.tx-fechas { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+/* Etiqueta y campo van pegados: sin este envoltorio, al envolver quedaba "Hasta" solo al
+   final de un renglón y su campo al principio del siguiente. */
+.tx-campo { display: inline-flex; align-items: center; gap: 8px; flex: 1 1 190px; min-width: 0; max-width: 230px; }
+.tx-campo .input { flex: 1 1 auto; min-width: 0; width: auto; }
+.tx-totales { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; }
+@media (max-width: 620px) {
+  /* Los totales dejan de ir pegados a la derecha: en una línea propia se leen mejor que
+     desalineados contra el borde. */
+  .tx-totales { margin-left: 0; width: 100%; gap: 14px; }
+  .tx-totales > div { text-align: left; }
+}
+
 /* segunda fila de encabezado: filtros por columna */
 .cc-tbl tr.tx-filtros th { padding-top: 0; padding-bottom: 8px; border-bottom: 1px solid var(--grid); }
 
