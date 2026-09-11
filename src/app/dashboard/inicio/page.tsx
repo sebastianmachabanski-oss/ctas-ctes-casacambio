@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import TableroInicio from '@/components/inicio/TableroInicio'
 import TransaccionesView from '@/components/transacciones/TransaccionesView'
+import RefrescoAutomatico from '@/components/RefrescoAutomatico'
 import { traerTransacciones } from '@/lib/consultas/transacciones'
 import { esAdmin, esStaff } from '@/lib/roles'
 
@@ -123,6 +124,11 @@ export default async function InicioPage({
 
   return (
     <>
+      {/* Los saldos y el listado se vuelven a pedir cada minuto: con más de un operador
+          cargando a la vez, la pantalla de los demás se quedaba vieja sin ninguna señal
+          (11/9/2026). El refresco conserva filtros, página y scroll. */}
+      <RefrescoAutomatico segundos={60} />
+
       <TableroInicio
         kpis={kpis}
         periodo={(PERIODOS as readonly string[]).includes(p) ? p : ''}
