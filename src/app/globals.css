@@ -349,11 +349,28 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
      "11/09/20…" y no sabe qué filtró. Por eso acá la fila SÍ puede envolver: en 360px no
      entran dos campos legibles más los botones, y un campo que no se lee es peor que un
      renglón de más. */
-  .tx-campo { flex: 1 1 128px; min-width: 128px; max-width: none; }
+  /* TODO EN UNA LÍNEA, con la fecha completa visible. Probé cinco combinaciones a 360px
+     y solo dos entran sin cortar el texto; esta es una de ellas:
+
+       ✗ con flecha + "Buscar"                 ->  09/11/2(
+       ✗ sin flecha + "Buscar"                 ->  09/11/20:
+       ✓ sin flecha + lupa en vez de "Buscar"  ->  09/11/2026
+       ✓ sin flecha + "Buscar" + sin el ícono de calendario del campo
+       ✗ con flecha + "Buscar" + sin el ícono
+
+     Se eligió la cuarta porque conserva la palabra "Buscar", que dice qué hace mejor que
+     una lupa. Lo que se sacrifica es el dibujito de calendario DENTRO del campo: en el
+     teléfono es decorativo —tocar cualquier parte del campo abre el calendario igual— y
+     son los ~20px por campo que faltaban. En la computadora sigue estando.
+
+     También se va la flecha entre los dos campos: son 16px más. El orden y el aria-label
+     dicen cuál es desde y cuál es hasta. */
+  .tx-campo { flex: 1 1 0; min-width: 0; max-width: none; }
   .tx-campo .input { font-size: 12.5px !important; padding: 4px 6px !important; }
-  .tx-flecha { display: inline; color: var(--muted); font-size: 12px; flex: none; }
+  .tx-campo .input::-webkit-calendar-picker-indicator { display: none; }
+  .tx-flecha { display: none; }
   .sec-nota { display: none; }
-  .tx-fechas { gap: 6px; }
+  .tx-fechas { gap: 6px; flex-wrap: nowrap; }
   .tx-fechas .btn-primary { flex: none; padding: 5px 12px !important; }
 
   /* Los totales dejan de ir pegados a la derecha: en una línea propia se leen mejor que
