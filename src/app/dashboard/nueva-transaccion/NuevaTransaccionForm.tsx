@@ -65,6 +65,29 @@ function Required() {
 
 const fmtUsd = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
 
+/**
+ * Valores con los que arranca el formulario. Es una función y no un objeto suelto por dos
+ * motivos: la fecha tiene que ser la de HOY cada vez que se llama, y el estado inicial y
+ * el reinicio salen del MISMO lugar —con dos listas separadas, una se actualiza y la otra
+ * queda vieja sin que nadie lo note—.
+ */
+function formPorDefecto() {
+  return {
+    fecha: today(),
+    tipo: 'CTA CTE',
+    col_f: 'C',
+    cuenta_cte: '',
+    operacion: 'INGRESAN',
+    propio: 'DOLARES',
+    externo: 'DOLARES',
+    monto: '',
+    cotizacion: '',
+    costo_porcentaje: '',
+    debe: '',
+    notas: '',
+  }
+}
+
 export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, puedeEditarUmbral }: {
   cuentas: string[]; clientes: string[]; umbralUsd: number; puedeEditarUmbral: boolean
 }) {
@@ -78,20 +101,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const [form, setForm] = useState({
-    fecha: today(),
-    tipo: 'CTA CTE',
-    col_f: 'C',
-    cuenta_cte: '',
-    operacion: 'INGRESAN',
-    propio: 'DOLARES',
-    externo: 'DOLARES',
-    monto: '',
-    cotizacion: '',
-    costo_porcentaje: '',
-    debe: '',
-    notas: '',
-  })
+  const [form, setForm] = useState(formPorDefecto)
 
   // Selector de cliente según el Tipo:
   //  - CTA CTE: buscador sobre las cuentas reales. Si el nombre no existe, se ofrece
@@ -380,13 +390,34 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     }
   }
 
+  /**
+   * Deja la pantalla como recién entrada (17/9/2026).
+   *
+   * Antes conservaba tipo, fecha, cliente, operación y monedas de la transacción anterior
+   * —solo limpiaba los importes—, así que la siguiente carga arrancaba con datos de la
+   * carga previa y el operador tenía que acordarse de revisarlos uno por uno.
+   *
+   * Y algo peor, que no se veía: `confirmoGrande` tampoco se reiniciaba. Es la tilde que
+   * habilita guardar un monto por encima del umbral; quedando marcada, la transacción
+   * grande SIGUIENTE se podía guardar sin volver a confirmarla. La protección existía
+   * pero valía una sola vez por visita a la pantalla.
+   *
+   * La fecha vuelve a HOY, no a la de la transacción anterior: es el valor por defecto y,
+   * además, así una pantalla abierta desde ayer no sigue cargando con la fecha de ayer.
+   */
   function resetForm() {
     setStep('idle')
     setExcelOk(null)
     setSoloApp(false)
     setWarning(null)
     setError(null)
-    setForm(f => ({ ...f, monto: '', cotizacion: '', costo_porcentaje: '', debe: '', notas: '' }))
+    setForm(formPorDefecto())
+    // El buscador de cliente guarda su texto aparte: sin esto el campo seguía mostrando
+    // el nombre anterior con la cuenta ya vacía.
+    setClienteQuery('')
+    setClienteOpen(false)
+    setMarcada(0)
+    setConfirmoGrande(false)
   }
 
   // La transacción ya quedó guardada en el sistema (Supabase). La réplica al origen
