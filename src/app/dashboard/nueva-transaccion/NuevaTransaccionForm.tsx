@@ -41,6 +41,15 @@ const OPERACIONES_POR_TIPO: Record<string, string[]> = {
 }
 // Cotización obligatoria solo para operaciones de compra/venta de moneda.
 const OPERACIONES_REQUIEREN_COTIZACION = ['COMPRA', 'VENTA']
+/**
+ * La cotización NO aplica a las transacciones de cuenta corriente (17/9/2026).
+ *
+ * Una cuenta corriente solo INGRESA o EGRESA una moneda contra el saldo del cliente en
+ * esa misma moneda: no hay cambio de una moneda por otra y, por lo tanto, no hay tasa que
+ * anotar. Dejar el campo escribible invitaba a cargar un número que después aparece en el
+ * listado como si significara algo.
+ */
+const cotizacionAplicaA = (tipo: string) => tipo !== 'CTA CTE'
 
 function today() {
   // OJO: toISOString() da la fecha en UTC, no en horario local — de noche en Argentina
@@ -214,7 +223,8 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
   useAvisoSinGuardar(hayCambios)
 
   const operacionesDisponibles = OPERACIONES_POR_TIPO[form.tipo] ?? []
-  const cotizacionRequerida = OPERACIONES_REQUIEREN_COTIZACION.includes(form.operacion)
+  const cotizacionHabilitada = cotizacionAplicaA(form.tipo)
+  const cotizacionRequerida = cotizacionHabilitada && OPERACIONES_REQUIEREN_COTIZACION.includes(form.operacion)
 
   // ── Alerta de monto grande (decisión 11/7/2026): umbral CONFIGURABLE y expresado en
   // DÓLARES; siempre se evalúa el valor en USD de la operación, venga en la moneda que
@@ -294,7 +304,13 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     // opción) y el cliente elegido tampoco aplica (cuenta corriente ↔ cliente eventual).
     const opciones = OPERACIONES_POR_TIPO[tipo] ?? []
     // Las monedas ya no dependen del Tipo, así que las elegidas se conservan tal cual.
-    setForm(f => ({ ...f, tipo, operacion: opciones[0] ?? '', cuenta_cte: '' }))
+    // La cotización SÍ se limpia al pasar a cuenta corriente: si no, un valor tipeado
+    // para una operación de caja viajaba igual y quedaba guardado en un movimiento donde
+    // no significa nada.
+    setForm(f => ({
+      ...f, tipo, operacion: opciones[0] ?? '', cuenta_cte: '',
+      cotizacion: cotizacionAplicaA(tipo) ? f.cotizacion : '',
+    }))
     setClienteQuery('')
     setClienteOpen(false)
   }
@@ -634,15 +650,19 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
           />
         </div>
         <div>
-          <label className="label">Cotización{cotizacionRequerida && <Required />}</label>
+          <label className="label" htmlFor="cotizacion">Cotización{cotizacionRequerida && <Required />}</label>
           <input
+            id="cotizacion"
             type="number"
             step="0.0001"
             min="0"
             className="input"
             value={form.cotizacion}
             onChange={e => set('cotizacion', e.target.value)}
-            placeholder="0.00"
+            disabled={!cotizacionHabilitada}
+            title={cotizacionHabilitada ? undefined
+              : 'Las transacciones de cuenta corriente no llevan cotización: no hay cambio de una moneda por otra.'}
+            placeholder={cotizacionHabilitada ? '0.00' : 'No aplica en cuenta corriente'}
           />
         </div>
         <div>
