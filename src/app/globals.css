@@ -343,6 +343,13 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
   font-size: 15px; line-height: 1; cursor: pointer;
 }
 .btn-icono:hover { color: var(--neg-ink); border-color: rgba(185,28,28,.35); }
+/* Nombre de cuenta que lleva a su cuenta corriente (drill down, 22/9/2026).
+   Se distingue del texto común solo al pasar por encima: subrayarlo siempre llenaría de
+   líneas una tabla que ya tiene mucha información. El área de toque va hasta el alto de
+   la fila para que en el teléfono no haya que apuntarle a un renglón de 12px. */
+.drill { color: inherit; text-decoration: none; display: inline-block; padding: 2px 0; }
+.drill:hover, .drill:focus-visible { color: var(--brand-ink); text-decoration: underline; }
+
 /* En la computadora el botón de buscar es texto; la lupa solo aparece en el teléfono. */
 .btn-buscar .lupa { display: none; }
 @media (max-width: 620px) {

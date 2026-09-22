@@ -354,7 +354,16 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                       style={{ whiteSpace: 'nowrap' }}>{m.tipo}</span>
                   </td>
                   <td style={{ textAlign: 'left' }}>
-                    {m.cliente ?? '—'}
+                    {/* El nombre lleva a la cuenta corriente del cliente, ya filtrada.
+                        SOLO en las filas de CTA CTE: en las de CAJA el cliente es texto
+                        libre —son clientes eventuales, regla del 5/7/2026— y no existe
+                        como cuenta, así que el enlace abriría una pantalla vacía. */}
+                    {m.tipo === 'CTA CTE' && m.cliente ? (
+                      <Link href={`/dashboard/cuenta-corriente?cuenta=${encodeURIComponent(m.cliente)}`}
+                        className="drill" title={`Ver la cuenta corriente de ${m.cliente}`}>
+                        {m.cliente}
+                      </Link>
+                    ) : (m.cliente ?? '—')}
                     {m.debe && <span className="tag tag-gray" style={{ marginLeft: 6, fontWeight: 600 }}>🚚 {m.debe}</span>}
                   </td>
                   <td style={{ textAlign: 'left' }}><span className={`tag ${badge(m.operacion)}`}>{m.operacion}</span></td>
