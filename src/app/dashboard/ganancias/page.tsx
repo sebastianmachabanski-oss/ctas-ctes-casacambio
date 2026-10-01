@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import GananciasView, { type DiaAgg, type ParAgg, type TTAgg } from '@/components/ganancias/GananciasView'
 import { veGanancias } from '@/lib/roles'
 import { esPeriodoValido, hoyArgentina, rangoDe } from '@/lib/periodos'
+import { repartirTT, ttVacio } from '@/lib/ganancias-tt'
 
 // Módulo de Ganancias — exclusivo del rol superadmin (ver src/lib/roles.ts).
 // Réplica de la solapa COLO: el servidor agrega por día las operaciones COMPRA/VENTA/
@@ -12,7 +13,6 @@ import { esPeriodoValido, hoyArgentina, rangoDe } from '@/lib/periodos'
 
 
 const parVacio = (): ParAgg => ({ vC: 0, aC: 0, vV: 0, aV: 0, vCcc: 0, aCcc: 0, vVcc: 0, aVcc: 0 })
-const ttVacio = (): TTAgg => ({ usd: 0, eur: 0, brl: 0, usdt: 0, chq: 0, pesos: 0 })
 
 export default async function GananciasPage({
   searchParams,
@@ -127,7 +127,7 @@ export default async function GananciasPage({
   const filasTT: any[] = []
   for (let from = 0; ; from += PAGE) {
     const { data: pg } = await supabase.from('movimientos_caja')
-      .select('fecha,notas,operacion,pesos,dolares,euros,reales,usdt,cheques')
+      .select('id,fecha,notas,operacion,pesos,dolares,euros,reales,usdt,cheques')
       .eq('op', 'T')
       .lte('fecha', fin)
       .order('fecha', { ascending: true })
@@ -137,54 +137,11 @@ export default async function GananciasPage({
     if (rows.length < PAGE) break
   }
 
-  // Un grupo (la NOTA, que nombra a los participantes) está CERRADO cuando tiene las dos
-  // puntas: al menos un INGRESAN y al menos un EGRESAN.
-  //
-  // POR QUÉ NO SE IMPUTA TODO AL MOVIMIENTO QUE CIERRA
-  // Los grupos se REPITEN: "JOACO SIZOKO" no es una transferencia, es una contraparte que
-  // aparece decenas de veces. Llevar la ganancia de toda su historia a la fecha del último
-  // movimiento inventaría un pico enorme en un día y vaciaría todos los meses anteriores.
-  // Cada movimiento cuenta en SU fecha; lo que decide el grupo es si cuenta o no.
-  const puntas = new Map<string, { ing: boolean; egr: boolean }>()
-  const claveGrupo = (m: any) => (m.notas ?? '').trim() || '(sin nota)'
-  for (const m of filasTT) {
-    const k = claveGrupo(m)
-    const p = puntas.get(k) ?? { ing: false, egr: false }
-    const op = String(m.operacion ?? '').toUpperCase()
-    if (op.includes('INGRES')) p.ing = true
-    else if (op.includes('EGRES')) p.egr = true
-    puntas.set(k, p)
-  }
-  const cerrado = (m: any) => {
-    const p = puntas.get(claveGrupo(m))
-    return !!p && p.ing && p.egr
-  }
-
-  // Los grupos con UNA SOLA punta no son ganancia: son plata que entró y todavía no se
-  // entregó (o al revés). Es una POSICIÓN ABIERTA. Se muestra aparte y entra al resultado
-  // recién cuando se carga la contraparte y el grupo se cierra.
-  const abiertas = ttVacio()
-  const gruposAbiertos = new Set<string>()
-
-  for (const m of filasTT) {
-    const suma = (t: TTAgg) => {
-      t.usd   += Number(m.dolares) || 0
-      t.eur   += Number(m.euros)   || 0
-      t.brl   += Number(m.reales)  || 0
-      t.usdt  += Number(m.usdt)    || 0
-      t.chq   += Number(m.cheques) || 0
-      t.pesos += Number(m.pesos)   || 0
-    }
-    if (cerrado(m)) {
-      // Solo lo que ocurrió DENTRO del período suma al resultado del período.
-      if (m.fecha >= ini) suma(diaDe(m.fecha).tt)
-    } else {
-      // La posición abierta es un saldo, no un flujo: se acumula toda su historia hasta
-      // el cierre del período, sin importar cuándo entró.
-      suma(abiertas)
-      gruposAbiertos.add(claveGrupo(m))
-    }
-  }
+  // El reparto entre "resultado del período" y "posición abierta" vive en `src/lib/
+  // ganancias-tt.ts` para poder validarlo sin montar un navegador ni tener la base
+  // delante (mismo criterio que `posicion.ts`). Ver scripts/validar-ganancias-tt.mts.
+  const { porFecha, abiertas, gruposAbiertos } = repartirTT(filasTT, ini)
+  porFecha.forEach((t, f) => { diaDe(f).tt = t })
 
   const dias = Array.from(porDia.values()).sort((a, b) => a.f.localeCompare(b.f))
 
@@ -252,7 +209,7 @@ export default async function GananciasPage({
       clientesCC={clientesCCN}
       serieUSD={serie}
       abiertas={abiertas}
-      gruposAbiertos={gruposAbiertos.size}
+      gruposAbiertos={gruposAbiertos}
       periodo={esRango ? '' : p}
       fecha={fecha}
       rDesde={esRango ? searchParams.desde! : ''}
