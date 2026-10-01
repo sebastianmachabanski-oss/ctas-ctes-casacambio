@@ -105,10 +105,12 @@ exige que volumen e importe en pesos estén en la misma pata.
 Cómo se calcula:
 
 1. Se agrupan las filas con `op = 'T'` por **NOTAS**, que es donde el cliente anota los
-   participantes. Un grupo está **CERRADO** cuando tiene sus dos puntas: al menos un
-   INGRESAN y al menos un EGRESAN. Solo los grupos cerrados entran al resultado.
-2. Se suman las **columnas de caja** de las filas cerradas del período. Ya traen el signo
-   puesto —INGRESAN suma, EGRESAN resta—, así que la suma **es** la diferencia.
+   participantes, y dentro de cada nota las patas se **parean por orden cronológico**: el
+   ingreso más viejo sin pareja se cancela con el egreso más viejo sin pareja.
+2. Un par **realizado** —ingreso + egreso— cuenta **entero**, en la fecha de la pata que lo
+   completó. Se suman sus **columnas de caja**, que ya traen el signo puesto (INGRESAN
+   suma, EGRESAN resta), así que la suma **es** la diferencia. Lo que no tiene pareja no
+   entra: todavía no se realizó.
 3. Ese neto nace en la moneda de la operación. Para sumarlo al total en pesos se convierte
    con la **cotización implícita del par en el período**, la misma que usa el panel de
    dólares. Las transferencias que ya son en pesos entran directo, sin convertir.
@@ -125,12 +127,26 @@ Se resolvió mostrándola aparte, como **posición abierta**: un panel propio, a
 el cierre del período (no del período: es un saldo, no un flujo) y rotulado como posición.
 Entra al resultado apenas se carga la punta que falta.
 
-**Por qué no se imputa todo al movimiento que cierra el grupo.** Los grupos se REPITEN:
-"JOACO SIZOKO" no es una transferencia, es una contraparte que aparece decenas de veces —
-1.683 movimientos en pocas decenas de grupos. Llevar la ganancia de toda esa historia a la
-fecha del último movimiento inventaría un pico enorme en un día y vaciaría todos los meses
-anteriores. Por eso **cada movimiento cuenta en SU fecha**; lo único que decide el grupo es
-si cuenta o no.
+### La ganancia se computa cuando se realiza (1/10/2026)
+
+Definiciones del negocio, confirmadas por el cliente:
+
+1. Una transferencia tiene **dos patas**: lo que ingresa y lo que egresa.
+2. El ingreso **siempre** es mayor o igual al egreso. Si no, no hay negocio — un par que da
+   negativo es un **error de carga**, no una pérdida, y la pantalla lo avisa aparte.
+3. **Hasta que no está la segunda pata, no se computa nada.** Cuando llega, el par **entero**
+   cuenta en esa fecha.
+
+**Qué cambió.** Antes cada pata se imputaba a su propia fecha y lo único que decidía el
+grupo era si contaba o no. Con eso, una transferencia con el ingreso en agosto y el egreso
+en septiembre dejaba el ingreso entero en agosto y el egreso entero —negativo— en
+septiembre: los meses quedaban partidos al medio y uno de los dos daba pérdida.
+
+**Cómo se parea.** Las notas son contrapartes que se REPITEN: "MATI - EDY" tiene 164 patas
+en 19 meses. La nota sola no identifica una transferencia, así que dentro de cada nota las
+patas se parean por **orden cronológico** (FIFO). Es lo que haría una persona mirando la
+planilla, y sobre los datos reales cierra: todos los grupos tienen la misma cantidad de
+ingresos que de egresos.
 
 Para saber si un grupo está cerrado hay que mirar su historia completa, no solo el período:
 una punta puede haberse cargado meses antes. Por eso la consulta de transferencias trae

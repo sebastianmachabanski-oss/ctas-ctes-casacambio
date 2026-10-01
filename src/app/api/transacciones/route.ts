@@ -39,6 +39,19 @@ export async function POST(request: Request) {
   if (!['C', 'T'].includes(col_f))
     return NextResponse.json({ error: 'Op debe ser C o T' }, { status: 400 })
 
+  // LA NOTA ES OBLIGATORIA EN LAS TRANSFERENCIAS (1/10/2026).
+  // La nota nombra a los participantes y es lo ÚNICO que vincula las dos patas de una
+  // transferencia. Sin ella la pata queda huérfana: no se puede parear, nunca se realiza
+  // y por lo tanto nunca entra a Ganancias. Tres filas sin nota de septiembre de 2026
+  // distorsionaron el resultado del mes entero antes de que se detectara.
+  // Va en el SERVIDOR y no solo en el formulario: el navegador no es el lugar donde se
+  // defiende una regla (ver docs/ROLES.md para el mismo criterio en permisos).
+  if (col_f === 'T' && !String(notas ?? '').trim())
+    return NextResponse.json(
+      { error: 'Las transferencias necesitan una nota que identifique a los participantes (ej. "BOH - GRA"): es lo que vincula el ingreso con el egreso.' },
+      { status: 400 },
+    )
+
   // La Operación disponible depende del Tipo: CTA CTE solo mueve cuenta corriente
   // (INGRESAN/EGRESAN); CAJA admite además las operaciones de caja (compra/venta/gastos).
   const OPERACIONES_VALIDAS: Record<string, string[]> = {
