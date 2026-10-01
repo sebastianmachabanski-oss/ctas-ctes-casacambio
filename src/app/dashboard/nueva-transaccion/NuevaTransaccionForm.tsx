@@ -319,6 +319,10 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     if (!form.fecha)       return 'La fecha es obligatoria'
     if (!form.tipo)        return 'El tipo de transacción es obligatorio'
     if (!form.col_f)       return 'Op es obligatorio'
+    // La nota es lo único que vincula las dos patas de una transferencia: sin ella la pata
+    // queda huérfana y nunca llega a computarse en Ganancias. El servidor valida lo mismo.
+    if (form.col_f === 'T' && !form.notas.trim())
+      return 'Las transferencias necesitan una nota que identifique a los participantes (ej. "BOH - GRA"): es lo que vincula el ingreso con el egreso.'
     if (!form.cuenta_cte.trim())
       return form.tipo === 'CTA CTE'
         ? 'Seleccioná una cuenta corriente de la lista'
@@ -690,14 +694,23 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
           </p>
         </div>
         <div>
-          <label className="label">Notas</label>
+          {/* En una transferencia la nota deja de ser una observación: es lo que vincula
+              el ingreso con el egreso. Por eso ahí pasa a obligatoria, con su marca y su
+              ayuda propias (1/10/2026). */}
+          <label className="label">Notas{form.col_f === 'T' && <Required />}</label>
           <input
             type="text"
             className="input"
             value={form.notas}
             onChange={e => set('notas', e.target.value)}
-            placeholder="Referencia, observaciones…"
+            placeholder={form.col_f === 'T' ? 'Participantes de la transferencia (ej. BOH - GRA)' : 'Referencia, observaciones…'}
           />
+          {form.col_f === 'T' && (
+            <p className="text-xs text-gray-400 mt-1">
+              Obligatoria en transferencias: es lo que permite juntar esta pata con la otra.
+              Usá la misma nota en el ingreso y en el egreso.
+            </p>
+          )}
         </div>
       </div>
 

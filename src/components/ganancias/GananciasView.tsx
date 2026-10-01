@@ -119,14 +119,16 @@ function cotizacionPar(dias: DiaAgg[], par: Cfg['par']): number | null {
 const cotizacionUsd = (dias: DiaAgg[]) => cotizacionPar(dias, 'usd')
 
 
-export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD, abiertas, gruposAbiertos, periodo, fecha, rDesde, rHasta, hoy }: {
+export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD, abiertas, puntasAbiertas, paresNegativos, periodo, fecha, rDesde, rHasta, hoy }: {
   dias: DiaAgg[]
   /** Reportes de caja que hasta el 10/9/2026 vivían en Inicio. */
   clientesCaja: Cliente[]; clientesCC: Cliente[]; serieUSD: Punto[]
-  /** Posición de las transferencias con una sola punta cargada (acumulada, no del período). */
+  /** Posición de las patas de transferencia que todavía no encontraron pareja. */
   abiertas: TTAgg
-  /** Cuántos grupos de transferencia están sin cerrar. */
-  gruposAbiertos: number
+  /** Cuántas patas de transferencia quedaron sin parear. */
+  puntasAbiertas: number
+  /** Transferencias realizadas en el período cuyo egreso superó al ingreso (error de carga). */
+  paresNegativos: number
   periodo: string; fecha: string; rDesde: string; rHasta: string; hoy: string
 }) {
   const esRango = !!(rDesde && rHasta)
@@ -212,10 +214,10 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
         {/* Transferencias en curso: NO son ganancia todavía. Mostrarlas como resultado
             sería contar como ganado algo que puede no volver nunca; esconderlas sería
             peor, porque es plata real inmovilizada. Van acá, rotuladas como posición. */}
-        {gruposAbiertos > 0 && (
+        {puntasAbiertas > 0 && (
           <div className="card gn-card" style={{ borderLeft: '3px solid var(--warn-ink)' }}>
             <div className="gn-lbl">
-              Transferencias en curso · {gruposAbiertos} grupo{gruposAbiertos !== 1 ? 's' : ''} sin cerrar
+              Transferencias en curso · {puntasAbiertas} sin su segunda pata
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}>
               {monedasConSaldo(abiertas).map(([k, v]) => (
@@ -225,12 +227,26 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
               ))}
             </div>
             <div className="gn-pie">
-              <b>No suman al resultado</b>: falta cargar la otra punta. Es una posición
-              acumulada al cierre del período, no un resultado del período.
+              <b>No suman al resultado</b>: la ganancia se computa cuando la transferencia
+              se realiza, y para eso falta cargar la otra pata. Es una posición acumulada al
+              cierre del período, no un resultado del período.
             </div>
           </div>
         )}
       </div>
+
+      {/* Por definición del negocio el ingreso de una transferencia SIEMPRE es mayor o igual
+          al egreso: si no, no hay negocio. Un par que da negativo es un error de carga, no
+          una pérdida. Se avisa para corregirlo en vez de dejarlo diluido adentro del total. */}
+      {paresNegativos > 0 && (
+        <div className="card" style={{ padding: '12px 16px', fontSize: 13, lineHeight: 1.5, borderLeft: '3px solid var(--warn-ink)' }}>
+          ⚠️ {paresNegativos === 1
+            ? <>Hay <b>1 transferencia</b> realizada en el período cuyo egreso superó al ingreso.</>
+            : <>Hay <b>{paresNegativos} transferencias</b> realizadas en el período cuyo egreso superó al ingreso.</>}
+          {' '}Por definición no debería pasar, así que probablemente sea un error de carga:
+          conviene revisar los importes antes de tomar este resultado por bueno.
+        </div>
+      )}
 
       {r.ttSinCotizacion && (
         <div className="card" style={{ padding: '12px 16px', fontSize: 13, lineHeight: 1.5, borderLeft: '3px solid var(--warn-ink)' }}>
@@ -298,11 +314,14 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
               cotización del período. Se puede desactivar en ⚙ Configuración.
             </p>
             <p style={{ margin: '0 0 8px' }}>
-              <b>Solo cuentan las transferencias cerradas.</b> Una transferencia recién tiene
-              resultado cuando están cargadas <b>sus dos puntas</b>: el ingreso y el egreso. Si
-              falta una, lo cargado no es ganancia sino plata en tránsito, y se muestra aparte
-              como <b>transferencias en curso</b>. Cuando se carga la punta que falta, el grupo
-              pasa a contar — cada movimiento en la fecha en que ocurrió, no en la del cierre.
+              <b>La ganancia se computa cuando la transferencia se realiza.</b> Una
+              transferencia tiene resultado recién cuando están cargadas <b>sus dos patas</b>:
+              el ingreso y el egreso. Hasta entonces lo cargado no es ganancia sino plata en
+              tránsito, y se muestra aparte como <b>transferencias en curso</b>. Cuando llega
+              la pata que falta, el par <b>entero</b> cuenta en esa fecha — no se reparte entre
+              las fechas de cada pata, porque entonces un mes se quedaría con el ingreso y el
+              siguiente con el egreso, y ese daría pérdida. El ingreso siempre tiene que ser
+              mayor o igual al egreso: si no, no hay negocio.
             </p>
             <p style={{ margin: '0 0 8px' }}>
               <b>En dólares.</b> Es el mismo resultado, convertido con la cotización promedio

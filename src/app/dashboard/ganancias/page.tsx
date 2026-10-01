@@ -140,8 +140,12 @@ export default async function GananciasPage({
   // El reparto entre "resultado del período" y "posición abierta" vive en `src/lib/
   // ganancias-tt.ts` para poder validarlo sin montar un navegador ni tener la base
   // delante (mismo criterio que `posicion.ts`). Ver scripts/validar-ganancias-tt.mts.
-  const { porFecha, abiertas, gruposAbiertos } = repartirTT(filasTT, ini)
+  const { porFecha, abiertas, puntasAbiertas, paresNegativos } = repartirTT(filasTT, ini)
   porFecha.forEach((t, f) => { diaDe(f).tt = t })
+  // Pares cuyo egreso superó al ingreso. Por definición del negocio no deberían existir
+  // (ver ganancias-tt.ts); los que se realizaron DENTRO del período se avisan en pantalla
+  // para corregir la carga, en vez de dejarlos diluidos adentro del total.
+  const negativosDelPeriodo = paresNegativos.filter(p => p.fecha >= ini).length
 
   const dias = Array.from(porDia.values()).sort((a, b) => a.f.localeCompare(b.f))
 
@@ -209,7 +213,8 @@ export default async function GananciasPage({
       clientesCC={clientesCCN}
       serieUSD={serie}
       abiertas={abiertas}
-      gruposAbiertos={gruposAbiertos}
+      puntasAbiertas={puntasAbiertas}
+      paresNegativos={negativosDelPeriodo}
       periodo={esRango ? '' : p}
       fecha={fecha}
       rDesde={esRango ? searchParams.desde! : ''}

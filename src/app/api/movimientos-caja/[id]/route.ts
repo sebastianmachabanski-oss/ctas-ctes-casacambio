@@ -37,6 +37,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (getError || !original)
     return NextResponse.json({ error: 'Movimiento no encontrado' }, { status: 404 })
 
+  // LA NOTA ES OBLIGATORIA EN LAS TRANSFERENCIAS (1/10/2026), también al editar: vaciarla
+  // acá rompe lo mismo que no cargarla en el alta. La nota vincula el ingreso con el
+  // egreso, y sin ella la pata queda huérfana y nunca se computa en Ganancias.
+  if (String((original as any).op ?? '').toUpperCase() === 'T' && !String(notas ?? '').trim())
+    return NextResponse.json(
+      { error: 'Las transferencias necesitan una nota que identifique a los participantes (ej. "BOH - GRA"): es lo que vincula el ingreso con el egreso.' },
+      { status: 400 },
+    )
+
   // El TIPO ahora sí se edita (1/9/2026): cargar una transacción de cuenta corriente como
   // CAJA por error era irreparable desde la app y había que tocar la base a mano.
   // Cambiarlo no es un campo más — decide si el movimiento existe o no en `diario`—, así

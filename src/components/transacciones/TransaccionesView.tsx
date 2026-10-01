@@ -8,6 +8,8 @@ import FiltroClientes from './FiltroClientes'
 type Mov = {
   id: string; fecha: string; cliente: string | null; operacion: string; monto: number
   tipo: string; debe: string | null; cot: number | null; notas: string | null
+  /** Columna F de la planilla: 'C' = operación común, 'T' = transferencia. */
+  op: string | null
   creado_por: string | null; creado_at: string | null
   editado_por: string | null; editado_at: string | null
   pesos: number; cheques: number; dolares: number; euros: number; reales: number; usdt: number; banco: number
@@ -193,7 +195,9 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
     navegar(1, '', '')
   }
 
-  const ncols = 8 + cols.length + (puedeEditar ? 1 : 0)
+  // Fecha, Op, Tipo, Cliente, Operación, Cot., Monto, (2 fijas más) y Notas, más una
+  // columna de importe por moneda con saldo y la de acciones si puede editar.
+  const ncols = 9 + cols.length + (puedeEditar ? 1 : 0)
   const hayFiltro = Boolean(cliSel.length || fTipo || fOp || fNotas || fAutor || fMin)
 
   return (
@@ -295,6 +299,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
             <thead>
               <tr>
                 <th>Fecha</th>
+                <th title="C = operación común · T = transferencia">Op</th>
                 <th style={{ textAlign: 'left' }}>Tipo</th>
                 <th style={{ textAlign: 'left' }}>Cliente</th>
                 <th style={{ textAlign: 'left' }}>Operación</th>
@@ -309,6 +314,9 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 {puedeEditar && <th></th>}
               </tr>
               <tr className="tx-filtros">
+                <th></th>
+                {/* Celda vacía de la columna Op: la fila de filtros tiene que tener tantas
+                    celdas como la de títulos o se corren todas las columnas. */}
                 <th></th>
                 <th style={{ textAlign: 'left' }}>
                   <select className="srch" value={fTipo} onChange={e => { setFTipo(e.target.value); aplicarFiltro({ tipo: e.target.value }) }}
@@ -349,6 +357,15 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               {filtrados.map(m => (
                 <tr key={m.id}>
                   <td style={{ color: 'var(--muted)' }}>{fmtFecha(m.fecha)}</td>
+                  {/* Op: C = operación común, T = transferencia. La T va marcada y la C en
+                      gris claro — las transferencias se cuentan con otra regla en Ganancias
+                      (la ganancia se computa al realizarse el par) y conviene distinguirlas
+                      de un vistazo; las C son la enorme mayoría y no necesitan destacarse. */}
+                  <td>
+                    {m.op === 'T'
+                      ? <span className="tag tag-orange" style={{ fontWeight: 700 }} title="Transferencia">T</span>
+                      : <span style={{ color: 'var(--muted)' }} title="Operación común">{m.op || '—'}</span>}
+                  </td>
                   <td style={{ textAlign: 'left' }}>
                     <span className={`tag ${m.tipo === 'CTA CTE' ? 'tag-blue' : 'tag-gray'}`}
                       style={{ whiteSpace: 'nowrap' }}>{m.tipo}</span>
