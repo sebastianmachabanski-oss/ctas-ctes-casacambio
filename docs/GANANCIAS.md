@@ -136,6 +136,34 @@ Para saber si un grupo está cerrado hay que mirar su historia completa, no solo
 una punta puede haberse cargado meses antes. Por eso la consulta de transferencias trae
 todo hasta el fin del período (`lte('fecha', fin)`), no solo el rango.
 
+### Una fila SIN NOTA no se agrupa con ninguna otra (22/9/2026)
+
+Hasta esta fecha, todas las filas sin nota compartían la clave `'(sin nota)'`. Ese cajón
+junta movimientos que no tienen nada que ver entre sí, así que terminaba teniendo ingresos
+**y** egresos, pasaba la prueba de "cerrado" y entraba al resultado como si fuera una
+transferencia real.
+
+**Lo que provocó.** En septiembre de 2026 había 5 filas sin nota —3 de septiembre y 2 de
+junio— que juntas daban US$ (24.725). Los 21 grupos con nota sumaban US$ 11.726 y todos
+eran positivos, pero la pantalla mostraba **US$ (12.999)**: el cajón daba vuelta el signo
+del mes. Agosto, que no tenía ninguna fila sin nota, salía bien y por eso el error parecía
+venir del dato migrado.
+
+Sin nota no hay con qué parear, así que **cada fila es su propio grupo**: queda con una
+sola punta, nunca cierra y sale del resultado hacia *Transferencias en curso*. Es la
+lectura honesta —no sabemos qué cancela— y además las deja **a la vista** en pantalla en
+lugar de esconderlas adentro de la ganancia. Se corrigen cargándoles la nota que les
+corresponde; ahí se van solas a su grupo real.
+
+Para encontrarlas:
+
+```sql
+select id, fecha, cliente, operacion, dolares, pesos, fila_sheet, creado_por
+  from movimientos_caja
+ where op = 'T' and coalesce(btrim(notas), '') = ''
+ order by fecha;
+```
+
 Dos decisiones que conviene tener presentes:
 
 - **Se suma la pata de CAJA, no la de cuenta corriente.** En una fila de cta cte las dos son
