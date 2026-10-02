@@ -152,6 +152,21 @@ Para saber si un grupo está cerrado hay que mirar su historia completa, no solo
 una punta puede haberse cargado meses antes. Por eso la consulta de transferencias trae
 todo hasta el fin del período (`lte('fecha', fin)`), no solo el rango.
 
+### Desde cuándo se avisan las transferencias en curso (2/10/2026)
+
+El panel *Transferencias en curso* solo reporta patas sin pareja desde el **1/9/2026**
+(`DESDE_EN_CURSO` en `src/lib/ganancias-tt.ts`).
+
+Antes de esa fecha hay patas sueltas del histórico migrado que **nunca van a encontrar
+pareja**: el movimiento que las cancelaba no se cargó en su momento y ya nadie lo va a
+cargar. Mostrarlas es afirmar que hay plata en tránsito que no está en tránsito — ruido
+permanente en un panel cuyo valor es avisar lo que falta cerrar hoy.
+
+Las patas anteriores al corte **no se reportan y tampoco se computan**: no son ganancia
+(nunca se realizaron) ni posición abierta (no hay nada que esperar). Siguen en la base y
+siguen pudiendo parearse: si algún día aparece el movimiento que falta, el par se arma y
+cuenta en la fecha en que se completó. **El corte decide qué se avisa, no qué existe.**
+
 ### Una fila SIN NOTA no se agrupa con ninguna otra (22/9/2026)
 
 Hasta esta fecha, todas las filas sin nota compartían la clave `'(sin nota)'`. Ese cajón

@@ -45,6 +45,22 @@ export type FilaTT = {
 export const ttVacio = (): TTAgg => ({ usd: 0, eur: 0, brl: 0, usdt: 0, chq: 0, pesos: 0 })
 
 /**
+ * Desde cuándo se reportan las transferencias en curso (2/10/2026).
+ *
+ * Antes de esta fecha hay patas sueltas que vienen del histórico migrado y que NUNCA van a
+ * encontrar pareja: el movimiento que las cancelaba no se cargó en su momento y ya nadie lo
+ * va a cargar. Mostrarlas como "en curso" es decir que hay plata en tránsito que en realidad
+ * no está en tránsito: es ruido permanente en un panel cuyo valor es justamente avisar lo
+ * que falta cerrar HOY.
+ *
+ * Las patas anteriores al corte **no se reportan y tampoco se computan**: no son ganancia
+ * (nunca se realizaron) ni posición abierta (no hay nada que esperar). Siguen en la base y
+ * siguen pudiendo parearse: si algún día aparece el movimiento que falta, el par se arma y
+ * cuenta en la fecha en que se completó. El corte solo decide QUÉ SE AVISA, no qué existe.
+ */
+export const DESDE_EN_CURSO = '2026-09-01'
+
+/**
  * Grupo al que pertenece una fila. La NOTA nombra a los participantes de la transferencia
  * ("BOH - GRA") y es lo único que vincula las dos puntas.
  *
@@ -117,7 +133,12 @@ export type ResultadoTT = {
  * El par se imputa a la fecha de la pata que lo COMPLETA, que es cuando el negocio se
  * realiza. Lo que queda sin pareja no es ganancia: es plata en tránsito.
  */
-export function repartirTT(filas: FilaTT[], ini: string): ResultadoTT {
+export function repartirTT(
+  filas: FilaTT[],
+  ini: string,
+  /** Desde cuándo se avisan las patas sin pareja. Ver DESDE_EN_CURSO. */
+  desdeEnCurso: string = DESDE_EN_CURSO,
+): ResultadoTT {
   const porFecha = new Map<string, TTAgg>()
   const abiertas = ttVacio()
   const paresNegativos: ResultadoTT['paresNegativos'] = []
@@ -162,7 +183,9 @@ export function repartirTT(filas: FilaTT[], ini: string): ResultadoTT {
 
     // Lo que no encontró pareja es posición abierta: un saldo, no un flujo, así que se
     // acumula toda su historia hasta el cierre del período sin importar cuándo entró.
+    // Salvo lo anterior al corte, que es histórico sin cierre posible (ver DESDE_EN_CURSO).
     for (const m of [...esperandoIng, ...esperandoEgr, ...sueltas]) {
+      if (m.fecha < desdeEnCurso) continue
       acumular(abiertas, m)
       puntasAbiertas++
     }
