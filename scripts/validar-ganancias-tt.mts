@@ -106,12 +106,17 @@ const egr = (fecha: string, notas: string | null, dolares: number, id: string): 
     egr('2026-09-11', '', -20_000, 'b'),
     egr('2026-09-11', '   ', -5_025, 'c'),
   ]
+  // El corte de "en curso" es 2026-09-01, así que la de junio no se reporta (histórico).
   const r = repartirTT(filas, '2026-09-01')
   igual('7a · ninguna fila sin nota entra al resultado', usdDelPeriodo(r), 0)
-  igual('7b · todas quedan como posición abierta', r.abiertas.usd, 300 - 20_000 - 5_025)
-  asert('7c · son tres grupos distintos, no uno', r.puntasAbiertas === 3)
+  igual('7b · las posteriores al corte quedan como posición abierta', r.abiertas.usd, -20_000 - 5_025)
+  asert('7c · se reportan las dos de septiembre, no la de junio', r.puntasAbiertas === 2)
   asert('7d · dos filas sin nota nunca comparten clave',
     claveGrupo(filas[1]) !== claveGrupo(filas[2]))
+  // Bajando el corte, la de junio vuelve a aparecer: está en la base, solo no se avisa.
+  const rTodo = repartirTT(filas, '2026-09-01', '1900-01-01')
+  igual('7e · con el corte abierto se reportan las tres', rTodo.abiertas.usd, 300 - 20_000 - 5_025)
+  asert('7f · y son tres patas', rTodo.puntasAbiertas === 3)
 }
 
 // ── 8. Par negativo: por definición no debería existir, se señala ───────────
@@ -160,6 +165,35 @@ const egr = (fecha: string, notas: string | null, dolares: number, id: string): 
   const r = repartirTT(filas, '2026-09-01')
   igual('11a · el par en euros suma en euros', r.porFecha.get('2026-09-06')?.eur ?? 0, 100)
   igual('11b · no ensucia los dólares', usdDelPeriodo(r), 0)
+}
+
+// ── 12. El corte de "transferencias en curso" (2/10/2026) ───────────────────
+//      Las patas sueltas anteriores al corte vienen del histórico migrado y no van a
+//      encontrar pareja nunca: no se avisan. Pero siguen existiendo y siguen pudiendo
+//      parearse si algún día aparece el movimiento que falta.
+{
+  const filas = [
+    egr('2026-05-21', 'CAR - EDY', -38_695, 'vieja'),   // histórico, sin pareja
+    egr('2026-09-30', 'HER - OSC', -25_125, 'nueva'),   // reciente, sin pareja
+  ]
+  const r = repartirTT(filas, '2026-09-01', '2026-09-01')
+  igual('12a · solo se reporta la posterior al corte', r.abiertas.usd, -25_125)
+  asert('12b · una sola pata avisada', r.puntasAbiertas === 1)
+  igual('12c · ninguna de las dos se computa como ganancia', usdDelPeriodo(r), 0)
+}
+
+// ── 13. Una pata vieja oculta SIGUE pudiendo parearse ───────────────────────
+//      El corte decide qué se avisa, no qué existe. Si llega el movimiento que falta,
+//      el par se arma y cuenta en la fecha en que se completó.
+{
+  const filas = [
+    egr('2026-05-21', 'CAR - EDY', -38_695, 'vieja'),
+    ing('2026-09-15', 'CAR - EDY', 39_000, 'llega'),    // aparece la pareja
+  ]
+  const r = repartirTT(filas, '2026-09-01', '2026-09-01')
+  igual('13a · el par se arma aunque una pata sea anterior al corte', usdDelPeriodo(r), 305)
+  igual('13b · cuenta en la fecha en que se completó', r.porFecha.get('2026-09-15')?.usd ?? 0, 305)
+  asert('13c · no queda nada abierto', r.puntasAbiertas === 0)
 }
 
 console.log(fallas.length === 0
