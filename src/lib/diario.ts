@@ -35,9 +35,49 @@ export type Movimiento = {
   fecha: string
   operacion: string | null
   monto: number | string | null
+  /**
+   * Referencia del movimiento. No entra en la búsqueda inicial: se usa SOLO para
+   * desempatar cuando el contenido deja más de una candidata (ver `desempatar`).
+   */
+  notas?: string | null
 }
 
 const esCtaCte = (m: Movimiento) => (m.tipo ?? '').toUpperCase() === 'CTA CTE'
+
+/** Fila de `diario` con lo necesario para desempatar. */
+type Candidata = { id: string; evento: string | null; notas: string | null }
+
+/** Normaliza una referencia para comparar: sin espacios de sobra y sin distinguir mayúsculas. */
+const normRef = (s: string | null | undefined) => (s ?? '').trim().toUpperCase()
+
+/**
+ * Desempata entre varias filas de `diario` usando la REFERENCIA del movimiento.
+ *
+ * POR QUÉ HACE FALTA (7/10/2026)
+ * La búsqueda por contenido —cuenta + fecha + operación + monto— no siempre identifica una
+ * sola fila. Caso real: el 5/10/2026 la cuenta EDY tenía DOS ingresos de U$S 5.000 el mismo
+ * día, uno con referencia "MATI RAFA" y otro con "RAFA". Al borrar uno, `buscarEnDiario`
+ * devolvía 'multiple', no tocaba `diario` y avisaba — el movimiento desaparecía del listado
+ * pero seguía sumando al saldo de la cuenta corriente.
+ *
+ * La referencia distingue las dos sin ninguna ambigüedad, y ya está guardada: la escriben
+ * tanto el alta como el sync. Lo único que faltaba era mirarla.
+ *
+ * SE USA SOLO COMO DESEMPATE, nunca en la búsqueda inicial. Si entrara en el `where`, un
+ * movimiento viejo cuya referencia no coincide exactamente entre las dos tablas pasaría de
+ * encontrarse a NO encontrarse, y un caso que hoy funciona se rompería. Así, lo que hoy da
+ * una sola fila sigue dando una sola fila; esto solo actúa donde antes se abandonaba.
+ *
+ * `evento` primero y `notas` como respaldo: el sync deja la referencia en `evento` y las
+ * pantallas caen a `notas` para lo cargado antes del 1/9/2026.
+ */
+export function desempatar(candidatas: Candidata[], referencia: string | null | undefined): Candidata[] {
+  const buscada = normRef(referencia)
+  // Sin referencia no hay con qué desempatar: se devuelve el empate tal cual, para que
+  // quien llame avise en vez de elegir una al azar.
+  if (!buscada) return candidatas
+  return candidatas.filter(c => normRef(c.evento ?? c.notas) === buscada)
+}
 
 /**
  * Ubica la fila de `diario` que corresponde a un movimiento de cuenta corriente.
@@ -51,7 +91,7 @@ export async function buscarEnDiario(
 
   const { data, error } = await supabase
     .from('diario')
-    .select('id')
+    .select('id, evento, notas')
     .eq('tipo', 'CTA CTE')
     .eq('anulado', false)
     .eq('cuenta_cte', mov.cliente ?? '')
@@ -60,10 +100,17 @@ export async function buscarEnDiario(
     .eq('monto', Number(mov.monto))
 
   if (error) return { estado: 'error', error: error.message }
-  const filas = (data ?? []) as { id: string }[]
+  const filas = (data ?? []) as Candidata[]
   if (filas.length === 0) return { estado: 'no_encontrada' }
-  if (filas.length > 1) return { estado: 'multiple', candidatas: filas.length }
-  return { estado: 'ok', id: filas[0].id }
+  if (filas.length === 1) return { estado: 'ok', id: filas[0].id }
+
+  // Empate: dos o más filas con el mismo contenido. La referencia suele distinguirlas.
+  const finalistas = desempatar(filas, mov.notas)
+  if (finalistas.length === 1) return { estado: 'ok', id: finalistas[0].id }
+
+  // Sigue sin poder decidirse: se informa el empate ORIGINAL y no se toca nada. Con cero
+  // o con varias no se adivina — es plata de un cliente.
+  return { estado: 'multiple', candidatas: filas.length }
 }
 
 /** Borra la fila de `diario` que acompaña a un movimiento de cuenta corriente. */
