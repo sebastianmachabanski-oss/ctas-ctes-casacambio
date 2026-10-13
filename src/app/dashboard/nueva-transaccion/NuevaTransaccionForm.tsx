@@ -312,6 +312,11 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
    * desvíos de saldo que estuvimos corrigiendo: dos caminos que escriben lo mismo y se
    * despegan con el tiempo. Si esa pata queda a medio cargar, el panel "Transferencias en
    * curso" la muestra.
+   *
+   * Desde que el campo Op solo se muestra en CUENTA CORRIENTE, esto no se puede alcanzar
+   * desde la pantalla: queda como RED DE SEGURIDAD. Si algún día un estado inconsistente
+   * dejara col_f en 'T' con tipo CAJA, mejor que avise y no guarde, en vez de escribir en
+   * silencio media transferencia — que es justo el problema que vinimos a eliminar.
    */
   const derivaATransferencias = form.col_f === 'T' && form.tipo === 'CAJA'
 
@@ -343,6 +348,10 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     setForm(f => ({
       ...f, tipo, operacion: opciones[0] ?? '', cuenta_cte: '',
       cotizacion: cotizacionAplicaA(tipo) ? f.cotizacion : '',
+      // En CAJA el Op no se elige: las transferencias de caja van por su propia pantalla.
+      // Si venía en T desde cuenta corriente, se repone en C para no guardar un marcador
+      // que el formulario ya no muestra.
+      col_f: tipo === 'CTA CTE' ? f.col_f : 'C',
     }))
     setClienteQuery('')
     setClienteOpen(false)
@@ -571,13 +580,25 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
               confirma la fecha elegida siempre en DD/MM/AAAA, sin depender de eso. */}
           {form.fecha && <p className="text-xs text-gray-400 mt-1">{formatoDDMMYYYY(form.fecha)}</p>}
         </div>
-        <div>
-          <label className="label">Op<Required /></label>
-          <select className="input" value={form.col_f} onChange={e => set('col_f', e.target.value)}>
-            <option value="C">C</option>
-            <option value="T">T</option>
-          </select>
-        </div>
+        {/* El campo Op solo aparece en CUENTA CORRIENTE (13/10/2026).
+            Desde que las transferencias de caja tienen pantalla propia, en CAJA el valor
+            está determinado por dónde se está cargando: acá siempre es C. Un campo cuyo
+            valor no se puede elegir es ruido, y encima invitaba a poner T y chocar contra
+            un cartel. En cuenta corriente sí se elige: una pata de transferencia fondeada
+            desde la cuenta de un cliente se carga por este formulario (ver el comentario
+            de `derivaATransferencias` para el porqué). */}
+        {form.tipo === 'CTA CTE' && (
+          <div>
+            <label className="label">Op<Required /></label>
+            <select className="input" value={form.col_f} onChange={e => set('col_f', e.target.value)}>
+              <option value="C">C</option>
+              <option value="T">T</option>
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              T solo si es una pata de transferencia.
+            </p>
+          </div>
+        )}
         {form.tipo === 'CTA CTE' ? (
           <div className="relative">
             <label className="label">Cuenta corriente<Required /></label>
