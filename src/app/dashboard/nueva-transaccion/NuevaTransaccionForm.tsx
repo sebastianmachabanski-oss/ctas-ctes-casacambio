@@ -5,6 +5,7 @@ import SelectBuscable from '@/components/SelectBuscable'
 import { useAvisoSinGuardar } from '@/lib/useAvisoSinGuardar'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
+import { pareceCuentaCorriente, avisoCajaVsCtaCte } from '@/lib/caja-vs-ctacte'
 
 // CHEQUES opera igual que el resto, en CAJA y en cuenta corriente: el cheque entra en la
 // columna CHEQUES y la contrapartida en CC PESOS / CC DOLARES (así lo hace la planilla).
@@ -231,6 +232,8 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
   // venga. Si la operación no mueve dólares, se convierte con la cotización de
   // referencia online (misma fuente que el tablero). ──
   const [confirmoGrande, setConfirmoGrande] = useState(false)
+  /** Confirmación de que un movimiento de CAJA con nombre de cuenta corriente va a caja. */
+  const [confirmoCaja, setConfirmoCaja] = useState(false)
   const [umbral, setUmbral] = useState(umbralUsd)
   const [rates, setRates] = useState<{ usd: number; eur: number; brl: number } | null>(null)
 
@@ -295,6 +298,19 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
 
   const montoGrande = usdOperado > umbral
 
+  // ¿Este movimiento de CAJA parece ser en realidad de cuenta corriente? (13/10/2026)
+  // La regla vive en `lib` y la aplica también el servidor: ver src/lib/caja-vs-ctacte.ts.
+  const sospechaCtaCte = pareceCuentaCorriente(
+    { tipo: form.tipo, operacion: form.operacion, op: form.col_f, cliente: form.cuenta_cte },
+    cuentasLocales,
+  )
+  // La confirmación se reinicia sola si cambia cualquiera de los campos que la provocaron.
+  // Sin esto quedaría tildada de una operación anterior y dejaría pasar la siguiente sin
+  // que nadie la mire — es el mismo agujero que tuvo `confirmoGrande`.
+  useEffect(() => {
+    setConfirmoCaja(false)
+  }, [form.tipo, form.operacion, form.col_f, form.cuenta_cte])
+
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
   }
@@ -348,12 +364,19 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     if (montoGrande && !confirmoGrande)
       return setError(`La operación equivale a más de US$ ${fmtUsd.format(umbral)}: tildá la confirmación para poder guardar.`)
 
+    // Posible movimiento de cuenta corriente cargado como CAJA: misma mecánica.
+    if (sospechaCtaCte && !confirmoCaja)
+      return setError(avisoCajaVsCtaCte(form.cuenta_cte))
+
     const payload = {
       ...form,
       cuenta_cte: form.cuenta_cte.trim(),
       monto: montoNumero(form.monto),
       cotizacion: form.cotizacion ? Number(form.cotizacion) : null,
       costo_porcentaje: form.costo_porcentaje ? Number(form.costo_porcentaje) : null,
+      // El servidor vuelve a detectar la sospecha por su cuenta y exige esta confirmación
+      // explícita. El navegador no es donde se defiende una regla.
+      confirmo_caja_cta_cte: confirmoCaja,
     }
 
     setStep('supabase')
@@ -438,6 +461,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     setClienteOpen(false)
     setMarcada(0)
     setConfirmoGrande(false)
+    setConfirmoCaja(false)
   }
 
   // La transacción ya quedó guardada en el sistema (Supabase). La réplica al origen
@@ -616,6 +640,13 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
                       onClick={() => { set('cuenta_cte', c); setClienteOpen(false) }}
                     >
                       {c}
+                      {/* Los clientes con cuenta corriente se MARCAN, no se ocultan: operan
+                          en efectivo todo el tiempo —más de cien compras y ventas por mes—
+                          y sacarlos de la lista obligaría a tipearlos a mano, ensuciando un
+                          padrón que no se normaliza (regla del 5/7/2026). */}
+                      {cuentasLocales.some(q => q.trim().toUpperCase() === c.trim().toUpperCase()) && (
+                        <span className="tag tag-blue" style={{ marginLeft: 8, fontSize: 10 }}>cta cte</span>
+                      )}
                     </button>
                   </li>
                 ))}
@@ -714,6 +745,38 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
         </div>
       </div>
 
+      {/* Posible movimiento de cuenta corriente cargado como CAJA (13/10/2026).
+          Lo primero que ofrece es ARREGLARLO —un botón que cambia el tipo y se lleva el
+          nombre—, no confirmarlo: si el camino correcto cuesta un clic y el de seguir
+          igual cuesta tildar una casilla, el error deja de ser el camino fácil.
+          La casilla existe porque hay casos legítimos (un retiro puntual que el cliente
+          no quiere que pase por su cuenta), así que esto pregunta, no bloquea. */}
+      {sospechaCtaCte && (
+        <div className="banner-warn">
+          ⚠️ <b>¿Esto va a la cuenta corriente de {form.cuenta_cte.trim()}?</b>{' '}
+          {avisoCajaVsCtaCte(form.cuenta_cte)}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+            <button
+              type="button"
+              className="chip on"
+              onClick={() => {
+                // El nombre ya es una cuenta corriente activa, así que pasa tal cual: el
+                // selector de CTA CTE lo busca por nombre exacto y lo encuentra.
+                const nombre = form.cuenta_cte.trim()
+                setForm(f => ({ ...f, tipo: 'CTA CTE', cuenta_cte: nombre, cotizacion: '' }))
+                setClienteQuery(nombre)
+                setClienteOpen(false)
+              }}>
+              Pasarlo a cuenta corriente
+            </button>
+            <label style={{ display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+              <input type="checkbox" checked={confirmoCaja} onChange={e => setConfirmoCaja(e.target.checked)} />
+              No, va a la caja: confirmo
+            </label>
+          </div>
+        </div>
+      )}
+
       {/* Banner de operación grande: evalúa SIEMPRE el valor en dólares (umbral configurable) */}
       {montoGrande && (
         <div className="banner-warn">
@@ -752,7 +815,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
 
       <div className="flex items-center gap-4 pt-1">
         <button type="submit" className="btn-primary"
-          disabled={loading || (montoGrande && !confirmoGrande)}>
+          disabled={loading || (montoGrande && !confirmoGrande) || (sospechaCtaCte && !confirmoCaja)}>
           {loading ? 'Guardando…' : 'Guardar transacción'}
         </button>
         <p className="text-xs text-gray-400 shrink-0"><Required /> Obligatorio</p>
