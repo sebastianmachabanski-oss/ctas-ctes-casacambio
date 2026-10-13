@@ -7,7 +7,10 @@ import BandaMercado from '@/components/BandaMercado'
 const TITLES: [string, string][] = [
   ['/dashboard/inicio', 'Inicio'],
   ['/dashboard/cuenta-corriente', 'Cuentas Corrientes'],
-  ['/dashboard/nueva-transaccion', 'Nueva transacción'],
+  ['/dashboard/nueva-transaccion', 'Nueva operación'],
+  // Va ANTES de '/dashboard/transferencias' por prolijidad de lectura; no hay riesgo de
+  // que se pisen porque el match es por prefijo y ninguna ruta es prefijo de la otra.
+  ['/dashboard/nueva-transferencia', 'Nueva transferencia'],
   ['/dashboard/transferencias', 'Transferencias'],
   ['/dashboard/gastos', 'Gastos'],
   ['/dashboard/calle', 'Dinero en calle'],

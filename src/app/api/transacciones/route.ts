@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 import { registrarAuditoria, calcularHuella, describirMovimiento } from '@/lib/auditoria'
 import { esStaff } from '@/lib/roles'
+import { pareceCuentaCorriente, avisoCajaVsCtaCte } from '@/lib/caja-vs-ctacte'
 
 export const maxDuration = 30
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
 
   const body = await request.json()
-  const { fecha, tipo, col_f, cuenta_cte, operacion, propio, externo, monto, cotizacion, costo_porcentaje, debe, notas } = body
+  const { fecha, tipo, col_f, cuenta_cte, operacion, propio, externo, monto, cotizacion, costo_porcentaje, debe, notas, confirmo_caja_cta_cte } = body
 
   if (!fecha || !tipo || !col_f || !cuenta_cte || !operacion || !propio || !externo || monto == null)
     return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
@@ -73,6 +74,24 @@ export async function POST(request: Request) {
       .select('nombre').eq('nombre', String(cuenta_cte).trim()).eq('activo', true).maybeSingle()
     if (!cta)
       return NextResponse.json({ error: `"${cuenta_cte}" no es una cuenta corriente activa: elegila de la lista` }, { status: 400 })
+  }
+
+  // UN MOVIMIENTO DE CUENTA CORRIENTE CARGADO COMO CAJA (13/10/2026).
+  // Cargar en CAJA lo que iba a una cuenta corriente mueve la plata en la oficina pero no
+  // impacta en el saldo del cliente, y la diferencia es casi invisible. La regla está en
+  // `src/lib/caja-vs-ctacte.ts` junto con el porqué de que mire la OPERACIÓN y no solo el
+  // nombre. No bloquea: hay casos legítimos, así que pide una confirmación explícita — y
+  // la pide ACÁ además de en el formulario, porque el navegador no defiende nada.
+  if (!confirmo_caja_cta_cte) {
+    const { data: activas } = await supabase
+      .from('cuentas_corrientes').select('nombre').eq('activo', true)
+    const nombres = ((activas ?? []) as { nombre: string }[]).map(c => c.nombre)
+    if (pareceCuentaCorriente({ tipo, operacion, op: col_f, cliente: cuenta_cte }, nombres)) {
+      return NextResponse.json(
+        { error: avisoCajaVsCtaCte(String(cuenta_cte)), requiere: 'confirmo_caja_cta_cte' },
+        { status: 409 },
+      )
+    }
   }
 
   // Impacto en caja con el MISMO motor validado contra la planilla. Si la combinación
