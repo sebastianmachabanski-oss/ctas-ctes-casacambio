@@ -85,6 +85,12 @@ function formPorDefecto() {
   return {
     fecha: today(),
     tipo: 'CTA CTE',
+    // SIEMPRE 'C'. El selector de Op se quitó el 13/10/2026: las transferencias se
+    // cargan enteras en su propia pantalla, así que acá no hay nada que elegir. En todo
+    // el histórico hubo UNA sola transferencia de cuenta corriente —agosto de 2026,
+    // traída de la planilla, nunca cargada desde la app—, así que el campo solo sumaba
+    // ruido y una forma de equivocarse. Se sigue mandando al servidor para no cambiar el
+    // contrato de la API, que sigue validando 'C' o 'T'.
     col_f: 'C',
     cuenta_cte: '',
     operacion: 'INGRESAN',
@@ -298,27 +304,6 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
 
   const montoGrande = usdOperado > umbral
 
-  /**
-   * ¿Esta carga tiene que ir a la pantalla de transferencias? (13/10/2026)
-   *
-   * Las transferencias de CAJA se cargan allá, enteras y de una sola vez, para que no
-   * queden patas sueltas. Acá solo se podía cargar una, y si la otra no llegaba
-   * desbalanceaba la ganancia del período sin que nadie lo notara hasta días después.
-   *
-   * LAS DE CUENTA CORRIENTE SIGUEN ACÁ, y es a propósito. Una pata de tipo CTA CTE tiene
-   * que escribirse en las DOS tablas —`movimientos_caja` y `diario`—, y este formulario ya
-   * tiene ese camino andando y probado. Construir un segundo lugar que escriba `diario`
-   * para cubrir un caso en 1.762 sería repetir exactamente el error que produjo los
-   * desvíos de saldo que estuvimos corrigiendo: dos caminos que escriben lo mismo y se
-   * despegan con el tiempo. Si esa pata queda a medio cargar, el panel "Transferencias en
-   * curso" la muestra.
-   *
-   * Desde que el campo Op solo se muestra en CUENTA CORRIENTE, esto no se puede alcanzar
-   * desde la pantalla: queda como RED DE SEGURIDAD. Si algún día un estado inconsistente
-   * dejara col_f en 'T' con tipo CAJA, mejor que avise y no guarde, en vez de escribir en
-   * silencio media transferencia — que es justo el problema que vinimos a eliminar.
-   */
-  const derivaATransferencias = form.col_f === 'T' && form.tipo === 'CAJA'
 
   // ¿Este movimiento de CAJA parece ser en realidad de cuenta corriente? (13/10/2026)
   // La regla vive en `lib` y la aplica también el servidor: ver src/lib/caja-vs-ctacte.ts.
@@ -348,10 +333,6 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     setForm(f => ({
       ...f, tipo, operacion: opciones[0] ?? '', cuenta_cte: '',
       cotizacion: cotizacionAplicaA(tipo) ? f.cotizacion : '',
-      // En CAJA el Op no se elige: las transferencias de caja van por su propia pantalla.
-      // Si venía en T desde cuenta corriente, se repone en C para no guardar un marcador
-      // que el formulario ya no muestra.
-      col_f: tipo === 'CTA CTE' ? f.col_f : 'C',
     }))
     setClienteQuery('')
     setClienteOpen(false)
@@ -361,10 +342,6 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     if (!form.fecha)       return 'La fecha es obligatoria'
     if (!form.tipo)        return 'El tipo de transacción es obligatorio'
     if (!form.col_f)       return 'Op es obligatorio'
-    // La nota es lo único que vincula las dos patas de una transferencia: sin ella la pata
-    // queda huérfana y nunca llega a computarse en Ganancias. El servidor valida lo mismo.
-    if (form.col_f === 'T' && !form.notas.trim())
-      return 'Las transferencias necesitan una nota que identifique a los participantes (ej. "BOH - GRA"): es lo que vincula el ingreso con el egreso.'
     if (!form.cuenta_cte.trim())
       return form.tipo === 'CTA CTE'
         ? 'Seleccioná una cuenta corriente de la lista'
@@ -389,11 +366,6 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     // Operación grande (en USD): exige tildar la confirmación del banner (sin popup).
     if (montoGrande && !confirmoGrande)
       return setError(`La operación equivale a más de US$ ${fmtUsd.format(umbral)}: tildá la confirmación para poder guardar.`)
-
-    // Una transferencia DE CAJA no se carga por mitades: va entera, en su propia
-    // pantalla. La de cuenta corriente sigue acá (ver el banner para el porqué).
-    if (derivaATransferencias)
-      return setError('Las transferencias de caja se cargan enteras en la pantalla "Nueva transferencia", con sus dos patas juntas.')
 
     // Posible movimiento de cuenta corriente cargado como CAJA: misma mecánica.
     if (sospechaCtaCte && !confirmoCaja)
@@ -580,25 +552,6 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
               confirma la fecha elegida siempre en DD/MM/AAAA, sin depender de eso. */}
           {form.fecha && <p className="text-xs text-gray-400 mt-1">{formatoDDMMYYYY(form.fecha)}</p>}
         </div>
-        {/* El campo Op solo aparece en CUENTA CORRIENTE (13/10/2026).
-            Desde que las transferencias de caja tienen pantalla propia, en CAJA el valor
-            está determinado por dónde se está cargando: acá siempre es C. Un campo cuyo
-            valor no se puede elegir es ruido, y encima invitaba a poner T y chocar contra
-            un cartel. En cuenta corriente sí se elige: una pata de transferencia fondeada
-            desde la cuenta de un cliente se carga por este formulario (ver el comentario
-            de `derivaATransferencias` para el porqué). */}
-        {form.tipo === 'CTA CTE' && (
-          <div>
-            <label className="label">Op<Required /></label>
-            <select className="input" value={form.col_f} onChange={e => set('col_f', e.target.value)}>
-              <option value="C">C</option>
-              <option value="T">T</option>
-            </select>
-            <p className="text-xs text-gray-400 mt-1">
-              T solo si es una pata de transferencia.
-            </p>
-          </div>
-        )}
         {form.tipo === 'CTA CTE' ? (
           <div className="relative">
             <label className="label">Cuenta corriente<Required /></label>
@@ -768,44 +721,16 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
           </p>
         </div>
         <div>
-          {/* En una transferencia la nota deja de ser una observación: es lo que vincula
-              el ingreso con el egreso. Por eso ahí pasa a obligatoria, con su marca y su
-              ayuda propias (1/10/2026). */}
-          <label className="label">Notas{form.col_f === 'T' && <Required />}</label>
+          <label className="label">Notas</label>
           <input
             type="text"
             className="input"
             value={form.notas}
             onChange={e => set('notas', e.target.value)}
-            placeholder={form.col_f === 'T' ? 'Participantes de la transferencia (ej. BOH - GRA)' : 'Referencia, observaciones…'}
+            placeholder="Referencia, observaciones…"
           />
-          {form.col_f === 'T' && (
-            <p className="text-xs text-gray-400 mt-1">
-              Obligatoria en transferencias: es lo que permite juntar esta pata con la otra.
-              Usá la misma nota en el ingreso y en el egreso.
-            </p>
-          )}
         </div>
       </div>
-
-      {/* Las transferencias se cargan enteras en su propia pantalla (13/10/2026).
-          Acá solo se podía cargar UNA pata, y si la otra no llegaba quedaba una
-          transferencia a medio cargar que desbalanceaba la ganancia del período y se
-          descubría días después. La opción T se deja a la vista —sacarla dejaría al
-          operador buscándola— pero no guarda: deriva. */}
-      {derivaATransferencias && (
-        <div className="banner-warn">
-          🔀 <b>Las transferencias de caja se cargan enteras, con sus dos patas.</b>{' '}
-          Se hace en su propia pantalla, en una sola operación, para que no quede ninguna a
-          medio cargar.
-          <div style={{ marginTop: 8 }}>
-            <button type="button" className="chip on"
-              onClick={() => router.push('/dashboard/nueva-transferencia')}>
-              Ir a Nueva transferencia
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Posible movimiento de cuenta corriente cargado como CAJA (13/10/2026).
           Lo primero que ofrece es ARREGLARLO —un botón que cambia el tipo y se lleva el
@@ -877,7 +802,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
 
       <div className="flex items-center gap-4 pt-1">
         <button type="submit" className="btn-primary"
-          disabled={loading || derivaATransferencias || (montoGrande && !confirmoGrande) || (sospechaCtaCte && !confirmoCaja)}>
+          disabled={loading || (montoGrande && !confirmoGrande) || (sospechaCtaCte && !confirmoCaja)}>
           {loading ? 'Guardando…' : 'Guardar transacción'}
         </button>
         <p className="text-xs text-gray-400 shrink-0"><Required /> Obligatorio</p>
