@@ -298,6 +298,23 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
 
   const montoGrande = usdOperado > umbral
 
+  /**
+   * ¿Esta carga tiene que ir a la pantalla de transferencias? (13/10/2026)
+   *
+   * Las transferencias de CAJA se cargan allá, enteras y de una sola vez, para que no
+   * queden patas sueltas. Acá solo se podía cargar una, y si la otra no llegaba
+   * desbalanceaba la ganancia del período sin que nadie lo notara hasta días después.
+   *
+   * LAS DE CUENTA CORRIENTE SIGUEN ACÁ, y es a propósito. Una pata de tipo CTA CTE tiene
+   * que escribirse en las DOS tablas —`movimientos_caja` y `diario`—, y este formulario ya
+   * tiene ese camino andando y probado. Construir un segundo lugar que escriba `diario`
+   * para cubrir un caso en 1.762 sería repetir exactamente el error que produjo los
+   * desvíos de saldo que estuvimos corrigiendo: dos caminos que escriben lo mismo y se
+   * despegan con el tiempo. Si esa pata queda a medio cargar, el panel "Transferencias en
+   * curso" la muestra.
+   */
+  const derivaATransferencias = form.col_f === 'T' && form.tipo === 'CAJA'
+
   // ¿Este movimiento de CAJA parece ser en realidad de cuenta corriente? (13/10/2026)
   // La regla vive en `lib` y la aplica también el servidor: ver src/lib/caja-vs-ctacte.ts.
   const sospechaCtaCte = pareceCuentaCorriente(
@@ -364,9 +381,10 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     if (montoGrande && !confirmoGrande)
       return setError(`La operación equivale a más de US$ ${fmtUsd.format(umbral)}: tildá la confirmación para poder guardar.`)
 
-    // Una transferencia no se carga por mitades: va entera, en su propia pantalla.
-    if (form.col_f === 'T')
-      return setError('Las transferencias se cargan enteras en la pantalla "Nueva transferencia", con sus dos patas juntas.')
+    // Una transferencia DE CAJA no se carga por mitades: va entera, en su propia
+    // pantalla. La de cuenta corriente sigue acá (ver el banner para el porqué).
+    if (derivaATransferencias)
+      return setError('Las transferencias de caja se cargan enteras en la pantalla "Nueva transferencia", con sus dos patas juntas.')
 
     // Posible movimiento de cuenta corriente cargado como CAJA: misma mecánica.
     if (sospechaCtaCte && !confirmoCaja)
@@ -754,9 +772,9 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
           transferencia a medio cargar que desbalanceaba la ganancia del período y se
           descubría días después. La opción T se deja a la vista —sacarla dejaría al
           operador buscándola— pero no guarda: deriva. */}
-      {form.col_f === 'T' && (
+      {derivaATransferencias && (
         <div className="banner-warn">
-          🔀 <b>Las transferencias se cargan enteras, con sus dos patas.</b>{' '}
+          🔀 <b>Las transferencias de caja se cargan enteras, con sus dos patas.</b>{' '}
           Se hace en su propia pantalla, en una sola operación, para que no quede ninguna a
           medio cargar.
           <div style={{ marginTop: 8 }}>
@@ -838,7 +856,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
 
       <div className="flex items-center gap-4 pt-1">
         <button type="submit" className="btn-primary"
-          disabled={loading || form.col_f === 'T' || (montoGrande && !confirmoGrande) || (sospechaCtaCte && !confirmoCaja)}>
+          disabled={loading || derivaATransferencias || (montoGrande && !confirmoGrande) || (sospechaCtaCte && !confirmoCaja)}>
           {loading ? 'Guardando…' : 'Guardar transacción'}
         </button>
         <p className="text-xs text-gray-400 shrink-0"><Required /> Obligatorio</p>
