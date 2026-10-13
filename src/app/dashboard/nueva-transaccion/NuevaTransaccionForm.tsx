@@ -364,6 +364,10 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
     if (montoGrande && !confirmoGrande)
       return setError(`La operación equivale a más de US$ ${fmtUsd.format(umbral)}: tildá la confirmación para poder guardar.`)
 
+    // Una transferencia no se carga por mitades: va entera, en su propia pantalla.
+    if (form.col_f === 'T')
+      return setError('Las transferencias se cargan enteras en la pantalla "Nueva transferencia", con sus dos patas juntas.')
+
     // Posible movimiento de cuenta corriente cargado como CAJA: misma mecánica.
     if (sospechaCtaCte && !confirmoCaja)
       return setError(avisoCajaVsCtaCte(form.cuenta_cte))
@@ -745,6 +749,25 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
         </div>
       </div>
 
+      {/* Las transferencias se cargan enteras en su propia pantalla (13/10/2026).
+          Acá solo se podía cargar UNA pata, y si la otra no llegaba quedaba una
+          transferencia a medio cargar que desbalanceaba la ganancia del período y se
+          descubría días después. La opción T se deja a la vista —sacarla dejaría al
+          operador buscándola— pero no guarda: deriva. */}
+      {form.col_f === 'T' && (
+        <div className="banner-warn">
+          🔀 <b>Las transferencias se cargan enteras, con sus dos patas.</b>{' '}
+          Se hace en su propia pantalla, en una sola operación, para que no quede ninguna a
+          medio cargar.
+          <div style={{ marginTop: 8 }}>
+            <button type="button" className="chip on"
+              onClick={() => router.push('/dashboard/nueva-transferencia')}>
+              Ir a Nueva transferencia
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Posible movimiento de cuenta corriente cargado como CAJA (13/10/2026).
           Lo primero que ofrece es ARREGLARLO —un botón que cambia el tipo y se lleva el
           nombre—, no confirmarlo: si el camino correcto cuesta un clic y el de seguir
@@ -815,7 +838,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
 
       <div className="flex items-center gap-4 pt-1">
         <button type="submit" className="btn-primary"
-          disabled={loading || (montoGrande && !confirmoGrande) || (sospechaCtaCte && !confirmoCaja)}>
+          disabled={loading || form.col_f === 'T' || (montoGrande && !confirmoGrande) || (sospechaCtaCte && !confirmoCaja)}>
           {loading ? 'Guardando…' : 'Guardar transacción'}
         </button>
         <p className="text-xs text-gray-400 shrink-0"><Required /> Obligatorio</p>
