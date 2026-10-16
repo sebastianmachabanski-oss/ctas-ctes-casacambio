@@ -26,7 +26,7 @@
  */
 
 /** Neto de las transferencias por moneda: lo que entra menos lo que sale. */
-export type TTAgg = { usd: number; eur: number; brl: number; usdt: number; chq: number; pesos: number }
+export type TTAgg = { usd: number; eur: number; brl: number; usdt: number; gbp: number; chq: number; pesos: number }
 
 /** Una fila de `movimientos_caja` con op = 'T', recortada a lo que esta cuenta mira. */
 export type FilaTT = {
@@ -39,10 +39,11 @@ export type FilaTT = {
   euros?: number | null
   reales?: number | null
   usdt?: number | null
+  libras?: number | null
   cheques?: number | null
 }
 
-export const ttVacio = (): TTAgg => ({ usd: 0, eur: 0, brl: 0, usdt: 0, chq: 0, pesos: 0 })
+export const ttVacio = (): TTAgg => ({ usd: 0, eur: 0, brl: 0, usdt: 0, gbp: 0, chq: 0, pesos: 0 })
 
 /**
  * Desde cuándo se reportan las transferencias en curso (2/10/2026).
@@ -92,6 +93,7 @@ function acumular(t: TTAgg, m: FilaTT) {
   t.eur   += Number(m.euros)   || 0
   t.brl   += Number(m.reales)  || 0
   t.usdt  += Number(m.usdt)    || 0
+  t.gbp   += Number(m.libras)  || 0
   t.chq   += Number(m.cheques) || 0
   t.pesos += Number(m.pesos)   || 0
 }
@@ -99,7 +101,7 @@ function acumular(t: TTAgg, m: FilaTT) {
 /** Suma de todas las monedas de una fila. Solo para detectar un par de signo negativo. */
 function netoFila(m: FilaTT): number {
   return (Number(m.dolares) || 0) + (Number(m.euros) || 0) + (Number(m.reales) || 0)
-       + (Number(m.usdt) || 0) + (Number(m.cheques) || 0) + (Number(m.pesos) || 0)
+       + (Number(m.usdt) || 0) + (Number(m.libras) || 0) + (Number(m.cheques) || 0) + (Number(m.pesos) || 0)
 }
 
 export type ResultadoTT = {

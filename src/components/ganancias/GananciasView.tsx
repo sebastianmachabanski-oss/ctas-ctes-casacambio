@@ -15,11 +15,11 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 export type ParAgg = { vC: number; aC: number; vV: number; aV: number; vCcc: number; aCcc: number; vVcc: number; aVcc: number }
 /** Neto de las transferencias (op = 'T') del día, por moneda: lo que entra menos lo que sale. */
-export type TTAgg = { usd: number; eur: number; brl: number; usdt: number; chq: number; pesos: number }
-export type DiaAgg = { f: string; usd: ParAgg; eur: ParAgg; brl: ParAgg; usdt: ParAgg; chq: ParAgg; g: number; gcc: number; tt: TTAgg }
+export type TTAgg = { usd: number; eur: number; brl: number; usdt: number; gbp: number; chq: number; pesos: number }
+export type DiaAgg = { f: string; usd: ParAgg; eur: ParAgg; brl: ParAgg; usdt: ParAgg; gbp: ParAgg; chq: ParAgg; g: number; gcc: number; tt: TTAgg }
 
 type Cfg = {
-  ops: Set<string>; par: 'usd' | 'eur' | 'brl' | 'usdt' | 'chq'; cc: boolean
+  ops: Set<string>; par: 'usd' | 'eur' | 'brl' | 'usdt' | 'gbp' | 'chq'; cc: boolean
   resid: 'fijo' | 'costo' | 'mtm'; margen: number; cierre: number; gastos: boolean
   /** Sumar el resultado de las transferencias (op = 'T'). */
   transferencias: boolean
@@ -29,12 +29,12 @@ const fmt0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
 const fmt3 = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 const ars = (n: number) => `$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
 const usd = (n: number) => `US$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
-const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$', usdt: 'USDT', chq: 'CH$', pesos: '$' }
-const NOMBRE_PAR: Record<string, string> = { usd: 'Dólares', eur: 'Euros', brl: 'Reales', usdt: 'USDT', chq: 'Cheques' }
+const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$', usdt: 'USDT', gbp: '£', chq: 'CH$', pesos: '$' }
+const NOMBRE_PAR: Record<string, string> = { usd: 'Dólares', eur: 'Euros', brl: 'Reales', usdt: 'USDT', gbp: 'Libras', chq: 'Cheques' }
 
 /** Las monedas de un neto de transferencias que efectivamente tienen algo, para listarlas. */
 const monedasConSaldo = (t: TTAgg) =>
-  (['usd', 'eur', 'brl', 'usdt', 'chq', 'pesos'] as const)
+  (['usd', 'eur', 'brl', 'usdt', 'gbp', 'chq', 'pesos'] as const)
     .map(k => [k, t[k]] as const)
     .filter(([, v]) => Math.round(v) !== 0)
 
@@ -51,6 +51,7 @@ const SUPUESTOS_PAR: Record<Cfg['par'], Pick<Cfg, 'resid' | 'margen' | 'cierre'>
   eur:  { resid: 'fijo', margen: 0.05, cierre: 1500 },
   brl:  { resid: 'fijo', margen: 0.05, cierre: 1500 },
   usdt: { resid: 'fijo', margen: 0.05, cierre: 1500 },
+  gbp:  { resid: 'fijo', margen: 0.05, cierre: 1500 },
   chq:  { resid: 'mtm',  margen: 0.05, cierre: 1 },
 }
 
@@ -395,6 +396,7 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
               <option value="eur">Euros ↔ Pesos</option>
               <option value="brl">Reales ↔ Pesos</option>
               <option value="usdt">USDT ↔ Pesos</option>
+              <option value="gbp">Libras ↔ Pesos</option>
               <option value="chq">Cheques ↔ Pesos</option>
             </select>
             <div className="param-what">Qué modifica: <b>sobre qué monedas se mide la ganancia</b>. Cada par tiene su resultado propio, sin mezclarse con los demás.</div>

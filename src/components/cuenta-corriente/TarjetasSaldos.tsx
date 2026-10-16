@@ -1,6 +1,6 @@
 type Saldo = {
   cuenta_cte: string; saldo_pesos: number | null; saldo_dolares: number | null
-  saldo_euros: number | null; saldo_reales: number | null; saldo_usdt?: number | null
+  saldo_euros: number | null; saldo_reales: number | null; saldo_usdt?: number | null; saldo_libras?: number | null
 }
 interface Props { saldos: Saldo[]; cuentaCte: string | null }
 
@@ -10,6 +10,7 @@ const MONEDAS = [
   { key: 'saldo_pesos'   as const, label: 'Pesos',   sym: '$',   color: '#2563eb' },
   { key: 'saldo_euros'   as const, label: 'Euros',   sym: '€',   color: '#7c3aed' },
   { key: 'saldo_reales'  as const, label: 'Reales',  sym: 'R$',  color: '#eab308' },
+  { key: 'saldo_libras'  as const, label: 'Libras',  sym: '£',   color: '#be123c' },
   // USDT solo puede venir de la app: en la planilla no existe (25/8/2026).
   { key: 'saldo_usdt'    as const, label: 'USDT',    sym: 'USDT', color: '#26a17b' },
 ]
@@ -20,8 +21,9 @@ export default function TarjetasSaldos({ saldos }: Props) {
     saldo_dolares: (a.saldo_dolares ?? 0) + (s.saldo_dolares ?? 0),
     saldo_euros:   (a.saldo_euros   ?? 0) + (s.saldo_euros   ?? 0),
     saldo_reales:  (a.saldo_reales  ?? 0) + (s.saldo_reales  ?? 0),
+    saldo_libras:  (a.saldo_libras  ?? 0) + (s.saldo_libras  ?? 0),
     saldo_usdt:    (a.saldo_usdt    ?? 0) + (s.saldo_usdt    ?? 0),
-  }), { saldo_pesos: 0, saldo_dolares: 0, saldo_euros: 0, saldo_reales: 0, saldo_usdt: 0 })
+  }), { saldo_pesos: 0, saldo_dolares: 0, saldo_euros: 0, saldo_reales: 0, saldo_usdt: 0, saldo_libras: 0 })
 
   const conSaldo = MONEDAS.filter(m => (t[m.key] ?? 0) !== 0)
   const mostrar = conSaldo.length > 0 ? conSaldo : MONEDAS.slice(0, 2)

@@ -56,7 +56,7 @@ export default async function GananciasPage({
   const filas: any[] = []
   for (let from = 0; ; from += PAGE) {
     const { data: pg } = await supabase.from('movimientos_caja')
-      .select('fecha,operacion,pesos,cheques,dolares,euros,reales,usdt,cc_pesos,cc_dolares,cc_euros,cc_reales')
+      .select('fecha,operacion,pesos,cheques,dolares,euros,reales,usdt,libras,cc_pesos,cc_dolares,cc_euros,cc_reales,cc_libras')
       .in('operacion', ['COMPRA', 'VENTA', 'GASTOS'])
       // Las transferencias se miden con su propia regla (más abajo), no con el calce de
       // compras y ventas. Si alguna vez una COMPRA se marcara con T, contarla en los dos
@@ -75,14 +75,14 @@ export default async function GananciasPage({
   // USDT y CHEQUES solo tienen columna de caja (no hay cc_usdt ni cc_cheques): la pata CC
   // queda siempre en 0. En cuenta corriente el cheque igual se registra en la columna
   // CHEQUES y la contrapartida en CC PESOS, así que el margen se mide igual.
-  const PARES: ['usd' | 'eur' | 'brl' | 'usdt' | 'chq', string, string][] = [
+  const PARES: ['usd' | 'eur' | 'brl' | 'usdt' | 'gbp' | 'chq', string, string][] = [
     ['usd', 'dolares', 'cc_dolares'], ['eur', 'euros', 'cc_euros'], ['brl', 'reales', 'cc_reales'],
-    ['usdt', 'usdt', 'cc_usdt'], ['chq', 'cheques', 'cc_cheques'],
+    ['usdt', 'usdt', 'cc_usdt'], ['gbp', 'libras', 'cc_libras'], ['chq', 'cheques', 'cc_cheques'],
   ]
   const porDia = new Map<string, DiaAgg>()
   const diaDe = (f: string): DiaAgg => {
     let d = porDia.get(f)
-    if (!d) { d = { f, usd: parVacio(), eur: parVacio(), brl: parVacio(), usdt: parVacio(), chq: parVacio(), g: 0, gcc: 0, tt: ttVacio() }; porDia.set(f, d) }
+    if (!d) { d = { f, usd: parVacio(), eur: parVacio(), brl: parVacio(), usdt: parVacio(), gbp: parVacio(), chq: parVacio(), g: 0, gcc: 0, tt: ttVacio() }; porDia.set(f, d) }
     return d
   }
   for (const m of filas) {
@@ -127,7 +127,7 @@ export default async function GananciasPage({
   const filasTT: any[] = []
   for (let from = 0; ; from += PAGE) {
     const { data: pg } = await supabase.from('movimientos_caja')
-      .select('id,fecha,notas,operacion,pesos,dolares,euros,reales,usdt,cheques')
+      .select('id,fecha,notas,operacion,pesos,dolares,euros,reales,usdt,libras,cheques')
       .eq('op', 'T')
       .lte('fecha', fin)
       .order('fecha', { ascending: true })
@@ -173,7 +173,7 @@ export default async function GananciasPage({
     clientesCaja = []
     for (let from = 0; ; from += PAGE) {
       const { data: pg } = await supabase.from('caja_clientes')
-        .select('cliente,pesos,dolares,euros,reales,ultimo_movimiento')
+        .select('cliente,pesos,dolares,euros,reales,libras,ultimo_movimiento')
         .order('cliente').range(from, from + PAGE - 1)
       const rows = (pg ?? []) as any[]
       clientesCaja.push(...rows)
@@ -183,7 +183,7 @@ export default async function GananciasPage({
   const clientesCC: any[] = []
   for (let from = 0; ; from += PAGE) {
     const { data: pg } = await supabase.from('saldos_cuenta_corriente')
-      .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales,ultimo_movimiento')
+      .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales,saldo_libras,ultimo_movimiento')
       .order('cuenta_cte').range(from, from + PAGE - 1)
     const rows = (pg ?? []) as any[]
     clientesCC.push(...rows)
@@ -197,12 +197,12 @@ export default async function GananciasPage({
   // migración todavía no corrió; en ese caso nadie se oculta.
   const clientesCajaN = clientesCaja.map(c => ({
     nombre: c.cliente, pesos: Number(c.pesos) || 0, dolares: Number(c.dolares) || 0,
-    euros: Number(c.euros) || 0, reales: Number(c.reales) || 0,
+    euros: Number(c.euros) || 0, reales: Number(c.reales) || 0, libras: Number(c.libras) || 0,
     ultimo: (c.ultimo_movimiento as string | null) ?? null,
   }))
   const clientesCCN = clientesCC.map(c => ({
     nombre: c.cuenta_cte, pesos: Number(c.saldo_pesos) || 0, dolares: Number(c.saldo_dolares) || 0,
-    euros: Number(c.saldo_euros) || 0, reales: Number(c.saldo_reales) || 0,
+    euros: Number(c.saldo_euros) || 0, reales: Number(c.saldo_reales) || 0, libras: Number(c.saldo_libras) || 0,
     ultimo: (c.ultimo_movimiento as string | null) ?? null,
   }))
 

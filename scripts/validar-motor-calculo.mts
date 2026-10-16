@@ -122,5 +122,45 @@ function assertIgual<T>(actual: T, esperado: T, msg: string) {
   assertIgual(r.cuenta, 'CAJA', 'USDT INGRESAN: CUENTA = CAJA')
 }
 
+// ── LIBRAS (16/10/2026) ─────────────────────────────────────────────────────
+// Moneda solo-app, igual que USDT: no existe en la planilla, así que estos casos no
+// cotejan contra el Sheet. Lo que verifican es que entre en la matriz de cotización en
+// el lugar correcto: la libra vale MÁS que todas las demás, así que cuando es la moneda
+// propia el monto se MULTIPLICA por la cotización, nunca se divide.
+{
+  // COMPRA 100 libras pagando pesos a 1.500 por libra → entrega 150.000 pesos
+  const r = calcularMovimiento({ tipo: 'CAJA', operacion: 'COMPRA', propio: 'LIBRAS', externo: 'PESOS', monto: 100, cotizacion: 1500, costoPorcentaje: null })
+  assertCasi(r.valores.LIBRAS, 100, 'LIBRAS COMPRA/PESOS: LIBRAS = +100')
+  assertCasi(r.valores.PESOS, -150000, 'LIBRAS COMPRA/PESOS: PESOS = -150.000')
+  assertIgual(r.cuenta, 'CAMBIO DIVISAS', 'LIBRAS COMPRA/PESOS: CUENTA = CAMBIO DIVISAS')
+}
+{
+  // VENTA 100 libras cobrando pesos a 1.600 → recibe 160.000 pesos
+  const r = calcularMovimiento({ tipo: 'CAJA', operacion: 'VENTA', propio: 'LIBRAS', externo: 'PESOS', monto: 100, cotizacion: 1600, costoPorcentaje: null })
+  assertCasi(r.valores.LIBRAS, -100, 'LIBRAS VENTA/PESOS: LIBRAS = -100')
+  assertCasi(r.valores.PESOS, 160000, 'LIBRAS VENTA/PESOS: PESOS = +160.000')
+}
+{
+  // Contra DÓLARES: la libra sigue siendo la fuerte, así que multiplica.
+  // 100 libras a 1,30 dólares por libra → entrega 130 dólares.
+  const r = calcularMovimiento({ tipo: 'CAJA', operacion: 'COMPRA', propio: 'LIBRAS', externo: 'DOLARES', monto: 100, cotizacion: 1.3, costoPorcentaje: null })
+  assertCasi(r.valores.LIBRAS, 100, 'LIBRAS COMPRA/DOLARES: LIBRAS = +100')
+  assertCasi(r.valores.DOLARES, -130, 'LIBRAS COMPRA/DOLARES: DOLARES = -130')
+}
+{
+  // Y al revés: con PESOS como propia, la cotización DIVIDE.
+  const r = calcularMovimiento({ tipo: 'CAJA', operacion: 'COMPRA', propio: 'PESOS', externo: 'LIBRAS', monto: 150000, cotizacion: 1500, costoPorcentaje: null })
+  assertCasi(r.valores.PESOS, 150000, 'PESOS COMPRA/LIBRAS: PESOS = +150.000')
+  assertCasi(r.valores.LIBRAS, -100, 'PESOS COMPRA/LIBRAS: LIBRAS = -100')
+}
+{
+  // En CUENTA CORRIENTE: un INGRESAN deja la cuenta en NEGATIVO, igual que el resto
+  // (el cliente trajo plata, la casa se la debe). Ver la regla del 1/9/2026.
+  const r = calcularMovimiento({ tipo: 'CTA CTE', operacion: 'INGRESAN', propio: 'LIBRAS', externo: 'LIBRAS', monto: 500, cotizacion: null, costoPorcentaje: null })
+  assertCasi(r.valores.LIBRAS, 500, 'LIBRAS CTA CTE INGRESAN: LIBRAS = +500')
+  assertCasi(r.valores['CC LIBRAS'], -500, 'LIBRAS CTA CTE INGRESAN: CC LIBRAS = -500')
+  assertIgual(r.cuenta, 'CAJA', 'LIBRAS CTA CTE INGRESAN: CUENTA = CAJA')
+}
+
 console.log(`\n${ok} OK, ${fail} fallidas`)
 process.exit(fail > 0 ? 1 : 0)

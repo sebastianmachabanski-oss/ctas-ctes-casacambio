@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 // que todavía no se integró a la caja. Réplica del recuadro rojo "Calle" de la solapa
 // CAJA. Regla de la planilla: al total de calle solo suman los valores POSITIVOS.
 
-const COLUMNAS = ['pesos', 'cheques', 'dolares', 'euros', 'reales', 'usdt', 'banco', 'cc_pesos', 'cc_dolares', 'cc_euros', 'cc_reales'] as const
+const COLUMNAS = ['pesos', 'cheques', 'dolares', 'euros', 'reales', 'usdt', 'libras', 'banco', 'cc_pesos', 'cc_dolares', 'cc_euros', 'cc_reales', 'cc_libras'] as const
 
 export default async function CallePage() {
   const supabase = await createClient()

@@ -57,6 +57,8 @@ const ORDEN = [
   'migrations/2026-08-25_cta_cte_paginado.sql',
   'migrations/2026-08-26_op_transferencias.sql',
   'migrations/2026-09-11_senal_cambios.sql',
+  // Va al final: agrega columnas y recrea seis objetos que enumeran las monedas.
+  'migrations/2026-10-16_libras.sql',
 ]
 
 /** Lo que NO va, y por qué. Cada exclusión es una decisión que hay que poder defender. */

@@ -17,16 +17,18 @@ export type Saldo = {
   saldo_euros: number | null
   saldo_reales: number | null
   saldo_usdt: number | null
+  saldo_libras: number | null
   ultimo_movimiento: string | null
 }
 
-export type ClaveMoneda = 'saldo_dolares' | 'saldo_pesos' | 'saldo_euros' | 'saldo_reales' | 'saldo_usdt'
+export type ClaveMoneda = 'saldo_dolares' | 'saldo_pesos' | 'saldo_euros' | 'saldo_reales' | 'saldo_usdt' | 'saldo_libras'
 
 export const MONEDAS: { key: ClaveMoneda; label: string; sym: string; color: string }[] = [
   { key: 'saldo_dolares', label: 'Dólares', sym: 'U$S',  color: '#16a34a' },
   { key: 'saldo_pesos',   label: 'Pesos',   sym: '$',    color: '#2563eb' },
   { key: 'saldo_euros',   label: 'Euros',   sym: '€',    color: '#7c3aed' },
   { key: 'saldo_reales',  label: 'Reales',  sym: 'R$',   color: '#eab308' },
+  { key: 'saldo_libras',  label: 'Libras',  sym: '£',    color: '#be123c' },
   // USDT solo puede venir de la app: en la planilla no existe (25/8/2026).
   { key: 'saldo_usdt',    label: 'USDT',    sym: 'USDT', color: '#26a17b' },
 ]

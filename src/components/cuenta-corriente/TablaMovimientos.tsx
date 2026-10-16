@@ -4,7 +4,7 @@ type DiarioRow = {
   id: string; fecha: string; cuenta_cte: string; operacion: string
   concepto: string | null; evento: string | null; notas?: string | null
   cc_dolares: number | null; cc_pesos: number | null
-  cc_euros: number | null; cc_reales: number | null
+  cc_euros: number | null; cc_reales: number | null; cc_libras: number | null
 }
 
 // La referencia del movimiento: el sync la deja en `evento` y el alta de la app la

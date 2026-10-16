@@ -12,7 +12,7 @@ export type Fila = {
   monto: number | null; cot: number | null; costo_pct: number | null
   notas: string | null
   pesos: number | null; cheques: number | null; dolares: number | null
-  euros: number | null; reales: number | null
+  euros: number | null; reales: number | null; libras: number | null
 }
 
 type Filtros = { desde: string; hasta: string; cliente: string; notas: string[] }
@@ -23,6 +23,7 @@ const MONEDAS = [
   { key: 'dolares' as const, label: 'Dólares', sym: 'U$S' },
   { key: 'euros'   as const, label: 'Euros',   sym: '€'   },
   { key: 'reales'  as const, label: 'Reales',  sym: 'R$'  },
+  { key: 'libras'  as const, label: 'Libras',  sym: '£'   },
 ]
 
 const nf = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2 })

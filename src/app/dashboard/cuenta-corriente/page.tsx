@@ -113,6 +113,7 @@ export default async function CuentaCorrientePage({
             && eq(Number(u.acum_dolares) || 0, s.saldo_dolares)
             && eq(Number(u.acum_euros) || 0, s.saldo_euros)
             && eq(Number(u.acum_reales) || 0, s.saldo_reales)
+            && eq(Number(u.acum_libras) || 0, s.saldo_libras)
             && eq(Number(u.acum_usdt) || 0, s.saldo_usdt)
         }
       }

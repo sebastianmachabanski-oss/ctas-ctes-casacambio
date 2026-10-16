@@ -9,6 +9,7 @@ export interface DiarioRow {
   operacion: string; concepto: string | null; evento: string | null
   detalle: string | null; recibo: string | null; moneda: string; monto: number
   cc_pesos: number | null; cc_dolares: number | null; cc_euros: number | null; cc_reales: number | null
+  cc_libras: number | null
   cotizacion: number | null
   anulado: boolean; anulado_por: string | null; anulado_at: string | null
   motivo_anulacion: string | null; notas: string | null; creado_por: string | null
@@ -16,7 +17,7 @@ export interface DiarioRow {
 }
 export interface SaldoCuentaCorriente {
   cuenta_cte: string; saldo_pesos: number | null; saldo_dolares: number | null
-  saldo_euros: number | null; saldo_reales: number | null; ultimo_movimiento: string | null
+  saldo_euros: number | null; saldo_reales: number | null; saldo_libras: number | null; ultimo_movimiento: string | null
 }
 export type Database = {
   public: {

@@ -22,7 +22,7 @@ export const dynamic = 'force-dynamic'
 
 // Columnas de "calle" (dinero con repartidor asignado). Regla de la planilla: al total
 // solo suman los valores POSITIVOS.
-const COLS_CALLE = ['pesos', 'cheques', 'dolares', 'euros', 'reales', 'usdt'] as const
+const COLS_CALLE = ['pesos', 'cheques', 'dolares', 'euros', 'reales', 'usdt', 'libras'] as const
 
 async function traerTodo<T>(fetchPage: (from: number, to: number) => Promise<T[]>): Promise<T[]> {
   const PAGE = 1000
@@ -93,7 +93,7 @@ export default async function InicioPage({
   // 2) Total en calle por moneda (solo positivos).
   const calleRows = await traerTodo<Record<string, number>>(async (from, to) => {
     const { data } = await supabase.from('movimientos_caja')
-      .select('pesos,cheques,dolares,euros,reales')
+      .select('pesos,cheques,dolares,euros,reales,usdt,libras')
       .not('debe', 'is', null)
       .neq('operacion', 'OPERACION?')
       .range(from, to)
@@ -118,6 +118,7 @@ export default async function InicioPage({
     { cur: 'Euros',   col: '#7c3aed', caja: t.euros ?? 0,   calle: calle.euros,   enCaja: (t.euros ?? 0) - calle.euros,     cc: t.cc_euros ?? 0 },
     { cur: 'Reales',  col: '#eab308', caja: t.reales ?? 0,  calle: calle.reales,  enCaja: (t.reales ?? 0) - calle.reales,   cc: t.cc_reales ?? 0 },
     { cur: 'USDT',    col: '#26a17b', caja: t.usdt ?? 0,    calle: calle.usdt,    enCaja: (t.usdt ?? 0) - calle.usdt,       cc: null },
+    { cur: 'Libras',  col: '#be123c', caja: t.libras ?? 0,  calle: calle.libras,  enCaja: (t.libras ?? 0) - calle.libras,   cc: t.cc_libras ?? 0 },
     { cur: 'Cheques', col: '#0d9488', caja: t.cheques ?? 0, calle: calle.cheques, enCaja: (t.cheques ?? 0) - calle.cheques, cc: null },
     { cur: 'Banco',   col: '#8a94a6', caja: t.banco ?? 0,   calle: null,          enCaja: null,                              cc: null },
   ]
