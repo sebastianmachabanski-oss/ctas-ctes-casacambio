@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
+import { rutaActiva } from '@/lib/configuracion'
 import { APP_NOMBRE } from '@/lib/marca'
 import { aUsuario } from '@/lib/usuarios'
 import type { Profile } from '@/lib/supabase/types'
@@ -79,6 +80,10 @@ export default function Sidebar({ profile }: { profile: Profile }) {
   // sigue existiendo y funcionando en /dashboard/admin/sync para quien la necesite.
   const items = (NAV[profile.rol] ?? NAV.cliente)
     .filter(it => PLANILLA_ACTIVA || it.href !== '/dashboard/admin/sync')
+    // Módulos apagados en esta instalación (ver src/lib/configuracion.ts). El filtro va
+    // sobre el menú ya armado por rol: un módulo apagado no se ve, y además su pantalla
+    // rebota desde el layout — esconder la opción no alcanza, con la URL se entra igual.
+    .filter(it => !it.href || rutaActiva(it.href))
 
   // Estado de anclado: recordado entre visitas; en pantallas chicas arranca como panel.
   useEffect(() => {
