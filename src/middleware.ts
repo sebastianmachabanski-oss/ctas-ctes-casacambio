@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { esAdmin } from '@/lib/roles'
+import { rutaActiva } from '@/lib/configuracion'
 
 export async function middleware(request: NextRequest) {
   // Las funciones de Netlify (p.ej. sync-background) manejan su propia autenticación
@@ -60,6 +61,20 @@ export async function middleware(request: NextRequest) {
 
   // Solo administrador/superadmin pueden acceder a /admin
   if (pathname.startsWith('/dashboard/admin') && !esAdmin(profile.rol)) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  // Módulos apagados en esta instalación (ver src/lib/configuracion.ts).
+  //
+  // Va ACÁ y no en cada pantalla por dos razones. Primero, es un solo lugar: una pantalla
+  // nueva de un módulo apagado queda cubierta sola, sin que nadie se acuerde de agregarle
+  // la guarda. Segundo, esconder la opción del menú NO apaga nada — con la URL en la mano
+  // se entra igual, y el módulo seguiría existiendo para quien la tenga.
+  //
+  // No es una barrera de seguridad: el rol ya decidió qué puede ver esta persona. Es una
+  // decisión de producto —qué contrató este cliente— y por eso manda al panel en lugar de
+  // dar un error.
+  if (!rutaActiva(pathname)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
