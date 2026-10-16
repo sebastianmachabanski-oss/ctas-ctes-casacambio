@@ -140,6 +140,7 @@ export type CambiosDiario = {
   cc_euros: number
   cc_reales: number
   cc_usdt: number
+  cc_libras: number
   evento: string | null
   notas: string | null
 }

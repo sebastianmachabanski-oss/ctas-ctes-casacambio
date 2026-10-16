@@ -12,14 +12,15 @@ type Mov = {
   op: string | null
   creado_por: string | null; creado_at: string | null
   editado_por: string | null; editado_at: string | null
-  pesos: number; cheques: number; dolares: number; euros: number; reales: number; usdt: number; banco: number
-  cc_pesos: number; cc_dolares: number; cc_euros: number; cc_reales: number; cc_usdt: number
+  pesos: number; cheques: number; dolares: number; euros: number; reales: number; usdt: number; libras: number; banco: number
+  cc_pesos: number; cc_dolares: number; cc_euros: number; cc_reales: number; cc_usdt: number; cc_libras: number
 }
 
 // Columnas de impacto por moneda (solo se muestran las presentes en el resultado).
 const IMPACTOS: { key: keyof Mov; sym: string }[] = [
   { key: 'pesos', sym: '$' }, { key: 'cheques', sym: 'CH$' }, { key: 'dolares', sym: 'U$S' },
-  { key: 'euros', sym: '€' }, { key: 'reales', sym: 'R$' }, { key: 'usdt', sym: 'USDT' }, { key: 'banco', sym: 'BCO' },
+  { key: 'euros', sym: '€' }, { key: 'reales', sym: 'R$' }, { key: 'usdt', sym: 'USDT' },
+  { key: 'libras', sym: '£' }, { key: 'banco', sym: 'BCO' },
   { key: 'cc_pesos', sym: 'CC $' }, { key: 'cc_dolares', sym: 'CC U$S' },
   { key: 'cc_euros', sym: 'CC €' }, { key: 'cc_reales', sym: 'CC R$' },
   { key: 'cc_usdt', sym: 'CC USDT' },

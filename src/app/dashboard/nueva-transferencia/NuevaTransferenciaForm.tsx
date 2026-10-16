@@ -17,10 +17,10 @@ import { validarTransferencia, gananciaDe, gananciaNegativa, type EntradaTransfe
  */
 
 // Las monedas que se operan. USDT incluido: existe solo en la app pero se transfiere igual.
-const MONEDAS = ['DOLARES', 'PESOS', 'EUROS', 'REALES', 'USDT']
+const MONEDAS = ['DOLARES', 'PESOS', 'EUROS', 'REALES', 'USDT', 'LIBRAS']
 
 const SIMBOLO: Record<string, string> = {
-  DOLARES: 'US$', PESOS: '$', EUROS: '€', REALES: 'R$', USDT: 'USDT',
+  DOLARES: 'US$', PESOS: '$', EUROS: '€', REALES: 'R$', USDT: 'USDT', LIBRAS: '£',
 }
 
 const fmt = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })

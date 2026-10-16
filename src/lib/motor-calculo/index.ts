@@ -8,17 +8,21 @@
 import { buscarSignoOperacion, buscarMultCotizacion } from './signos'
 import { OPERACIONES_CUENTA } from './operaciones'
 
+// LIBRAS (16/10/2026): igual que USDT, moneda solo-app. Opera en CAJA y en CUENTA
+// CORRIENTE desde el primer día, y se cotiza contra todas las demás.
+//
 // USDT: moneda solo-app, NO existe en la planilla — no hay ni una transacción cargada
 // allá. Desde el 25/8/2026 opera también en CUENTA CORRIENTE, así que se suma "CC USDT".
 // Como en el Sheet no existe, ambas columnas quedan en 0 para toda fila de la planilla y
 // la validación del motor contra el Sheet no se ve afectada.
-export const MONEDAS = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT'] as const
+export const MONEDAS = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT', 'LIBRAS'] as const
 export type Moneda = typeof MONEDAS[number]
 
-// Columnas de salida: las 10 de la planilla + USDT y CC USDT, que son solo de la app.
+// Columnas de salida: las 10 de la planilla + USDT/CC USDT y LIBRAS/CC LIBRAS, que son
+// solo de la app (ninguna de las dos existe en el Sheet).
 export const COLUMNAS_SALIDA = [
-  'PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT', 'BANCO',
-  'CC PESOS', 'CC DOLARES', 'CC EUROS', 'CC REALES', 'CC USDT',
+  'PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT', 'LIBRAS', 'BANCO',
+  'CC PESOS', 'CC DOLARES', 'CC EUROS', 'CC REALES', 'CC USDT', 'CC LIBRAS',
 ] as const
 export type ColumnaSalida = typeof COLUMNAS_SALIDA[number]
 

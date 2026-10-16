@@ -16,7 +16,7 @@ import { Fragment, useMemo, useState } from 'react'
  * con ese rango y el gráfico ajusta su ventana.
  */
 
-export type Cliente = { nombre: string; pesos: number; dolares: number; euros: number; reales: number; ultimo: string | null }
+export type Cliente = { nombre: string; pesos: number; dolares: number; euros: number; reales: number; libras: number; ultimo: string | null }
 export type Punto = { fecha: string; saldo: number }
 
 const fmt = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
@@ -119,7 +119,7 @@ export default function ReportesCaja({ clientesCaja, clientesCC, serieUSD, hoy, 
         </div>
         <div className="tbl-wrap" style={{ maxHeight: 520, overflowY: 'auto' }}>
           <table className="cc-tbl">
-            <thead><tr><th>Cliente</th><th>Pesos</th><th>Dólares</th><th>Euros</th><th>Reales</th><th>Último mov.</th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Pesos</th><th>Dólares</th><th>Euros</th><th>Reales</th><th>Libras</th><th>Último mov.</th></tr></thead>
             <tbody>
               {filtrados.slice(0, 400).map((c, i) => (
                 <Fragment key={c.nombre + i}>
@@ -127,13 +127,13 @@ export default function ReportesCaja({ clientesCaja, clientesCC, serieUSD, hoy, 
                       lee como si la lista se repitiera. */}
                   {i === desdeInactivos && (
                     <tr>
-                      <td colSpan={6} style={{ background: 'var(--soft, #f1f5f9)', color: 'var(--muted)', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600 }}>
+                      <td colSpan={7} style={{ background: 'var(--soft, #f1f5f9)', color: 'var(--muted)', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600 }}>
                         Sin movimientos en {DIAS_ACTIVO} días
                       </td>
                     </tr>
                   )}
                   <tr>
-                    <td>{c.nombre}</td>{cell(c.pesos)}{cell(c.dolares)}{cell(c.euros)}{cell(c.reales)}
+                    <td>{c.nombre}</td>{cell(c.pesos)}{cell(c.dolares)}{cell(c.euros)}{cell(c.reales)}{cell(c.libras)}
                     <td className={cortaPorActividad && c.ultimo && c.ultimo < corte ? 'zero' : ''} style={{ whiteSpace: 'nowrap' }}>
                       {c.ultimo ? fecha(c.ultimo) : '—'}
                     </td>

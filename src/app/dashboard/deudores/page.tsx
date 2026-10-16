@@ -30,7 +30,7 @@ export default async function DeudoresPage() {
   for (let from = 0; ; from += PAGE) {
     const { data: pg } = await supabase
       .from('saldos_cuenta_corriente')
-      .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales,saldo_usdt,ultimo_movimiento')
+      .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales,saldo_usdt,saldo_libras,ultimo_movimiento')
       .order('cuenta_cte', { ascending: true })
       .range(from, from + PAGE - 1)
     const rows = (pg ?? []) as any[]
@@ -40,7 +40,7 @@ export default async function DeudoresPage() {
 
   // Las cuentas en cero no aportan nada a la posición y son la mayoría del padrón.
   const saldos = filas.filter((s: any) =>
-    (['saldo_dolares', 'saldo_pesos', 'saldo_euros', 'saldo_reales', 'saldo_usdt'] as const)
+    (['saldo_dolares', 'saldo_pesos', 'saldo_euros', 'saldo_reales', 'saldo_usdt', 'saldo_libras'] as const)
       .some(k => (Number(s[k]) || 0) !== 0)
   ) as Saldo[]
 

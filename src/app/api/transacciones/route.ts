@@ -14,6 +14,7 @@ function mapMoneda(val: string): string {
   if (m.includes('PESO') || m === 'ARS') return 'PESOS'
   if (m.includes('EURO') || m === 'EUR') return 'EUROS'
   if (m.includes('REAL') || m === 'BRL') return 'REALES'
+  if (m.includes('LIBRA') || m === 'GBP') return 'LIBRAS'
   return m
 }
 
@@ -137,6 +138,7 @@ export async function POST(request: Request) {
   const cc_euros   = cc('CC EUROS')
   const cc_reales  = cc('CC REALES')
   const cc_usdt    = cc('CC USDT')
+  const cc_libras  = cc('CC LIBRAS')
 
   // USDT no existe en la planilla, así que una fila que lo toque solo puede venir de acá:
   // se marca 'app' para que el sync no la borre. En `diario` esa marca es la diferencia
@@ -159,6 +161,7 @@ export async function POST(request: Request) {
     cc_euros,
     cc_reales,
     cc_usdt,
+    cc_libras,
     origen: involucraUsdt ? 'app' : 'sheet',
     // La referencia va en `evento`, que es donde la deja el sync al traer la columna
     // NOTAS de la planilla, y es la que muestra Cuentas Corrientes en la columna "Ref.".

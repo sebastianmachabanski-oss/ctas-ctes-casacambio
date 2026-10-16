@@ -6,13 +6,13 @@ type Movimiento = {
   id: string; fecha: string; tipo: string; cliente: string | null; operacion: string
   propio: string | null; externo: string | null; monto: number; cot: number | null
   debe: string | null; notas: string | null
-  pesos: number; cheques: number; dolares: number; euros: number; reales: number; usdt: number; banco: number
-  cc_pesos: number; cc_dolares: number; cc_euros: number; cc_reales: number
+  pesos: number; cheques: number; dolares: number; euros: number; reales: number; usdt: number; libras: number; banco: number
+  cc_pesos: number; cc_dolares: number; cc_euros: number; cc_reales: number; cc_libras: number
 }
 
 const SIMBOLOS: Record<string, string> = {
-  pesos: '$', cheques: 'CH$', dolares: 'U$S', euros: '€', reales: 'R$', usdt: 'USDT',
-  banco: 'BCO', cc_pesos: 'CC $', cc_dolares: 'CC U$S', cc_euros: 'CC €', cc_reales: 'CC R$',
+  pesos: '$', cheques: 'CH$', dolares: 'U$S', euros: '€', reales: 'R$', usdt: 'USDT', libras: '£',
+  banco: 'BCO', cc_pesos: 'CC $', cc_dolares: 'CC U$S', cc_euros: 'CC €', cc_reales: 'CC R$', cc_libras: 'CC £',
 }
 const COLUMNAS = Object.keys(SIMBOLOS)
 const nf = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })

@@ -11,7 +11,7 @@ import { pareceCuentaCorriente, avisoCajaVsCtaCte } from '@/lib/caja-vs-ctacte'
 // columna CHEQUES y la contrapartida en CC PESOS / CC DOLARES (así lo hace la planilla).
 // USDT también opera en las dos desde el 25/8/2026 (antes era solo-CAJA), así que la
 // lista de monedas ya no depende del Tipo.
-const MONEDAS = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT']
+const MONEDAS = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT', 'LIBRAS']
 const SIMBOLOS: Record<string, string> = {
   pesos: '$', cheques: 'CH$', dolares: 'U$S', euros: '€', reales: 'R$', usdt: 'USDT',
   banco: 'BCO', cc_pesos: 'CC $', cc_dolares: 'CC U$S', cc_euros: 'CC €', cc_reales: 'CC R$',

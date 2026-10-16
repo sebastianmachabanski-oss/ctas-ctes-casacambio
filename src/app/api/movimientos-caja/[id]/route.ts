@@ -107,8 +107,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     notas: notas?.trim() || null,
     cuenta: resultado.cuenta,
     pesos: v.PESOS, cheques: v.CHEQUES, dolares: v.DOLARES, euros: v.EUROS, reales: v.REALES,
+    usdt: v.USDT, libras: v.LIBRAS,
     banco: v.BANCO, cc_pesos: v['CC PESOS'], cc_dolares: v['CC DOLARES'],
     cc_euros: v['CC EUROS'], cc_reales: v['CC REALES'],
+    cc_usdt: v['CC USDT'], cc_libras: v['CC LIBRAS'],
     editado_por: (profile as any)?.nombre ?? user.email ?? 'app',
     editado_at: new Date().toISOString(),
   }).eq('id', params.id)
@@ -131,6 +133,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     cc_dolares: Number(v['CC DOLARES'] ?? 0),
     cc_euros:   Number(v['CC EUROS']   ?? 0),
     cc_reales:  Number(v['CC REALES']  ?? 0),
+    cc_libras:  Number(v['CC LIBRAS']  ?? 0),
     cc_usdt:    Number(v['CC USDT']    ?? 0),
     // La referencia va en las dos columnas: el sync usa `evento` y la pantalla cae a
     // `notas` para los movimientos viejos.

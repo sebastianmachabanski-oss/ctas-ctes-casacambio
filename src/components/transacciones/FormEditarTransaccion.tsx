@@ -13,7 +13,7 @@ type Movimiento = {
 
 const nf = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
 const SIMBOLOS: Record<string, string> = {
-  'PESOS': '$', 'CHEQUES': 'CH$', 'DOLARES': 'U$S', 'EUROS': '€', 'REALES': 'R$', 'USDT': 'USDT',
+  'PESOS': '$', 'CHEQUES': 'CH$', 'DOLARES': 'U$S', 'EUROS': '€', 'REALES': 'R$', 'USDT': 'USDT', 'LIBRAS': '£',
   'BANCO': 'BCO', 'CC PESOS': 'CC $', 'CC DOLARES': 'CC U$S', 'CC EUROS': 'CC €', 'CC REALES': 'CC R$',
 }
 
