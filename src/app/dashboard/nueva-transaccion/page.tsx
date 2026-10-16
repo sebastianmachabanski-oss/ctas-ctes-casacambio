@@ -50,9 +50,25 @@ export default async function NuevaTransaccionPage() {
   const cfgUsd = (cfg as any)?.value?.usd
   if (typeof cfgUsd === 'number' && cfgUsd > 0) umbralUsd = cfgUsd
 
+  // Cuántos dólares vale una libra, para que la alerta de monto grande pueda medir
+  // también las operaciones en libras (16/10/2026).
+  //
+  // POR QUÉ UNA PARIDAD FIJA Y NO UNA COTIZACIÓN EN VIVO
+  // La fuente que ya usa la pantalla (dolarapi) no publica la libra: trae dólar, euro,
+  // real, peso chileno y uruguayo. Sumar una segunda API agregaría otro punto de falla
+  // en el camino de carga a cambio de una precisión que acá no hace falta: este número
+  // solo decide si una operación supera un umbral, no calcula ningún saldo. Si la libra
+  // se mueve un 3%, un umbral de 10.000 dólares se corre a 10.300 — no cambia ninguna
+  // decisión. Se guarda en `app_config` para poder ajustarla sin desplegar.
+  let dolaresPorLibra = 1.27
+  const { data: cfgLib } = await (supabase as any)
+    .from('app_config').select('value').eq('key', 'dolares_por_libra').maybeSingle()
+  const cfgDpl = (cfgLib as any)?.value?.dolares
+  if (typeof cfgDpl === 'number' && cfgDpl > 0) dolaresPorLibra = cfgDpl
+
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <NuevaTransaccionForm cuentas={cuentas} clientes={clientes} umbralUsd={umbralUsd} puedeEditarUmbral={esAdmin(rol)} />
+      <NuevaTransaccionForm cuentas={cuentas} clientes={clientes} umbralUsd={umbralUsd} dolaresPorLibra={dolaresPorLibra} puedeEditarUmbral={esAdmin(rol)} />
     </div>
   )
 }

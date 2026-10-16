@@ -104,8 +104,8 @@ function formPorDefecto() {
   }
 }
 
-export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, puedeEditarUmbral }: {
-  cuentas: string[]; clientes: string[]; umbralUsd: number; puedeEditarUmbral: boolean
+export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dolaresPorLibra, puedeEditarUmbral }: {
+  cuentas: string[]; clientes: string[]; umbralUsd: number; dolaresPorLibra: number; puedeEditarUmbral: boolean
 }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -241,6 +241,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
   /** Confirmación de que un movimiento de CAJA con nombre de cuenta corriente va a caja. */
   const [confirmoCaja, setConfirmoCaja] = useState(false)
   const [umbral, setUmbral] = useState(umbralUsd)
+  const [paridadLibra, setParidadLibra] = useState(dolaresPorLibra)
   const [rates, setRates] = useState<{ usd: number; eur: number; brl: number } | null>(null)
 
   useEffect(() => {
@@ -284,23 +285,36 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
   }, [form])
 
   // Valor en USD de la operación: pata en dólares directa, o la pata mayor convertida
-  // con las cotizaciones de referencia (pesos / euros / reales).
+  // con las cotizaciones de referencia (pesos / euros / reales) o la paridad de la libra.
   const usdOperado = useMemo(() => {
     if (preview.tipo !== 'ok') return 0
     const v = preview.valores
     // USDT cuenta como dólar (paridad ~1:1) para el umbral de alerta.
     const usd = Math.abs((v['DOLARES'] ?? 0) + (v['CC DOLARES'] ?? 0)) + Math.abs(v['USDT'] ?? 0)
     if (usd > 0) return usd
-    if (!rates?.usd) return 0
+
+    // LIBRAS va ANTES del corte por `rates` (16/10/2026): su conversión no depende de la
+    // cotización online —se hace con una paridad fija contra el dólar— así que tiene que
+    // poder medirse aunque la API de cotizaciones no responda.
+    //
+    // Sin esto, un INGRESAN o un EGRESAN en libras daba CERO y la alerta nunca saltaba:
+    // son las únicas operaciones sin pata contraria, y por lo tanto sin ninguna moneda
+    // conocida que convertir. Una compra o una venta de libras ya se medía bien, porque
+    // deja su contrapartida en pesos o en dólares.
+    const libras = Math.abs((v['LIBRAS'] ?? 0) + (v['CC LIBRAS'] ?? 0))
+    const porLibras = libras * (paridadLibra > 0 ? paridadLibra : 0)
+
+    if (!rates?.usd) return porLibras
     const pesos = Math.abs((v['PESOS'] ?? 0) + (v['CC PESOS'] ?? 0))
     const eur = Math.abs((v['EUROS'] ?? 0) + (v['CC EUROS'] ?? 0))
     const brl = Math.abs((v['REALES'] ?? 0) + (v['CC REALES'] ?? 0))
     return Math.max(
+      porLibras,
       pesos / rates.usd,
       rates.eur ? (eur * rates.eur) / rates.usd : 0,
       rates.brl ? (brl * rates.brl) / rates.usd : 0,
     )
-  }, [preview, rates])
+  }, [preview, rates, paridadLibra])
 
   const montoGrande = usdOperado > umbral
 
@@ -798,7 +812,25 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
       </div>
 
       {/* Umbral de alerta (en dólares, configurable por un administrador sin deploy) */}
-      <UmbralAlerta umbral={umbral} onCambio={setUmbral} puedeEditar={puedeEditarUmbral} />
+      <AjusteNumerico valor={umbral} onCambio={setUmbral} puedeEditar={puedeEditarUmbral}
+        endpoint="/api/config/umbral-alerta" campo="usd" prefijo="US$"
+        invalido="El umbral debe ser un número mayor a 0 (en dólares)">
+        Alerta de monto: se pide confirmación cuando la operación equivale a más de{' '}
+        <b style={{ color: 'var(--ink-2)' }}>US$ {fmtUsd.format(umbral)}</b>
+        {' '}(evaluado siempre en dólares).
+      </AjusteNumerico>
+      {/* La paridad de la libra solo se muestra cuando hace falta: la fuente de
+          cotizaciones no la publica, así que es el único número que hay que mantener a
+          mano. Aparece con la moneda elegida para no agregar una línea permanente. */}
+      {(form.propio === 'LIBRAS' || form.externo === 'LIBRAS') && (
+        <AjusteNumerico valor={paridadLibra} onCambio={setParidadLibra} puedeEditar={puedeEditarUmbral}
+          endpoint="/api/config/paridad-libra" campo="dolares" prefijo="US$"
+          invalido="Cuántos dólares vale una libra: un número mayor a 0">
+          Para medir el monto, una libra se toma como{' '}
+          <b style={{ color: 'var(--ink-2)' }}>US$ {paridadLibra}</b>
+          {' '}— la cotización online no publica la libra, así que este valor se ajusta a mano.
+        </AjusteNumerico>
+      )}
 
       <div className="flex items-center gap-4 pt-1">
         <button type="submit" className="btn-primary"
@@ -811,31 +843,47 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, pue
   )
 }
 
-// Línea informativa del umbral de alerta + editor inline (solo administradores).
+// Línea informativa de un ajuste + editor inline (solo administradores).
 // El valor vive en app_config y se cambia sin deploy.
-function UmbralAlerta({ umbral, onCambio, puedeEditar }: {
-  umbral: number; onCambio: (v: number) => void; puedeEditar: boolean
+//
+// Sirve para los dos ajustes de esta pantalla —el umbral de alerta y la paridad de la
+// libra— porque la mecánica es idéntica: mostrar, editar, guardar por PATCH. Tenerlos
+// como dos componentes casi iguales era garantía de que uno se arreglara y el otro no.
+function AjusteNumerico({ valor: actual, onCambio, puedeEditar, endpoint, campo, prefijo, invalido, children }: {
+  valor: number
+  onCambio: (v: number) => void
+  puedeEditar: boolean
+  /** Ruta del PATCH que lo persiste. */
+  endpoint: string
+  /** Nombre del campo que espera ese endpoint en el cuerpo. */
+  campo: string
+  /** Lo que va a la izquierda del input (ej. "US$"). */
+  prefijo: string
+  /** Mensaje cuando lo tipeado no sirve. */
+  invalido: string
+  /** La frase que describe el ajuste. */
+  children: React.ReactNode
 }) {
   const [editando, setEditando] = useState(false)
-  const [valor, setValor] = useState(String(umbral))
+  const [valor, setValor] = useState(String(actual))
   const [guardando, setGuardando] = useState(false)
 
   async function guardar() {
-    const usd = Number(valor.replace(/\./g, '').replace(',', '.'))
-    if (!isFinite(usd) || usd <= 0) { alert('El umbral debe ser un número mayor a 0 (en dólares)'); return }
+    const n = Number(valor.replace(/\./g, '').replace(',', '.'))
+    if (!isFinite(n) || n <= 0) { alert(invalido); return }
     setGuardando(true)
     try {
-      const res = await fetch('/api/config/umbral-alerta', {
+      const res = await fetch(endpoint, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usd }),
+        body: JSON.stringify({ [campo]: n }),
       })
       const data = await res.json()
       if (!res.ok) { alert('No se pudo guardar: ' + (data.error ?? 'error desconocido')); return }
-      onCambio(usd)
+      onCambio(n)
       setEditando(false)
     } catch {
-      alert('Error de conexión al guardar el umbral')
+      alert('Error de conexión al guardar')
     } finally {
       setGuardando(false)
     }
@@ -843,20 +891,16 @@ function UmbralAlerta({ umbral, onCambio, puedeEditar }: {
 
   return (
     <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-      <span>
-        Alerta de monto: se pide confirmación cuando la operación equivale a más de{' '}
-        <b style={{ color: 'var(--ink-2)' }}>US$ {fmtUsd.format(umbral)}</b>
-        {' '}(evaluado siempre en dólares).
-      </span>
+      <span>{children}</span>
       {puedeEditar && !editando && (
         <button type="button" className="chip" style={{ padding: '3px 10px', fontSize: 11.5 }}
-          onClick={() => { setValor(String(umbral)); setEditando(true) }}>
+          onClick={() => { setValor(String(actual)); setEditando(true) }}>
           ⚙ cambiar
         </button>
       )}
       {puedeEditar && editando && (
         <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-          US$
+          {prefijo}
           <input className="input num" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)}
             style={{ width: 110, padding: '3px 8px', display: 'inline-block' }} autoFocus />
           <button type="button" className="btn-primary" style={{ fontSize: 11.5, padding: '4px 10px' }}
