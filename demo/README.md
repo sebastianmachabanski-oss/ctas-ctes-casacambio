@@ -1,0 +1,138 @@
+# Video de demostración
+
+Graba un recorrido por la aplicación, con datos ficticios y texto sobreimpreso, para
+mostrarle el producto a un cliente potencial sin tener que hacer una demostración en vivo.
+
+**Dura alrededor de 1 minuto y 40 segundos. No tiene voz**: el texto que explica cada
+pantalla aparece abajo, sobre la imagen.
+
+---
+
+## Lo que hay que tener antes de empezar
+
+1. **Una base de demostración**, aparte de la del cliente. Se arma con los pasos 1 a 3 de
+   `docs/NUEVO-CLIENTE.md` y se llena con `scripts/sembrar-demo.mts`.
+2. **La aplicación andando en esta computadora**, apuntando a esa base.
+3. **Un usuario de esa base** para entrar (el que crea `scripts/crear-primer-admin.mts`).
+
+> **Esto NO se graba contra la aplicación del cliente.** El programa solo acepta grabar
+> contra `localhost` y se niega a hacerlo contra cualquier otra dirección. Es a propósito:
+> evita que, por un descuido, termine circulando un video con los movimientos y los nombres
+> de los clientes reales.
+
+---
+
+## Los cuatro pasos
+
+### 1. Instalar lo que hace falta (una sola vez)
+
+```bash
+cd demo
+npm install
+npx playwright install chromium
+```
+
+`playwright install chromium` baja un navegador aparte, que es el que se graba. Pesa unos
+cientos de megas y queda guardado; no hay que volver a bajarlo.
+
+### 2. Levantar la aplicación con los datos de demostración
+
+En **otra ventana de la terminal**, desde la carpeta del proyecto:
+
+```bash
+npm run dev
+```
+
+Queda andando en `http://localhost:3000`. Esa ventana no se cierra hasta terminar de grabar.
+
+Antes de seguir, abrir esa dirección en el navegador y confirmar **que los datos que se ven
+son los ficticios**. Si aparecen los del cliente, la aplicación está apuntando a la base
+equivocada: cortar y revisar `.env.local`.
+
+### 3. Grabar
+
+En la primera ventana:
+
+```bash
+cd demo
+DEMO_USUARIO=el-correo-del-usuario-de-demo DEMO_CLAVE=la-clave npm run grabar
+```
+
+Se abre una ventana de navegador que se maneja sola. **No hay que tocar nada ni mover el
+mouse**: lo que se ve ahí es lo que queda grabado. Al terminar, se cierra sola y la terminal
+dice dónde quedó el archivo:
+
+```
+✅ Listo: demo/salida/demo-2026-10-20.webm
+```
+
+### 4. Pasarlo a MP4
+
+El archivo sale en formato **WebM**, que es lo único que sabe generar la herramienta de
+grabación. WebM se ve bien en cualquier navegador, pero para mandarlo por WhatsApp o por
+correo conviene MP4. La conversión necesita **ffmpeg** instalado (`brew install ffmpeg` en
+Mac; en Windows, desde ffmpeg.org):
+
+```bash
+ffmpeg -i "demo/salida/demo-2026-10-20.webm" -c:v libx264 -crf 23 -pix_fmt yuv420p \
+  -movflags +faststart "demo/salida/demo-2026-10-20.mp4"
+```
+
+La terminal imprime este mismo comando al terminar de grabar, ya con el nombre del archivo
+puesto. Alcanza con copiarlo y pegarlo.
+
+---
+
+## Cambiar lo que dice el video
+
+Todo el recorrido está en una sola lista dentro de `grabar-demo.mjs`, en `RECORRIDO`. Cada
+parada es un bloque como este:
+
+```js
+{
+  ruta: '/dashboard/ganancias',
+  titulo: 'Cuánto se ganó',
+  texto: 'Por día, semana, mes o año. Y el detalle de cómo se llegó a ese número.',
+  espera: 5200,
+}
+```
+
+- `ruta` — la pantalla a mostrar. `null` significa "quedarse donde está" (sirve para decir
+  dos cosas sobre la misma pantalla).
+- `titulo` y `texto` — lo que aparece sobreimpreso.
+- `espera` — milisegundos que se queda ahí. 1.000 = 1 segundo.
+
+Agregar una parada es agregar un bloque; sacarla es borrarlo. **No hace falta tocar nada
+más.**
+
+---
+
+## Si algo sale mal
+
+| Lo que dice | Qué pasa | Qué hacer |
+|---|---|---|
+| `Solo se graba contra localhost` | `DEMO_URL` apunta a una dirección publicada | Es la protección funcionando. Grabar contra la aplicación local. |
+| `Faltan DEMO_USUARIO y DEMO_CLAVE` | No se pasaron los datos para entrar | Ponerlos adelante del comando, como en el paso 3. |
+| `Please run: npx playwright install` | Falta bajar el navegador | Correr ese comando dentro de `demo/`. |
+| `ERR_CONNECTION_REFUSED` | La aplicación no está levantada | Revisar la otra ventana: tiene que estar `npm run dev` andando. |
+| `⚠️ 3 parada(s) se saltearon` | Alguna pantalla cambió de dirección | El video igual se generó, sin esas partes. Corregir la `ruta` en `RECORRIDO`. |
+| `Video rendering requires ffmpeg` | Falta un complemento de la grabación | `npx playwright install ffmpeg` dentro de `demo/`. |
+
+---
+
+## Detalles para quien tenga que mantener esto
+
+- **La versión de Playwright va clavada** en `package.json`, sin `^`. Cada versión trae su
+  propio navegador y su propio ffmpeg: con un rango, un `npm install` de mañana puede traer
+  una versión que pide un navegador que no está bajado, y la grabación falla con un mensaje
+  que no se parece en nada a la causa.
+- **El cartel se dibuja adentro de la página**, no por fuera: la grabación captura lo que
+  muestra el navegador, así que un cartel puesto por fuera no saldría.
+- Sus clases llevan prefijo propio (`demo-titulo`, `demo-texto`) y se resetean a mano. No es
+  manía: una clase `.t` chocó con una clase `.t` de la aplicación y el título salió pintado
+  como un rectángulo blanco durante una grabación entera.
+- **Esta carpeta está aparte del proyecto a propósito.** Playwright pesa cientos de megas y
+  no tiene por qué instalarse en cada despliegue de Netlify.
+- `DEMO_HEADLESS=1` graba sin abrir ventana. Sirve para probar la máquina en un servidor sin
+  pantalla; para el video que se muestra conviene con ventana.
+- `DEMO_CHROMIUM=/ruta/al/chrome` usa un navegador ya instalado en vez de bajar otro.

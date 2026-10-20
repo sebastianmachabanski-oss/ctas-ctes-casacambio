@@ -11,3 +11,6 @@ scripts/pivots.json
 
 # Backups de datos generados localmente (contienen datos reales del negocio)
 backups/
+
+# Videos de demostración: pesan megas y se vuelven a generar con `npm run grabar`
+demo/salida/
