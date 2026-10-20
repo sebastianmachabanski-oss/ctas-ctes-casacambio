@@ -28,6 +28,7 @@
  */
 import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
+import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 
 /** Sin la barra del final: ver la nota en scripts/crear-primer-admin.mts. */
 const URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
@@ -47,19 +48,8 @@ if (!VISTA_PREVIA && !CONFIRMADO) salir(
 
 const db = createClient(URL ?? 'http://localhost', KEY ?? 'sin-clave', { auth: { persistSession: false, autoRefreshToken: false } })
 
-// ── Elenco ficticio ────────────────────────────────────────────────────────
-// Nombres de fantasía, a propósito poco creíbles como clientes reales.
-const CUENTAS = [
-  'ACME CAMBIOS', 'BOREAL SRL', 'CITRUS IMPORT', 'DELTA VIAJES',
-  'ESTUDIO NORTE', 'FARO LOGISTICA', 'GRANADA TEXTIL', 'HORIZONTE SA',
-]
-const EVENTUALES = [
-  'J. MARTINEZ', 'L. ROSSI', 'P. ALVAREZ', 'R. SUAREZ', 'M. BENITEZ',
-  'C. DOMINGUEZ', 'A. FERRARI', 'S. NAVARRO', 'T. ORTEGA', 'V. QUIROGA',
-]
-const REPARTIDORES = ['RUTA 1', 'RUTA 2', 'MOTO CENTRO']
-const CONTRAPARTES_TT = ['ACME - BOREAL', 'CITRUS - DELTA', 'FARO - HORIZONTE']
-const CONCEPTOS_GASTO = ['ALQUILER', 'SUELDOS', 'SERVICIOS', 'LIMPIEZA', 'SEGURIDAD']
+// El elenco ficticio vive en scripts/elenco-demo.ts: lo comparten este script, el que crea
+// el usuario del cliente y el que llena la auditoría. Repetido, se desincroniza.
 
 /** Azar REPETIBLE: la misma semilla da siempre la misma demo. */
 let semilla = 20261020

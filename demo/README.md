@@ -3,17 +3,37 @@
 Graba un recorrido por la aplicación, con datos ficticios y texto sobreimpreso, para
 mostrarle el producto a un cliente potencial sin tener que hacer una demostración en vivo.
 
-**Dura alrededor de 1 minuto y 40 segundos. No tiene voz**: el texto que explica cada
+**Dura alrededor de 2 minutos y 20 segundos. No tiene voz**: el texto que explica cada
 pantalla aparece abajo, sobre la imagen.
+
+El recorrido entra **con dos usuarios distintos**: el administrador, y el cliente de la
+casa de cambio mirando su propia cuenta. El cambio de usuario se ve en el video a
+propósito, porque es parte de lo que se está mostrando.
 
 ---
 
 ## Lo que hay que tener antes de empezar
 
 1. **Una base de demostración**, aparte de la del cliente. Se arma con los pasos 1 a 3 de
-   `docs/NUEVO-CLIENTE.md` y se llena con `scripts/sembrar-demo.mts`.
+   `docs/NUEVO-CLIENTE.md` y se llena con tres scripts, en este orden:
+
+   | Script | Qué deja |
+   |---|---|
+   | `scripts/sembrar-demo.mts` | 120 días de operaciones ficticias |
+   | `scripts/crear-cliente-demo.mts` | el usuario con rol **cliente**, atado a una cuenta |
+   | `scripts/sembrar-auditoria-demo.mts` | el registro de auditoría |
+
+   Los tres exigen la bandera `--confirmo-que-es-una-base-de-demo` **y** comprueban que
+   todas las cuentas de la base sean del elenco ficticio. Contra la base de un cliente
+   real no escriben nada: abortan.
+
+   El de auditoría hace falta porque ese registro lo escribe la app cuando una persona
+   hace algo; sembrando directo contra la base queda vacío, y la pantalla de Auditoría
+   —de las que más tranquilizan a quien evalúa el sistema— aparecería en blanco.
+
 2. **La aplicación andando en esta computadora**, apuntando a esa base.
-3. **Un usuario de esa base** para entrar (el que crea `scripts/crear-primer-admin.mts`).
+3. **Dos usuarios de esa base**: el administrador (`scripts/crear-primer-admin.mts`) y el
+   cliente (`scripts/crear-cliente-demo.mts`).
 
 > **Esto NO se graba contra la aplicación del cliente.** El programa solo acepta grabar
 > contra `localhost` y se niega a hacerlo contra cualquier otra dirección. Es a propósito:
@@ -55,8 +75,11 @@ En la primera ventana:
 
 ```bash
 cd demo
-DEMO_USUARIO=el-correo-del-usuario-de-demo DEMO_CLAVE=la-clave npm run grabar
+DEMO_USUARIO=... DEMO_CLAVE=... DEMO_CLIENTE_USUARIO=... DEMO_CLIENTE_CLAVE=... npm run grabar
 ```
+
+Los dos primeros son el administrador; los dos últimos, el cliente. Si faltan los del
+cliente, esas paradas se saltean con un aviso y el resto del video se graba igual.
 
 Se abre una ventana de navegador que se maneja sola. **No hay que tocar nada ni mover el
 mouse**: lo que se ve ahí es lo que queda grabado. Al terminar, se cierra sola y la terminal
