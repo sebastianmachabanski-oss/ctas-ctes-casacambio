@@ -215,9 +215,12 @@ try {
   // Ingreso
   console.log('→ Entrando…')
   await page.goto(`${URL_BASE}/login`, { waitUntil: 'networkidle', timeout: 45_000 })
-  await page.locator('input[type="email"]').first().fill(USUARIO)
+  // Por `id`, no por `type`. El campo de usuario es `type="text"` porque se entra con
+  // nombre de usuario y no con una dirección de correo, y el de la clave cambia de
+  // `password` a `text` cuando se aprieta el ojito. Buscar por tipo falla en los dos casos.
+  await page.locator('#email').fill(USUARIO)
   await pausa(500)
-  await page.locator('input[type="password"]').first().fill(CLAVE)
+  await page.locator('#password').fill(CLAVE)
   await pausa(500)
   await page.locator('button[type="submit"]').first().click()
   await page.waitForURL('**/dashboard**', { timeout: 30_000 })
