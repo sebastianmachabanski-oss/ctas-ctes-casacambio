@@ -29,7 +29,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 
-const URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
+/** Sin la barra del final: ver la nota en scripts/crear-primer-admin.mts. */
+const URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
 const KEY = process.env.SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
 const CONFIRMADO = process.argv.includes('--confirmo-que-es-una-base-de-demo')
 /** Genera y muestra el resumen SIN escribir nada ni conectarse. Para revisar antes. */

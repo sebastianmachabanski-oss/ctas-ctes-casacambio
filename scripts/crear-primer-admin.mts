@@ -28,7 +28,13 @@
 import { createClient } from '@supabase/supabase-js'
 import { randomBytes } from 'node:crypto'
 
-const URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
+/**
+ * La barra del final se saca a propósito. Copiando la dirección del panel de Supabase se
+ * cuela fácil, y la biblioteca arma `https://x.supabase.co//rest/v1/...` con doble barra:
+ * el portón de Supabase contesta "Invalid path specified in request URL", que no se parece
+ * en nada a la causa y manda a buscar el problema al lado equivocado.
+ */
+const URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
 const KEY = process.env.SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
 const [email, nombre] = process.argv.slice(2)
 
