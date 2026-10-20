@@ -266,6 +266,44 @@ const navegador = await chromium.launch({
   args: ['--window-size=1600,900', '--force-device-scale-factor=1'],
 })
 
+// ── Precalentado ───────────────────────────────────────────────────────────
+// `npm run dev` compila cada pantalla LA PRIMERA VEZ que alguien la pide. La más pesada
+// tarda más de los 30 segundos que espera el ingreso, así que la primera entrada fallaba
+// —y cuando no fallaba, el video mostraba la pantalla pensando—. Acá se recorre todo una
+// vez en un contexto SIN grabación: cuando arranca la cámara, ya está todo compilado.
+//
+// Tarda un minuto largo y no se ve en el video. Es el precio de que el video salga fluido.
+async function precalentar() {
+  const ctx = await navegador.newContext({ viewport: { width: 1600, height: 900 } })
+  const p = await ctx.newPage()
+  const rutas = [...new Set(RECORRIDO.filter(x => x.ruta).map(x => x.ruta))]
+
+  const visitar = async (usuario, clave, destinos) => {
+    try {
+      await p.goto(`${URL_BASE}/login`, { waitUntil: 'networkidle', timeout: 120_000 })
+      await p.locator('#email').fill(usuario)
+      await p.locator('#password').fill(clave)
+      await p.locator('button[type="submit"]').first().click()
+      await p.waitForURL('**/dashboard**', { timeout: 120_000 })
+      for (const r of destinos) {
+        await p.goto(`${URL_BASE}${r}`, { waitUntil: 'networkidle', timeout: 120_000 }).catch(() => {})
+      }
+      await ctx.clearCookies()
+    } catch (e) {
+      // Que falle el precalentado no justifica abortar: se graba igual, más lento.
+      console.warn(`   ⚠️  precalentado incompleto: ${e.message.split('\n')[0]}`)
+    }
+  }
+
+  console.log('→ Precalentando las pantallas (no se graba)…')
+  await visitar(USUARIO, CLAVE, rutas)
+  if (HAY_CLIENTE) await visitar(CLIENTE_USUARIO, CLIENTE_CLAVE, ['/dashboard/cuenta-corriente'])
+  await ctx.close()
+  console.log('   listo\n')
+}
+
+await precalentar()
+
 const contexto = await navegador.newContext({
   viewport: { width: 1600, height: 900 },
   recordVideo: { dir: SALIDA, size: { width: 1600, height: 900 } },
@@ -290,7 +328,9 @@ async function entrar(usuario, clave) {
   await page.locator('#password').fill(clave)
   await pausa(500)
   await page.locator('button[type="submit"]').first().click()
-  await page.waitForURL('**/dashboard**', { timeout: 30_000 })
+  // Holgado aunque ya esté precalentado: si el precalentado falló por lo que sea, acá se
+  // paga la compilación de la pantalla, y 30 segundos no alcanzaban.
+  await page.waitForURL('**/dashboard**', { timeout: 90_000 })
   await pausa(1800)
 }
 
