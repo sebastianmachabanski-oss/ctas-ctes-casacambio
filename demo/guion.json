@@ -15,8 +15,28 @@
     "parecido y cambiale el contenido. Cuidado con las comas: todos los bloques llevan",
     "una coma al final MENOS el último.",
     "",
-    "Si el archivo queda mal escrito, el grabador avisa y no graba. No rompe nada."
+    "Si el archivo queda mal escrito, el grabador avisa y no graba. No rompe nada.",
+    "",
+    "El color del cartel está en 'estilo', más abajo."
   ],
+
+  "estilo": {
+    "_comentario": [
+      "'fondo' son los tres números del color (rojo, verde, azul), de 0 a 255.",
+      "Va SIN el '#' y separado por comas, porque el cartel lo usa opaco abajo y",
+      "transparente arriba.",
+      "",
+      "  32,32,36      gris oscuro neutro (el que está)",
+      "  8,13,24       azul muy oscuro",
+      "  28,25,23      marrón muy oscuro",
+      "  0,0,0         negro",
+      "",
+      "El gris se usa a propósito: el azul se confundía con la barra lateral de la",
+      "aplicación y el cartel parecía parte de la pantalla, no un comentario sobre ella."
+    ],
+    "fondo": "32,32,36",
+    "texto": "#ffffff"
+  },
 
   "paradas": [
     {
@@ -88,7 +108,14 @@
     },
     {
       "como": "staff",
-      "ruta": "/dashboard/ganancias",
+      "_nota": [
+        "La ruta lleva '?p=mes' a propósito. Sin eso, la pantalla abre en el DÍA DE HOY,",
+        "y los datos de demostración llegan hasta el día en que se sembró la base: si se",
+        "graba un día después, Ganancias sale vacía.",
+        "Con el mes siempre hay movimientos, y además se ve el detalle día por día.",
+        "Para fijar otro período: '?p=mes&fecha=2026-09-15' o '?p=dia&fecha=2026-09-15'."
+      ],
+      "ruta": "/dashboard/ganancias?p=mes",
       "titulo": "Cuánto se ganó",
       "texto": "Por día, semana, mes o año. Y el detalle de cómo se llegó a ese número, abierto paso a paso.",
       "espera": 5200,

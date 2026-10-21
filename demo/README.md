@@ -159,7 +159,30 @@ que dicen casi lo mismo, o una transición que falta.
 Si el archivo quedó mal escrito, el grabador también avisa antes de empezar y **no graba
 nada**: el video anterior queda intacto.
 
-Los tiempos de lectura generales están en `grabar-demo.mjs`, en `LEER` y `RESPIRAR`.
+### El color del cartel
+
+También en `guion.json`, en el bloque `estilo`:
+
+```json
+"estilo": {
+  "fondo": "32,32,36",
+  "texto": "#ffffff"
+}
+```
+
+`fondo` son los tres números del color (rojo, verde y azul, de 0 a 255), sin `#` y
+separados por comas — va así porque el cartel usa ese mismo color opaco abajo y
+transparente arriba.
+
+El gris está elegido a propósito: el azul oscuro original era casi el mismo de la barra
+lateral de la aplicación, y el cartel se confundía con ella en vez de leerse como un
+comentario sobre la pantalla. Un gris neutro se despega de cualquier color que tenga la
+app, que además cambia de un cliente a otro.
+
+### Los tiempos generales
+
+Están en `grabar-demo.mjs`, en `LEER` (cuánto queda un cartel en pantalla antes de que
+empiece el movimiento) y `RESPIRAR` (la pausa después de cada acción).
 
 ---
 

@@ -135,6 +135,20 @@ if (!RECORRIDO.length) salir(`El guion no tiene ninguna parada (${GUION_ARCHIVO}
 // rectángulo blanco —el fondo y el borde redondeado de la otra regla— durante toda una
 // grabación. El cartel se inyecta en una página que no controla este archivo, así que no
 // puede dar por sentado que hereda nada.
+/**
+ * El color del cartel, configurable desde el guion (`"estilo": { "fondo": "…" }`).
+ *
+ * El azul oscuro original era casi el mismo de la barra lateral de la aplicación, y el
+ * cartel se confundía con ella: parecía parte de la pantalla en vez de un comentario
+ * sobre la pantalla. Un gris neutro se despega de cualquier color que tenga la app, que
+ * además cambia de un cliente a otro.
+ *
+ * Se declara en tres componentes sueltos y no como un color entero porque el fondo es un
+ * degradado: el mismo color aparece opaco abajo y transparente arriba.
+ */
+const FONDO = GUION.estilo?.fondo ?? '32,32,36'
+const TEXTO = GUION.estilo?.texto ?? '#ffffff'
+
 const ESTILOS = `
   #demo-cartel {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 2147483647;
@@ -142,8 +156,8 @@ const ESTILOS = `
     /* El tramo opaco tiene que tapar el título entero: con el degradado arrancando más
        abajo, el título caía sobre la parte clara de la pantalla y el blanco sobre blanco
        no se leía. El desvanecido vive en el padding de arriba, donde no hay texto. */
-    background: linear-gradient(to top, rgba(8,13,24,.97) 78%, rgba(8,13,24,0));
-    color: #fff; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: linear-gradient(to top, rgba(${FONDO},.97) 78%, rgba(${FONDO},0));
+    color: ${TEXTO}; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
     text-align: left; text-transform: none;
     opacity: 0; transition: opacity .45s ease; pointer-events: none;
   }
