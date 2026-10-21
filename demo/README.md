@@ -140,8 +140,24 @@ parecido y cambiale el contenido.
 ⚠️ El único cuidado: **todos los bloques llevan una coma al final menos el último**. Es el
 error típico de este formato.
 
-Si el archivo queda mal escrito, el grabador avisa antes de empezar, te dice en qué línea
-está el problema, y **no graba nada**. El video anterior queda intacto.
+### Revisar antes de grabar
+
+```bash
+cd demo
+npm run revisar
+```
+
+Responde en un segundo y **no necesita nada prendido**: ni la aplicación, ni el navegador.
+Revisa el formato y además lo que el formato no puede —que cada parada tenga título y
+texto, que el usuario sea uno de los dos que existen, que las acciones nombradas
+existan—, lista el recorrido completo para leerlo de corrido y calcula cuánto va a durar
+el video.
+
+Leer el recorrido seguido ayuda a notar lo que parada por parada no se ve: dos carteles
+que dicen casi lo mismo, o una transición que falta.
+
+Si el archivo quedó mal escrito, el grabador también avisa antes de empezar y **no graba
+nada**: el video anterior queda intacto.
 
 Los tiempos de lectura generales están en `grabar-demo.mjs`, en `LEER` y `RESPIRAR`.
 
