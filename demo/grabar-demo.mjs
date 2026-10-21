@@ -273,6 +273,34 @@ const navegador = await chromium.launch({
 // vez en un contexto SIN grabación: cuando arranca la cámara, ya está todo compilado.
 //
 // Tarda un minuto largo y no se ve en el video. Es el precio de que el video salga fluido.
+//
+// Y de paso hace de prueba de las claves: es el primer ingreso de la corrida, así que una
+// clave equivocada se descubre acá, antes de encender la cámara, en vez de a mitad del
+// recorrido.
+
+/**
+ * Espera a que pase una de dos: que entre, o que la app diga que la clave está mal.
+ * Devuelve 'ok', 'rechazado' o 'timeout'. Sin esto, una clave equivocada se manifiesta
+ * como una espera larguísima que termina en "Timeout exceeded" — un mensaje que manda a
+ * buscar el problema a cualquier lado menos al que es.
+ */
+async function esperarIngreso(p, ms) {
+  const nuncaFalla = q => q.catch(() => new Promise(() => {}))
+  return Promise.race([
+    nuncaFalla(p.waitForURL('**/dashboard**', { timeout: ms }).then(() => 'ok')),
+    nuncaFalla(p.getByText(/usuario o contraseña incorrectos/i).first()
+      .waitFor({ state: 'visible', timeout: ms }).then(() => 'rechazado')),
+    new Promise(r => setTimeout(() => r('timeout'), ms + 5_000)),
+  ])
+}
+
+/** El mensaje de "clave equivocada", en un solo lugar: lo usan el precalentado y el ingreso. */
+const avisoClave = usuario =>
+  `La app rechazó el ingreso de "${usuario}": usuario o contraseña incorrectos.\n`
+  + '   Un motivo frecuente en PowerShell: si la clave se escribió entre comillas\n'
+  + '   DOBLES y tiene un $, se interpreta como variable y llega cortada.\n'
+  + "   Con comillas simples no pasa:  $env:DEMO_CLAVE='tu-clave'"
+
 async function precalentar() {
   const ctx = await navegador.newContext({ viewport: { width: 1600, height: 900 } })
   const p = await ctx.newPage()
@@ -284,7 +312,11 @@ async function precalentar() {
       await p.locator('#email').fill(usuario)
       await p.locator('#password').fill(clave)
       await p.locator('button[type="submit"]').first().click()
-      await p.waitForURL('**/dashboard**', { timeout: 120_000 })
+      const r0 = await esperarIngreso(p, 120_000)
+      // La clave equivocada se corta acá mismo: reintentarla doce veces durante la
+      // grabación solo llena el video de pantallas de login.
+      if (r0 === 'rechazado') { await ctx.close(); await navegador.close(); salir(avisoClave(usuario)) }
+      if (r0 === 'timeout') throw new Error('el ingreso no respondió')
       for (const r of destinos) {
         await p.goto(`${URL_BASE}${r}`, { waitUntil: 'networkidle', timeout: 120_000 }).catch(() => {})
       }
@@ -315,6 +347,13 @@ const page = await contexto.newPage()
 let fallas = 0
 
 /**
+ * Un problema que NO tiene sentido reintentar. Una pantalla que cambió de dirección se
+ * saltea y el resto del video sirve; una clave equivocada va a fallar las doce veces, y
+ * reintentarla solo llena el video de pantallas de login.
+ */
+class Fatal extends Error {}
+
+/**
  * Entra con un usuario. Se muestra el formulario llenándose porque es parte de lo que se
  * está contando: que cada persona tiene su acceso.
  */
@@ -328,9 +367,16 @@ async function entrar(usuario, clave) {
   await page.locator('#password').fill(clave)
   await pausa(500)
   await page.locator('button[type="submit"]').first().click()
-  // Holgado aunque ya esté precalentado: si el precalentado falló por lo que sea, acá se
-  // paga la compilación de la pantalla, y 30 segundos no alcanzaban.
-  await page.waitForURL('**/dashboard**', { timeout: 90_000 })
+
+  // El timeout es holgado por si el precalentado falló: en ese caso acá se paga la
+  // compilación de la pantalla, que puede pasar el minuto.
+  const resultado = await esperarIngreso(page, 90_000)
+  if (resultado === 'rechazado') throw new Fatal(avisoClave(usuario))
+  if (resultado === 'timeout') throw new Fatal(
+    `El ingreso de "${usuario}" no terminó ni bien ni mal en 95 segundos.\n`
+    + '   Suele ser la app compilando la pantalla por primera vez. Probá de nuevo:\n'
+    + '   la segunda corrida encuentra todo compilado.')
+
   await pausa(1800)
 }
 
@@ -348,6 +394,8 @@ async function cerrarSesion() {
 
 /** Con qué usuario estamos adentro ahora mismo. */
 let sesion = null
+/** Si queda cargado, el recorrido se corta y se informa al final. */
+let fatal = null
 
 try {
   // Recorrido
@@ -383,21 +431,27 @@ try {
       await pausa(parada.espera ?? 2500)
       await ocultarCartel(page)
     } catch (e) {
+      if (e instanceof Fatal) { fatal = e; break }
       // Una parada que falla no se lleva puesta la grabación entera.
       fallas++
       console.warn(`   ⚠️  ${n} falló y se saltea: ${e.message.split('\n')[0]}`)
     }
   }
 
-  // Cierre
-  await prepararCartel(page)
-  await mostrarCartel(page, 'Todo en un solo lugar',
-    'Caja, cuentas corrientes, transferencias y resultados. Sin planillas sueltas.')
-  await pausa(4200)
+  if (!fatal) {
+    // Cierre
+    await prepararCartel(page)
+    await mostrarCartel(page, 'Todo en un solo lugar',
+      'Caja, cuentas corrientes, transferencias y resultados. Sin planillas sueltas.')
+    await pausa(4200)
+  }
 } finally {
   await contexto.close()   // recién acá Playwright escribe el archivo
   await navegador.close()
 }
+
+// El corte se informa DESPUÉS de cerrar el contexto, para no dejar el navegador abierto.
+if (fatal) salir(fatal.message)
 
 // ── Nombre final ───────────────────────────────────────────────────────────
 const webm = readdirSync(SALIDA).filter(f => f.endsWith('.webm')).map(f => join(SALIDA, f))
