@@ -138,16 +138,36 @@ if (!RECORRIDO.length) salir(`El guion no tiene ninguna parada (${GUION_ARCHIVO}
 /**
  * El color del cartel, configurable desde el guion (`"estilo": { "fondo": "…" }`).
  *
- * El azul oscuro original era casi el mismo de la barra lateral de la aplicación, y el
- * cartel se confundía con ella: parecía parte de la pantalla en vez de un comentario
- * sobre la pantalla. Un gris neutro se despega de cualquier color que tenga la app, que
- * además cambia de un cliente a otro.
+ * El azul oscuro original era casi el mismo de la barra lateral de la aplicación y el
+ * cartel se confundía con ella. El gris oscuro que lo reemplazó seguía siendo oscuro, y
+ * a la distancia leía igual: una franja oscura abajo de una pantalla con una franja
+ * oscura al costado. El gris CLARO se despega de las dos cosas, y de cualquier color que
+ * tenga la app — que además cambia de un cliente a otro.
  *
  * Se declara en tres componentes sueltos y no como un color entero porque el fondo es un
  * degradado: el mismo color aparece opaco abajo y transparente arriba.
  */
-const FONDO = GUION.estilo?.fondo ?? '32,32,36'
-const TEXTO = GUION.estilo?.texto ?? '#ffffff'
+const FONDO = GUION.estilo?.fondo ?? '228,228,233'
+
+/**
+ * El color del texto se deduce del fondo, salvo que el guion diga otra cosa.
+ *
+ * Probar tonos es la forma de dar con el que va, y cada vez que se cruza el punto en que
+ * el fondo deja de ser oscuro, el texto del color anterior se vuelve ilegible. Elegirlo a
+ * mano significa descubrirlo recién al mirar el video, y volver a grabar.
+ *
+ * El cálculo es el de la norma de accesibilidad web: se mide cuánta luz emite el color y
+ * se elige el texto que más contrasta. El umbral 0,18 es el punto donde negro y blanco
+ * contrastan parejo.
+ */
+function textoSegunFondo(rgb) {
+  const [r, g, b] = rgb.split(',').map(n => Number(n.trim()) / 255)
+  const lineal = c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  const luz = 0.2126 * lineal(r) + 0.7152 * lineal(g) + 0.0722 * lineal(b)
+  return luz > 0.18 ? '#18181b' : '#ffffff'
+}
+
+const TEXTO = GUION.estilo?.texto ?? textoSegunFondo(FONDO)
 
 const ESTILOS = `
   #demo-cartel {

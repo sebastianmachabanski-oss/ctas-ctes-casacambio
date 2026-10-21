@@ -168,8 +168,7 @@ También en `guion.json`, en el bloque `estilo`:
 
 ```json
 "estilo": {
-  "fondo": "32,32,36",
-  "texto": "#ffffff"
+  "fondo": "228,228,233"
 }
 ```
 
@@ -177,10 +176,24 @@ También en `guion.json`, en el bloque `estilo`:
 separados por comas — va así porque el cartel usa ese mismo color opaco abajo y
 transparente arriba.
 
-El gris está elegido a propósito: el azul oscuro original era casi el mismo de la barra
-lateral de la aplicación, y el cartel se confundía con ella en vez de leerse como un
-comentario sobre la pantalla. Un gris neutro se despega de cualquier color que tenga la
-app, que además cambia de un cliente a otro.
+| Números | Color |
+|---|---|
+| `228,228,233` | gris claro (el actual) |
+| `200,200,206` | gris claro un poco más apagado |
+| `245,245,245` | casi blanco |
+| `113,113,122` | gris medio |
+| `32,32,36` | gris oscuro |
+
+**El color del texto se elige solo** según lo claro que sea el fondo: sobre un fondo claro
+sale oscuro y sobre uno oscuro sale blanco. Así se pueden probar tonos sin terminar con un
+cartel ilegible, que de otro modo se descubre recién al mirar el video. Para imponerlo a
+mano, se agrega `"texto": "#18181b"` al mismo bloque.
+
+El gris claro está elegido a propósito. El azul original era casi el mismo de la barra
+lateral de la aplicación y el cartel se confundía con ella. El gris oscuro que lo
+reemplazó seguía siendo oscuro, y a la distancia leía igual: una franja oscura abajo de
+una pantalla con otra franja oscura al costado. El claro se despega de las dos cosas, y de
+cualquier color que tenga la app — que además cambia de un cliente a otro.
 
 ### Los tiempos generales
 

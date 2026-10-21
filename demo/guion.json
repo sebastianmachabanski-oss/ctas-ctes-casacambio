@@ -26,16 +26,21 @@
       "Va SIN el '#' y separado por comas, porque el cartel lo usa opaco abajo y",
       "transparente arriba.",
       "",
-      "  32,32,36      gris oscuro neutro (el que está)",
-      "  8,13,24       azul muy oscuro",
-      "  28,25,23      marrón muy oscuro",
-      "  0,0,0         negro",
+      "  228,228,233   gris claro (el que está)",
+      "  200,200,206   gris claro un poco más apagado",
+      "  245,245,245   casi blanco",
+      "  113,113,122   gris medio",
+      "  32,32,36      gris oscuro",
       "",
-      "El gris se usa a propósito: el azul se confundía con la barra lateral de la",
-      "aplicación y el cartel parecía parte de la pantalla, no un comentario sobre ella."
+      "El gris CLARO se usa a propósito. El azul original se confundía con la barra",
+      "lateral de la aplicación; el gris oscuro que lo reemplazó seguía siendo oscuro y",
+      "a la distancia leía igual, como una franja oscura abajo de otra al costado.",
+      "",
+      "El color del TEXTO se elige solo según lo claro que sea el fondo, así se pueden",
+      "probar tonos sin quedarse con un cartel ilegible. Para imponerlo a mano se agrega",
+      "  \"texto\": \"#18181b\""
     ],
-    "fondo": "32,32,36",
-    "texto": "#ffffff"
+    "fondo": "228,228,233"
   },
 
   "paradas": [
