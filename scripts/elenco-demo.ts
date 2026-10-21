@@ -49,7 +49,10 @@ export const OPERADORES = [
  * cuenta también se rechaza: o no se sembró, o no es la que se cree.
  */
 export function pareceBaseDeDemo(cuentasEnLaBase: string[]): string | null {
-  const unicas = [...new Set(cuentasEnLaBase.map(c => (c ?? '').trim().toUpperCase()).filter(Boolean))]
+  // `Array.from` y no `[...]`: el tsconfig del proyecto apunta a una versión que no
+  // permite recorrer un Set con el operador de propagación, y `scripts/` entra en el
+  // chequeo de tipos del build. Con el spread, el despliegue falla.
+  const unicas = Array.from(new Set(cuentasEnLaBase.map(c => (c ?? '').trim().toUpperCase()).filter(Boolean)))
   if (unicas.length === 0) {
     return 'la base no tiene ninguna cuenta corriente cargada: ¿corriste scripts/sembrar-demo.mts?'
   }
