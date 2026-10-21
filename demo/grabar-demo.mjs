@@ -21,7 +21,7 @@
  * decisión explícita y con otra guarda, no un descuido.
  */
 import { chromium } from 'playwright'
-import { mkdirSync, existsSync, renameSync, readdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, existsSync, renameSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -432,19 +432,42 @@ try {
 if (fatal) salir(fatal.message)
 
 // ── Nombre final ───────────────────────────────────────────────────────────
+// Playwright le pone al video un nombre al azar; acá se lo renombra con la fecha.
+//
+// El más reciente se elige POR FECHA DE ESCRITURA, no por nombre. Ordenar por nombre tenía
+// un defecto que costó una tarde: al grabar dos veces el mismo día, en la carpeta quedan
+// el video anterior (`demo-AAAA-MM-DD.webm`) y el recién hecho (nombre al azar). Según qué
+// letra le tocara al azar, el orden alfabético devolvía el VIEJO, el programa lo anunciaba
+// como resultado y el nuevo quedaba ahí con su nombre ilegible. Uno abre el archivo que le
+// dijeron y ve la grabación anterior, sin ninguna señal de que algo salió mal.
 const webm = readdirSync(SALIDA).filter(f => f.endsWith('.webm')).map(f => join(SALIDA, f))
 if (!webm.length) salir('La grabación no produjo ningún archivo.')
 
-const reciente = webm.sort().pop()
+const reciente = webm.sort((a, b) => statSync(a).mtimeMs - statSync(b).mtimeMs).pop()
 const destino = join(SALIDA, `demo-${new Date().toISOString().slice(0, 10)}.webm`)
-if (existsSync(destino) && destino !== reciente) { /* se pisa, es una regrabación */ }
-if (reciente !== destino) renameSync(reciente, destino)
+
+if (reciente !== destino) {
+  // El de la grabación anterior se borra antes de renombrar: es una regrabación del mismo
+  // día y lo que importa es que el nombre apunte al video nuevo.
+  if (existsSync(destino)) unlinkSync(destino)
+  renameSync(reciente, destino)
+}
+
+// Los videos sueltos de corridas anteriores confunden: quedan con nombre al azar y nadie
+// sabe cuál es cuál. Se van, porque el que vale ya tiene nombre.
+for (const f of readdirSync(SALIDA).filter(f => f.endsWith('.webm')).map(f => join(SALIDA, f))) {
+  if (f !== destino) { try { unlinkSync(f) } catch {} }
+}
 
 console.log(`
 ✅ Listo: ${destino}
+   (grabado recién, a las ${new Date(statSync(destino).mtimeMs).toTimeString().slice(0, 8)})
 ${fallas ? `\n⚠️  ${fallas} parada(s) se saltearon. Revisá el log de arriba.\n` : ''}
 Para pasarlo a MP4 (requiere ffmpeg instalado):
 
-  ffmpeg -i "${destino}" -c:v libx264 -crf 23 -pix_fmt yuv420p -movflags +faststart \\
+  ffmpeg -y -i "${destino}" -c:v libx264 -crf 23 -pix_fmt yuv420p -movflags +faststart \\
     "${destino.replace(/\.webm$/, '.mp4')}"
 `)
+// El -y es la misma trampa que el nombre del video, un paso más adelante: sin él, ffmpeg
+// pregunta si pisa el MP4 que ya está y basta un Enter distraído para quedarse con el de
+// la grabación anterior, convencido de estar viendo el nuevo.

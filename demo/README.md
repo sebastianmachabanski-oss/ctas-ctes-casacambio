@@ -97,9 +97,12 @@ correo conviene MP4. La conversión necesita **ffmpeg** instalado (`brew install
 Mac; en Windows, desde ffmpeg.org):
 
 ```bash
-ffmpeg -i "demo/salida/demo-2026-10-20.webm" -c:v libx264 -crf 23 -pix_fmt yuv420p \
+ffmpeg -y -i "demo/salida/demo-2026-10-20.webm" -c:v libx264 -crf 23 -pix_fmt yuv420p \
   -movflags +faststart "demo/salida/demo-2026-10-20.mp4"
 ```
+
+El `-y` es importante: sin él, ffmpeg pregunta si pisa el MP4 que ya está, y basta un
+Enter distraído para quedarse con el de la grabación anterior creyendo que es el nuevo.
 
 La terminal imprime este mismo comando al terminar de grabar, ya con el nombre del archivo
 puesto. Alcanza con copiarlo y pegarlo.
