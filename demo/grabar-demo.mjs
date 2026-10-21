@@ -21,7 +21,7 @@
  * decisión explícita y con otra guarda, no un descuido.
  */
 import { chromium } from 'playwright'
-import { mkdirSync, existsSync, renameSync, readdirSync } from 'node:fs'
+import { mkdirSync, existsSync, renameSync, readdirSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -61,139 +61,71 @@ const RESPIRAR = 900   // pausa después de cada acción, para que no se vea atr
 const pausa = ms => new Promise(r => setTimeout(r, ms))
 
 /**
- * El recorrido. Cada parada: con qué usuario, a dónde ir, qué decir y qué hacer.
+ * El recorrido se lee de `guion.json`, que está al lado de este archivo.
+ *
+ * POR QUÉ NO ESTÁ ACÁ ADENTRO
+ * Los textos del video se retocan muchas más veces que el programa: una explicación que
+ * no se entiende, una frase larga, un tiempo corto. Si viven entre el código, cada retoque
+ * obliga a abrir un archivo de programación y arriesgarse a romper algo que no se tocó.
+ * En un archivo aparte los edita cualquiera.
  *
  * `como` elige con qué usuario se mira la pantalla: 'staff' (el administrador) o 'cliente'
  * (el cliente de la casa de cambio mirando su propia cuenta). Cuando una parada pide un
  * usuario distinto del que está adentro, el recorrido cierra la sesión y vuelve a entrar.
  * Eso se ve en el video, y conviene que se vea: es parte de lo que se está mostrando.
  *
- * `hacer` es opcional y recibe la página. Todo lo que pueda fallar va envuelto: si una
- * pantalla cambió de nombre, la grabación sigue y se nota en el log, en lugar de cortarse
- * a la mitad y perder los cinco minutos anteriores.
- *
  * EL ORDEN NO ES EL DE LAS PANTALLAS, ES EL DEL ARGUMENTO. Primero quién entra y qué ve
  * cada uno, porque ordena todo lo que viene después. Después lo que el cliente puede hacer
  * solo, que es lo que distingue al producto. Recién entonces la operación diaria. Y al
  * final el control: ganancias y auditoría.
  */
-const RECORRIDO = [
-  // ── 1. Quién entra y qué ve cada uno ─────────────────────────────────────
-  {
-    como: 'staff',
-    ruta: '/dashboard/admin/usuarios',
-    titulo: 'Cada uno ve lo que le toca',
-    texto: 'Cuatro roles: operador, administrador, dueño y cliente. El rol decide qué pantallas abre cada persona, y se controla en el servidor — no alcanza con conocer la dirección.',
-    espera: 5200,
-  },
 
-  // ── 2. Lo que el cliente hace sin llamar a nadie ─────────────────────────
-  {
-    como: 'cliente',
-    ruta: '/dashboard/cuenta-corriente',
-    titulo: 'El cliente consulta su cuenta solo',
-    texto: 'Entra con su propio usuario y ve su saldo y sus movimientos cuando quiere. Sin llamar ni esperar a que alguien le arme un resumen.',
-    espera: 5600,
-    hacer: async page => { await pausa(1400); await page.mouse.wheel(0, 420) },
-  },
-  {
-    como: 'cliente',
-    ruta: null,
-    titulo: 'Y solo la suya',
-    texto: 'No ve la caja, ni las demás cuentas, ni cuánto ganó el negocio. El mismo sistema, con otra puerta.',
-    espera: 4200,
-  },
+/**
+ * Los movimientos guionados, por nombre. El guion los nombra en su campo `accion`.
+ *
+ * Están acá y no en el guion porque son programa, no texto: bajan la pantalla, escriben en
+ * un campo. Lo que se edita seguido —qué dice y cuánto dura— está en el JSON; esto casi
+ * nunca cambia.
+ */
+const ACCIONES = {
+  /** Baja la pantalla para mostrar lo que hay más abajo. */
+  'bajar': async page => { await page.mouse.wheel(0, 520); await pausa(1200) },
 
-  // ── 3. La operación diaria ───────────────────────────────────────────────
-  {
-    como: 'staff',
-    ruta: '/dashboard/inicio',
-    titulo: 'Todo el dinero, en una pantalla',
-    texto: 'Saldos por moneda al instante: lo que hay en caja, lo que está en la calle y lo que debe cada cuenta corriente.',
-    espera: 4200,
-  },
-  {
-    como: 'staff',
-    ruta: '/dashboard/inicio',
-    titulo: 'Las operaciones del día',
-    texto: 'Debajo de los saldos, cada movimiento con su impacto. Se filtra por fecha, cliente, tipo o monto.',
-    espera: 3800,
-    hacer: async page => { await page.mouse.wheel(0, 520); await pausa(1200) },
-  },
+  /** Igual, pero deja mirar un rato antes de bajar. */
+  'bajar-despacio': async page => { await pausa(1400); await page.mouse.wheel(0, 420) },
 
-  // ── 4. Cargar una operación ──────────────────────────────────────────────
-  {
-    como: 'staff',
-    ruta: '/dashboard/nueva-transaccion',
-    titulo: 'Cargar una operación',
-    texto: 'Se elige el tipo, la moneda y el monto. El sistema calcula el resto.',
-    espera: 2600,
+  /** Completa una compra de dólares como la cargaría un operador. */
+  'cargar-operacion': async page => {
+    const escribir = async (sel, valor) => {
+      const campo = page.locator(sel).first()
+      if (await campo.count()) { await campo.click(); await campo.fill(valor); await pausa(420) }
+    }
+    await escribir('input[placeholder="Nombre del cliente"]', 'J. MARTINEZ')
+    await escribir('input[inputmode="decimal"]', '5000')
+    await pausa(900)
+    await page.mouse.wheel(0, 420)
   },
-  {
-    como: 'staff',
-    ruta: null,   // sigue en la misma pantalla
-    titulo: 'El impacto se ve ANTES de guardar',
-    texto: 'Mientras se escribe, la previsualización muestra exactamente cómo queda la caja. Sin sorpresas después.',
-    espera: 5200,
-    hacer: async page => {
-      // Se completa una compra de dólares como la cargaría un operador.
-      const escribir = async (sel, valor) => {
-        const campo = page.locator(sel).first()
-        if (await campo.count()) { await campo.click(); await campo.fill(valor); await pausa(420) }
-      }
-      await escribir('input[placeholder="Nombre del cliente"]', 'J. MARTINEZ')
-      await escribir('input[inputmode="decimal"]', '5000')
-      await pausa(900)
-      await page.mouse.wheel(0, 420)
-    },
-  },
+}
 
-  // ── 5. Transferencias ────────────────────────────────────────────────────
-  {
-    como: 'staff',
-    ruta: '/dashboard/transferencias',
-    titulo: 'Transferencias',
-    texto: 'Las dos patas se cargan juntas, así no quedan operaciones a medio registrar. La ganancia se computa cuando la transferencia se cierra, no antes.',
-    espera: 5200,
-  },
+const GUION_ARCHIVO = join(AQUI, 'guion.json')
 
-  // ── 6. Gastos ────────────────────────────────────────────────────────────
-  {
-    como: 'staff',
-    ruta: '/dashboard/gastos',
-    titulo: 'Los gastos también salen de la caja',
-    texto: 'Alquiler, sueldos, servicios. Se cargan acá y descuentan del saldo igual que cualquier otra salida: lo que muestra la caja ya los tiene adentro.',
-    espera: 4800,
-    hacer: async page => { await pausa(1400); await page.mouse.wheel(0, 380) },
-  },
+let GUION
+try {
+  GUION = JSON.parse(readFileSync(GUION_ARCHIVO, 'utf8'))
+} catch (e) {
+  salir(`No se pudo leer el guion (${GUION_ARCHIVO}):\n   ${e.message}\n\n`
+    + '   Suele ser una coma de más o de menos. Todos los bloques llevan coma al final\n'
+    + '   MENOS el último. No se grabó nada: el archivo anterior sigue intacto.')
+}
 
-  // ── 7. Resultado ─────────────────────────────────────────────────────────
-  {
-    como: 'staff',
-    ruta: '/dashboard/ganancias',
-    titulo: 'Cuánto se ganó',
-    texto: 'Por día, semana, mes o año. Y el detalle de cómo se llegó a ese número, abierto paso a paso.',
-    espera: 5200,
-    hacer: async page => { await pausa(1600); await page.mouse.wheel(0, 380) },
-  },
+const RECORRIDO = (GUION.paradas ?? []).map((p, i) => {
+  if (p.accion && !ACCIONES[p.accion]) salir(
+    `La parada ${i + 1} ("${p.titulo ?? ''}") pide la acción "${p.accion}", que no existe.\n`
+    + `   Las disponibles son: ${Object.keys(ACCIONES).join(', ')}`)
+  return { ...p, hacer: p.accion ? ACCIONES[p.accion] : undefined }
+})
 
-  // ── 8. Control ───────────────────────────────────────────────────────────
-  {
-    como: 'staff',
-    ruta: '/dashboard/admin/auditoria',
-    titulo: 'Quién hizo qué, y cuándo',
-    texto: 'Cada alta, cada corrección y cada borrado queda registrado con su autor y su hora.',
-    espera: 4600,
-  },
-  {
-    como: 'staff',
-    ruta: null,
-    titulo: 'Y qué decía antes',
-    texto: 'En una corrección se guardan los dos valores, el viejo y el nuevo. El registro no se puede editar ni borrar: la base lo impide.',
-    espera: 5200,
-    hacer: async page => { await pausa(1200); await page.mouse.wheel(0, 420) },
-  },
-]
+if (!RECORRIDO.length) salir(`El guion no tiene ninguna parada (${GUION_ARCHIVO}).`)
 
 // ── Cartel sobreimpreso ────────────────────────────────────────────────────
 // Se dibuja DENTRO de la página porque Playwright graba lo que el navegador muestra: un
@@ -222,6 +154,24 @@ const ESTILOS = `
   }
   #demo-cartel .demo-titulo { font-size: 30px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 7px; }
   #demo-cartel .demo-texto { font-size: 18px; line-height: 1.45; opacity: .9; max-width: 940px; font-weight: 400; }
+`
+
+/**
+ * Esconde el cartelito de Next que dice "2 errores" o muestra el rayo de compilación.
+ *
+ * Existe SOLO en modo desarrollo: en el sitio publicado no está. Pero la grabación se hace
+ * contra el modo desarrollo, así que saldría en el video — y un cartel de errores arriba
+ * de una demostración de venta dice justo lo que no se quiere decir.
+ *
+ * Esto lo saca de la IMAGEN, no de la existencia: los errores siguen apareciendo en la
+ * terminal de `npm run dev`, que es donde corresponde mirarlos.
+ */
+const OCULTAR_INDICADOR_DEV = `
+  nextjs-portal,
+  [data-nextjs-toast],
+  [data-nextjs-dialog-overlay],
+  #__next-build-watcher,
+  #__next-prerender-indicator { display: none !important; }
 `
 
 async function prepararCartel(page) {
@@ -343,6 +293,22 @@ const contexto = await navegador.newContext({
   timezoneId: 'America/Argentina/Buenos_Aires',
 })
 
+// Se inyecta al CARGAR cada pantalla, no después: si se pusiera junto con el cartel, el
+// indicador alcanzaría a verse en el video durante el instante que va de la carga a la
+// primera parada.
+await contexto.addInitScript(css => {
+  const poner = () => {
+    if (document.getElementById('demo-sin-indicador')) return
+    const s = document.createElement('style')
+    s.id = 'demo-sin-indicador'
+    s.textContent = css
+    document.head?.appendChild(s)
+  }
+  // El `head` puede no existir todavía cuando corre este script.
+  if (document.head) poner()
+  else document.addEventListener('DOMContentLoaded', poner, { once: true })
+}, OCULTAR_INDICADOR_DEV)
+
 const page = await contexto.newPage()
 let fallas = 0
 
@@ -438,12 +404,10 @@ try {
     }
   }
 
-  if (!fatal) {
-    // Cierre
+  if (!fatal && GUION.cierre) {
     await prepararCartel(page)
-    await mostrarCartel(page, 'Todo en un solo lugar',
-      'Caja, cuentas corrientes, transferencias y resultados. Sin planillas sueltas.')
-    await pausa(4200)
+    await mostrarCartel(page, GUION.cierre.titulo, GUION.cierre.texto)
+    await pausa(GUION.cierre.espera ?? 4200)
   }
 } finally {
   await contexto.close()   // recién acá Playwright escribe el archivo

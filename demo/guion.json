@@ -1,0 +1,119 @@
+{
+  "_leeme": [
+    "ESTE ES EL GUION DEL VIDEO. Se edita acá, no en el programa.",
+    "",
+    "Cada bloque de 'paradas' es un momento del video:",
+    "  titulo  — el renglón grande del cartel",
+    "  texto   — la explicación, abajo del título",
+    "  espera  — cuánto se queda en esa pantalla, en milésimas de segundo (1000 = 1 segundo)",
+    "  ruta    — qué pantalla mostrar. null = quedarse en la misma de antes",
+    "  como    — con qué usuario: 'staff' (el administrador) o 'cliente'",
+    "  accion  — opcional, el nombre de un movimiento guionado (bajan la pantalla, escriben",
+    "            en un campo). Los disponibles están listados en grabar-demo.mjs.",
+    "",
+    "Para sacar una parada, borrá su bloque entre llaves. Para agregar una, copiá uno",
+    "parecido y cambiale el contenido. Cuidado con las comas: todos los bloques llevan",
+    "una coma al final MENOS el último.",
+    "",
+    "Si el archivo queda mal escrito, el grabador avisa y no graba. No rompe nada."
+  ],
+
+  "paradas": [
+    {
+      "como": "staff",
+      "ruta": "/dashboard/admin/usuarios",
+      "titulo": "Cada uno ve lo que le toca",
+      "texto": "Cuatro roles: operador, administrador, dueño y cliente. El rol decide qué pantallas abre cada persona, y se controla en el servidor — no alcanza con conocer la dirección.",
+      "espera": 5200
+    },
+    {
+      "como": "cliente",
+      "ruta": "/dashboard/cuenta-corriente",
+      "titulo": "El cliente consulta su cuenta solo",
+      "texto": "Entra con su propio usuario y ve su saldo y sus movimientos cuando quiere. Sin llamar ni esperar a que alguien le arme un resumen.",
+      "espera": 5600,
+      "accion": "bajar-despacio"
+    },
+    {
+      "como": "cliente",
+      "ruta": null,
+      "titulo": "Y solo la suya",
+      "texto": "No ve la caja, ni las demás cuentas, ni cuánto ganó el negocio. El mismo sistema, con otra puerta.",
+      "espera": 4200
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/inicio",
+      "titulo": "Todo el dinero, en una pantalla",
+      "texto": "Saldos por moneda al instante: lo que hay en caja, lo que está en la calle y lo que debe cada cuenta corriente.",
+      "espera": 4200
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/inicio",
+      "titulo": "Las operaciones del día",
+      "texto": "Debajo de los saldos, cada movimiento con su impacto. Se filtra por fecha, cliente, tipo o monto.",
+      "espera": 3800,
+      "accion": "bajar"
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/nueva-transaccion",
+      "titulo": "Cargar una operación",
+      "texto": "Se elige el tipo, la moneda y el monto. El sistema calcula el resto.",
+      "espera": 2600
+    },
+    {
+      "como": "staff",
+      "ruta": null,
+      "titulo": "El impacto se ve ANTES de guardar",
+      "texto": "Mientras se escribe, la previsualización muestra exactamente cómo queda la caja. Sin sorpresas después.",
+      "espera": 5200,
+      "accion": "cargar-operacion"
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/transferencias",
+      "titulo": "Transferencias",
+      "texto": "Las dos patas se cargan juntas, así no quedan operaciones a medio registrar. La ganancia se computa cuando la transferencia se cierra, no antes.",
+      "espera": 5200
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/gastos",
+      "titulo": "Los gastos también salen de la caja",
+      "texto": "Alquiler, sueldos, servicios. Se cargan acá y descuentan del saldo igual que cualquier otra salida: lo que muestra la caja ya los tiene adentro.",
+      "espera": 4800,
+      "accion": "bajar-despacio"
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/ganancias",
+      "titulo": "Cuánto se ganó",
+      "texto": "Por día, semana, mes o año. Y el detalle de cómo se llegó a ese número, abierto paso a paso.",
+      "espera": 5200,
+      "accion": "bajar-despacio"
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/admin/auditoria",
+      "titulo": "Quién hizo qué, y cuándo",
+      "texto": "Cada alta, cada corrección y cada borrado queda registrado con su autor y su hora.",
+      "espera": 4600
+    },
+    {
+      "como": "staff",
+      "ruta": null,
+      "titulo": "Y qué decía antes",
+      "texto": "En una corrección se guardan los dos valores, el viejo y el nuevo. El registro no se puede editar ni borrar: la base lo impide.",
+      "espera": 5200,
+      "accion": "bajar"
+    }
+  ],
+
+  "cierre": {
+    "titulo": "Todo en un solo lugar",
+    "texto": "Caja, cuentas corrientes, transferencias y resultados. Sin planillas sueltas.",
+    "espera": 4200
+  }
+}

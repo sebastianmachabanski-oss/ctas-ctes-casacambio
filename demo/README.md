@@ -108,25 +108,42 @@ puesto. Alcanza con copiarlo y pegarlo.
 
 ## Cambiar lo que dice el video
 
-Todo el recorrido está en una sola lista dentro de `grabar-demo.mjs`, en `RECORRIDO`. Cada
-parada es un bloque como este:
+Todo el guion está en **`demo/guion.json`**. Se abre con el Bloc de notas y se edita como
+un texto: **no hace falta tocar nada de programación**.
 
-```js
+Cada parada es un bloque como este:
+
+```json
 {
-  ruta: '/dashboard/ganancias',
-  titulo: 'Cuánto se ganó',
-  texto: 'Por día, semana, mes o año. Y el detalle de cómo se llegó a ese número.',
-  espera: 5200,
+  "como": "staff",
+  "ruta": "/dashboard/ganancias",
+  "titulo": "Cuánto se ganó",
+  "texto": "Por día, semana, mes o año. Y el detalle de cómo se llegó a ese número.",
+  "espera": 5200
 }
 ```
 
-- `ruta` — la pantalla a mostrar. `null` significa "quedarse donde está" (sirve para decir
-  dos cosas sobre la misma pantalla).
-- `titulo` y `texto` — lo que aparece sobreimpreso.
-- `espera` — milisegundos que se queda ahí. 1.000 = 1 segundo.
+| Campo | Qué es |
+|---|---|
+| `titulo` | el renglón grande del cartel |
+| `texto` | la explicación, abajo del título |
+| `espera` | cuánto se queda ahí, en milésimas de segundo (1000 = 1 segundo) |
+| `ruta` | qué pantalla mostrar. `null` = quedarse en la de antes, para decir dos cosas sobre la misma |
+| `como` | con qué usuario: `"staff"` (el administrador) o `"cliente"` |
+| `accion` | opcional: `"bajar"`, `"bajar-despacio"` o `"cargar-operacion"` |
 
-Agregar una parada es agregar un bloque; sacarla es borrarlo. **No hace falta tocar nada
-más.**
+**Para cambiar un texto**, cambiá lo que está entre comillas y guardá. Listo.
+
+**Para sacar una parada**, borrá su bloque entre llaves. **Para agregar una**, copiá uno
+parecido y cambiale el contenido.
+
+⚠️ El único cuidado: **todos los bloques llevan una coma al final menos el último**. Es el
+error típico de este formato.
+
+Si el archivo queda mal escrito, el grabador avisa antes de empezar, te dice en qué línea
+está el problema, y **no graba nada**. El video anterior queda intacto.
+
+Los tiempos de lectura generales están en `grabar-demo.mjs`, en `LEER` y `RESPIRAR`.
 
 ---
 
