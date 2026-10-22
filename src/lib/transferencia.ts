@@ -90,14 +90,19 @@ export const gananciaNegativa = (e: EntradaTransferencia) => gananciaDe(e) < 0
 /**
  * Arma las dos patas listas para el motor de cálculo.
  *
- * `propio` y `externo` llevan la MISMA moneda, igual que cualquier INGRESAN/EGRESAN
- * cargado hasta hoy (se puede ver en la huella de auditoría de los movimientos viejos:
- * `...|INGRESAN|DOLARES|DOLARES|...`). Con monedas iguales el motor no pide cotización,
- * que es lo correcto: en una transferencia no hay cambio de una moneda por otra.
+ * `externo` va VACÍO. En una transferencia no hay cambio de una moneda por otra: entra y
+ * sale la misma, así que no hay moneda externa que declarar.
+ *
+ * Antes llevaba la misma moneda que `propio`, copiando lo que se ve en la huella de
+ * auditoría de los movimientos viejos (`...|INGRESAN|DOLARES|DOLARES|...`). Los importes
+ * salían bien igual, y por eso no se notaba, pero el código de operación quedaba
+ * `INGRESANDOLARESDOLARES` en vez de `INGRESANDOLARES`: una combinación que no existe en
+ * la tabla de operaciones, de modo que la fila se guardaba SIN CLASIFICAR (`cuenta` en
+ * nulo). Con `externo` vacío el código es el correcto y la fila queda en CAJA.
  */
 export function armarTransferencia(e: EntradaTransferencia): TransferenciaArmada {
   const moneda = txt(e.moneda).toUpperCase()
-  const base = { tipo: 'CAJA' as const, propio: moneda, externo: moneda }
+  const base = { tipo: 'CAJA' as const, propio: moneda, externo: '' }
   return {
     patas: [
       { ...base, operacion: 'INGRESAN', cliente: txt(e.entra.participante), monto: Number(e.entra.monto) },
