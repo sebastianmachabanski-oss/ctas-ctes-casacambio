@@ -1,0 +1,13 @@
+{
+  "name": "casa-cambio-demo",
+  "private": true,
+  "type": "module",
+  "description": "Herramientas para grabar el video de demostración. Aparte del proyecto a propósito: Playwright pesa cientos de megas y no tiene por qué instalarse en cada despliegue. La versión va clavada (sin ^) porque cada versión de Playwright trae su propio navegador y su propio ffmpeg: con un rango, `npm install` puede traer una versión que pide un navegador que no está bajado y la grabación falla.",
+  "scripts": {
+    "grabar": "node grabar-demo.mjs",
+    "revisar": "node revisar-guion.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.56.0"
+  }
+}

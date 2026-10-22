@@ -1,0 +1,31 @@
+# Credenciales del grabador de la demostración.
+#
+# CÓMO SE USA
+#   1. Copiá este archivo como `credenciales.local` (sin el `.ejemplo`), en esta
+#      misma carpeta.
+#   2. Reemplazá los valores por los tuyos.
+#   3. Listo: `npm run grabar` las toma solo, en cualquier ventana.
+#
+#   En PowerShell:  copy credenciales.local.ejemplo credenciales.local
+#
+# `credenciales.local` NO se sube al repositorio: tiene claves, aunque sean de una
+# base de demostración.
+#
+# Los valores van SIN comillas y sin espacios alrededor del `=`. Lo que esté puesto
+# en el entorno manda sobre este archivo, así que una prueba suelta
+# (`$env:DEMO_ESPERA=5000`) funciona sin tener que editarlo.
+
+# El administrador de la base de demo. Lo crea scripts/crear-primer-admin.mts.
+# OJO: es la clave NUEVA, la que pusiste cuando la app te obligó a cambiarla al
+# entrar por primera vez. La que imprimió el script ya no sirve.
+DEMO_USUARIO=demo@ejemplo.com
+DEMO_CLAVE=la-clave-del-administrador
+
+# El cliente, para mostrar lo que ve cuando consulta su propia cuenta.
+# Lo crea scripts/crear-cliente-demo.mts.
+DEMO_CLIENTE_USUARIO=cliente@ejemplo.com
+DEMO_CLIENTE_CLAVE=Demo1234!
+
+# Opcional: le pone la misma duración a TODAS las paradas, para probar el ritmo sin
+# editar el guion. Borrá o comentá esta línea para usar los tiempos de cada parada.
+DEMO_ESPERA=8000
