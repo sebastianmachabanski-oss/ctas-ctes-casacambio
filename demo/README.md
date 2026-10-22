@@ -108,25 +108,40 @@ dice dónde quedó el archivo:
 ✅ Listo: demo/salida/demo-2026-10-20.webm
 ```
 
-### 4. Pasarlo a MP4
+### 4. Pasarlo a MP4 (y ponerle música)
 
-El archivo sale en formato **WebM**, que es lo único que sabe generar la herramienta de
-grabación. WebM se ve bien en cualquier navegador, pero para mandarlo por WhatsApp o por
-correo conviene MP4. La conversión necesita **ffmpeg** instalado (`brew install ffmpeg` en
-Mac; en Windows, desde ffmpeg.org):
-
-```bash
-ffmpeg -y -i "demo/salida/demo-2026-10-20.webm" -c:v libx264 -crf 23 -pix_fmt yuv420p \
-  -movflags +faststart "demo/salida/demo-2026-10-20.mp4"
+```powershell
+npm run mp4
 ```
 
-El `-y` es importante: sin él, ffmpeg pregunta si pisa el MP4 que ya está, y basta un
-Enter distraído para quedarse con el de la grabación anterior creyendo que es el nuevo.
+Busca la última grabación, la convierte, y avisa dónde quedó. Necesita **ffmpeg**
+instalado (`winget install Gyan.FFmpeg` en Windows, `brew install ffmpeg` en Mac; después
+hay que cerrar y volver a abrir la terminal).
 
-La terminal imprime este mismo comando al terminar de grabar, ya con el nombre del archivo
-puesto. Alcanza con copiarlo y pegarlo.
+El archivo sale en WebM porque es lo único que sabe grabar el navegador. WebM se ve bien
+en cualquier navegador, pero para mandarlo por WhatsApp o por correo conviene MP4.
 
----
+#### La música
+
+Poné un archivo llamado **`musica.mp3`** en la carpeta `demo` y volvé a correr
+`npm run mp4`. Se mezcla sola: se recorta al largo del video —o se repite si es más
+corta—, se baja de volumen para que no tape nada, y se desvanece en los últimos tres
+segundos para que no termine de golpe.
+
+Si quedó alta o baja:
+
+```powershell
+$env:DEMO_VOLUMEN=0.10
+npm run mp4
+```
+
+El valor por defecto es `0.18`, o sea el 18% del volumen original.
+
+⚠️ **La música no viene incluida, a propósito.** Tiene dueño: subir un archivo al
+repositorio sería repartir algo cuya licencia no conocemos. Hay bibliotecas de música
+libre de regalías con pistas pensadas para presentaciones; al elegir una hay que
+verificar que la licencia permita **uso comercial**, porque un video de venta lo es
+aunque no se cobre por el video. Algunas piden mencionar al autor.
 
 ## Cambiar lo que dice el video
 

@@ -62,22 +62,30 @@
       "ruta": null,
       "titulo": "Seguridad",
       "texto": "Solo tiene acceso a su información",
-      "espera": 4200
+      "espera": 5200
     },
     {
       "como": "staff",
       "ruta": "/dashboard/inicio",
-      "titulo": "Integridad",
-      "texto": "En una sola vista un dashboard completo conteniendo saldos por moneda, caja, dinero en la calle y saldos en cuenta corriente.",
-      "espera": 4200
+      "titulo": "Ahora entra el administrador",
+      "texto": "Mismo sistema, otro alcance: ve la caja, todas las cuentas y los resultados del negocio.",
+      "espera": 5000
     },
     {
       "como": "staff",
-      "ruta": "/dashboard/inicio",
+      "ruta": null,
       "titulo": "Visibilidad",
       "texto": "En la misma pantalla cada movimiento con su impacto. Se filtra por fecha, cliente, tipo o monto.",
-      "espera": 3800,
+      "espera": 5000,
       "accion": "bajar"
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/cuenta-corriente",
+      "titulo": "Todas las cuentas, en un solo lugar",
+      "texto": "El administrador ve y filtra las cuentas corrientes de toda la casa de cambio, no solo una.",
+      "espera": 5600,
+      "accion": "bajar-despacio"
     },
     {
       "como": "staff",
@@ -91,8 +99,15 @@
       "ruta": null,
       "titulo": "Impacto",
       "texto": "Mientras se escribe, la previsualización muestra exactamente cómo queda la caja. Sin sorpresas después.",
-      "espera": 3800,
+      "espera": 5000,
       "accion": "cargar-operacion"
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/nueva-transferencia",
+      "titulo": "Nueva transferencia",
+      "texto": "Texto a completar.",
+      "espera": 5000
     },
     {
       "como": "staff",
@@ -107,6 +122,22 @@
       "titulo": "Gastos",
       "texto": "Alquiler, sueldos, servicios tienen impacto en la situación de caja, permite registrarlos y listarlos",
       "espera": 4800,
+      "accion": "bajar-despacio"
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/calle",
+      "titulo": "Dinero en calle",
+      "texto": "Texto a completar.",
+      "espera": 5000,
+      "accion": "bajar-despacio"
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/deudores",
+      "titulo": "Posición Ctas Ctes",
+      "texto": "Texto a completar.",
+      "espera": 5000,
       "accion": "bajar-despacio"
     },
     {
@@ -128,9 +159,16 @@
       "como": "staff",
       "ruta": null,
       "titulo": "Auditable",
-      "texto": "En una corrección se guardan los dos valores, el viejo y el nuevo. El registro no se puede editar ni borrar: la trazabilidad ayuda a tener mayor control sobre lo operado",
-      "espera": 5200,
+      "texto": "En una corrección se guardan los dos valores, el viejo y el nuevo. El registro no se puede editar ni borrar.",
+      "espera": 5000,
       "accion": "bajar"
+    },
+    {
+      "como": "staff",
+      "ruta": "/dashboard/mi-cuenta",
+      "titulo": "Mi cuenta",
+      "texto": "Texto a completar.",
+      "espera": 5000
     }
   ],
   "cierre": {

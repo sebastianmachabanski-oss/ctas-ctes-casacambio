@@ -63,6 +63,7 @@ export default async function InicioPage({
     p?: string; desde?: string; hasta?: string
     tdesde?: string; thasta?: string; tpagina?: string
     tcli?: string; ttipo?: string; top?: string; tnotas?: string; tautor?: string; tmonto?: string
+    tpropio?: string; texterno?: string
   }
 }) {
   const supabase = await createClient()
@@ -107,6 +108,7 @@ export default async function InicioPage({
     desde: searchParams.tdesde, hasta: searchParams.thasta, pagina: searchParams.tpagina,
     cli: searchParams.tcli, tipo: searchParams.ttipo, op: searchParams.top,
     notas: searchParams.tnotas, autor: searchParams.tautor, monto: searchParams.tmonto,
+    propio: searchParams.tpropio, externo: searchParams.texterno,
   })
 
   // "Saldo en caja" = valor en la moneda (el número grande de la tarjeta, del período

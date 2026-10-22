@@ -1,15 +1,18 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
 import FiltroClientes from './FiltroClientes'
+import { SIN_EXTERNA } from '@/lib/consultas/transacciones'
 
 type Mov = {
   id: string; fecha: string; cliente: string | null; operacion: string; monto: number
   tipo: string; debe: string | null; cot: number | null; notas: string | null
   /** Columna F de la planilla: 'C' = operación común, 'T' = transferencia. */
   op: string | null
+  /** Monedas de la operación. `externo` va vacío cuando no hay cambio de una por otra. */
+  propio: string | null; externo: string | null
   creado_por: string | null; creado_at: string | null
   editado_por: string | null; editado_at: string | null
   pesos: number; cheques: number; dolares: number; euros: number; reales: number; usdt: number; libras: number; banco: number
@@ -25,6 +28,8 @@ const IMPACTOS: { key: keyof Mov; sym: string }[] = [
   { key: 'cc_euros', sym: 'CC €' }, { key: 'cc_reales', sym: 'CC R$' },
   { key: 'cc_usdt', sym: 'CC USDT' },
 ]
+// Las monedas que pueden aparecer en una operación. Mismo orden que en el alta.
+const MONEDAS = ['PESOS', 'CHEQUES', 'DOLARES', 'EUROS', 'REALES', 'USDT', 'LIBRAS']
 const OPERACIONES = ['COMPRA', 'VENTA', 'INGRESAN', 'EGRESAN', 'GASTOS', 'SWITCH', 'ENTRA TT', 'SALE TT', 'SOBRANTE', 'FALTANTE', 'GANANCIA', 'SALDO INICIAL']
 
 const nf = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
@@ -71,11 +76,11 @@ function badge(op: string) {
   return 'tag-gray'
 }
 
-type Filtros = { cli: string; tipo: string; op: string; notas: string; autor: string; monto: string }
+type Filtros = { cli: string; tipo: string; op: string; notas: string; autor: string; monto: string; propio: string; externo: string }
 type Totales = { monto: number; pesos: number; dolares: number }
 
 /** Los parámetros que este listado maneja en la URL. Lo demás no se toca al navegar. */
-const MIOS = ['desde', 'hasta', 'pagina', 'cli', 'tipo', 'op', 'notas', 'autor', 'monto'] as const
+const MIOS = ['desde', 'hasta', 'pagina', 'cli', 'tipo', 'op', 'notas', 'autor', 'monto', 'propio', 'externo'] as const
 
 export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas, filtros, totales, clientes, clientesSel, ruta = '/dashboard/inicio', pref = 't' }: {
   movimientos: Mov[]; puedeEditar: boolean; desde: string; hasta: string
@@ -92,6 +97,15 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   pref?: string
 }) {
   const router = useRouter()
+  /**
+   * Si el servidor está buscando.
+   *
+   * Los filtros consultan al servidor, y entre el clic y la respuesta pasan segundos en
+   * los que la pantalla sigue mostrando el resultado ANTERIOR, sin ninguna señal. Es la
+   * peor forma de esperar: uno no sabe si el filtro no anduvo, si no apretó bien, o si
+   * simplemente tarda — y vuelve a tocar, encadenando consultas.
+   */
+  const [buscando, empezarBusqueda] = useTransition()
   const [d1, setD1] = useState(desde)
   const [d2, setD2] = useState(hasta)
   // Los filtros se aplican EN EL SERVIDOR y viajan en la URL: si se filtrara la página ya
@@ -107,6 +121,8 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   const [fAutor, setFAutor] = useState(filtros.autor)
   const [fNotas, setFNotas] = useState(filtros.notas)
   const [fTipo, setFTipo] = useState(filtros.tipo)
+  const [fPropio, setFPropio] = useState(filtros.propio)
+  const [fExterno, setFExterno] = useState(filtros.externo)
   const [borrando, setBorrando] = useState<string | null>(null)
   const [errorBorrar, setErrorBorrar] = useState('')
   const [avisoPlanilla, setAvisoPlanilla] = useState('')
@@ -163,7 +179,10 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
 
   // Navegación: rango de fechas, filtros por columna y paginación, todo en la URL.
   function navegar(p: number, d1v = d1, d2v = d2, f: Partial<Filtros> = {}) {
-    const actuales: Filtros = { cli: cliSel.join('|'), tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMin, ...f }
+    const actuales: Filtros = {
+      cli: cliSel.join('|'), tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMin,
+      propio: fPropio, externo: fExterno, ...f,
+    }
     // Se parte de la URL actual y se reemplazan SOLO los parámetros del listado. Los que
     // no son suyos —el período de los saldos de Inicio— quedan intactos: sin esto,
     // filtrar el listado devolvía los KPIs de arriba a "Todo".
@@ -174,7 +193,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
     for (const [k, v] of Object.entries(actuales)) if (v) params.set(pref + k, v)
     if (p > 1) params.set(pref + 'pagina', String(p))
     const qs = params.toString()
-    router.replace(ruta + (qs ? '?' + qs : ''))
+    empezarBusqueda(() => router.replace(ruta + (qs ? '?' + qs : '')))
   }
 
   // Cambiar un filtro siempre vuelve a la página 1: la anterior puede no existir ya.
@@ -198,7 +217,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
 
   // Fecha, Op, Tipo, Cliente, Operación, Cot., Monto, (2 fijas más) y Notas, más una
   // columna de importe por moneda con saldo y la de acciones si puede editar.
-  const ncols = 9 + cols.length + (puedeEditar ? 1 : 0)
+  const ncols = 11 + cols.length + (puedeEditar ? 1 : 0)
   const hayFiltro = Boolean(cliSel.length || fTipo || fOp || fNotas || fAutor || fMin)
 
   return (
@@ -295,7 +314,25 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
 
       {/* Tabla con filtros por columna */}
       <div className="card">
-        <div className="tbl-wrap tbl-scroll">
+        {/* Aviso de que el servidor está buscando. Flota sobre la tabla en vez de
+            empujarla: insertando un renglón, la tabla salta cada vez que se filtra. */}
+        <div style={{ position: 'relative' }}>
+          {buscando && (
+            <div style={{
+              position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 5, background: 'var(--ink-2)', color: '#fff',
+              padding: '5px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+              boxShadow: '0 2px 10px rgba(0,0,0,.18)', pointerEvents: 'none',
+            }}>
+              Buscando…
+            </div>
+          )}
+        <div className="tbl-wrap tbl-scroll" style={{
+          // Atenuada mientras llega el resultado: lo que se ve abajo todavía es el
+          // resultado anterior, y conviene que se note que no es el definitivo.
+          opacity: buscando ? 0.45 : 1,
+          transition: 'opacity .15s ease',
+        }}>
           <table className="cc-tbl densa">
             <thead>
               <tr>
@@ -306,6 +343,11 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 <th style={{ textAlign: 'left' }}>Operación</th>
                 <th>Cot.</th>
                 <th>Monto</th>
+                {/* Las monedas de la operación, enseguida del monto: el monto solo no dice
+                    de qué es. `Externa` queda vacía en las operaciones que no cambian una
+                    moneda por otra (INGRESAN, EGRESAN, GASTOS). */}
+                <th style={{ textAlign: 'left' }}>Moneda</th>
+                <th style={{ textAlign: 'left' }} title="Moneda que se entrega a cambio. Vacía en las operaciones que no cambian una moneda por otra.">Mon. externa</th>
                 {/* Notas va en el mismo lugar que en la planilla: después de los datos de
                     carga y antes de las columnas calculadas. Ancho acotado y con recorte
                     para no empujar la tabla a scroll horizontal. */}
@@ -342,6 +384,25 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                 </th>
                 <th></th>
                 <th><input className="srch" placeholder="monto · &gt; &lt;" title="Un número busca ese monto exacto. Con > o < filtra por rango (ej. >1000000)" value={fMin} onChange={e => setFMin(e.target.value)} style={{ width: 110, minWidth: 0 }} /></th>
+                <th style={{ textAlign: 'left' }}>
+                  <select className="srch" value={fPropio}
+                    onChange={e => { setFPropio(e.target.value); aplicarFiltro({ propio: e.target.value }) }}
+                    style={{ width: 96, minWidth: 0 }}>
+                    <option value="">todas</option>
+                    {MONEDAS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </th>
+                <th style={{ textAlign: 'left' }}>
+                  <select className="srch" value={fExterno}
+                    onChange={e => { setFExterno(e.target.value); aplicarFiltro({ externo: e.target.value }) }}
+                    style={{ width: 96, minWidth: 0 }}>
+                    <option value="">todas</option>
+                    {MONEDAS.map(m => <option key={m} value={m}>{m}</option>)}
+                    {/* Las operaciones que no cambian de moneda son muchas y de otro modo
+                        no habría forma de pedirlas. */}
+                    <option value={SIN_EXTERNA}>sin externa</option>
+                  </select>
+                </th>
                 <th style={{ textAlign: 'left' }}>
                   <input className="srch" placeholder="filtrar…" value={fNotas}
                     onChange={e => setFNotas(e.target.value)} style={{ width: 120, minWidth: 0 }} />
@@ -387,6 +448,8 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
                   <td style={{ textAlign: 'left' }}><span className={`tag ${badge(m.operacion)}`}>{m.operacion}</span></td>
                   <td className="num" style={{ color: 'var(--muted)', fontWeight: 400 }}>{m.cot ? nfCot.format(Number(m.cot)) : <span className="zero">—</span>}</td>
                   <td className="num">{nf.format(montoPrincipal(m))}</td>
+                  <td style={{ textAlign: 'left', fontSize: 12 }}>{m.propio || <span className="zero">—</span>}</td>
+                  <td style={{ textAlign: 'left', fontSize: 12 }}>{m.externo || <span className="zero">—</span>}</td>
                   <td style={{ textAlign: 'left', fontSize: 12, color: 'var(--muted)' }}>
                     {m.notas
                       ? <div title={m.notas} style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.notas}</div>
@@ -424,6 +487,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               )}
             </tbody>
           </table>
+        </div>
         </div>
         <div style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <span>

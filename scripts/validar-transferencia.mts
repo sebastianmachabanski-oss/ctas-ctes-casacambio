@@ -44,7 +44,11 @@ const base = (p: Partial<EntradaTransferencia> = {}): EntradaTransferencia => ({
   asert('1e · la primera INGRESA', patas[0].operacion === 'INGRESAN')
   asert('1f · la segunda EGRESA', patas[1].operacion === 'EGRESAN')
   asert('1g · las dos son de CAJA', patas.every(p => p.tipo === 'CAJA'))
-  asert('1h · misma moneda en propio y externo', patas.every(p => p.propio === p.externo))
+  // `externo` VACÍO, no la misma moneda. En una transferencia no hay cambio de una moneda
+  // por otra, así que no hay moneda externa que declarar — y con ella cargada el motor no
+  // reconoce la operación y la fila queda sin clasificar (ver el punto 9).
+  asert('1h · la moneda propia es la pedida', patas.every(p => p.propio === 'DOLARES'))
+  asert('1i · no se declara moneda externa', patas.every(p => p.externo === ''))
   asert('1i · cada pata lleva su participante',
     patas[0].cliente === 'BOH X TT' && patas[1].cliente === 'GRA X TT')
 }
@@ -126,6 +130,45 @@ const base = (p: Partial<EntradaTransferencia> = {}): EntradaTransferencia => ({
   }))
   asert('8a · la moneda queda en mayúsculas', patas[0].propio === 'DOLARES')
   asert('8b · el participante sin espacios de sobra', patas[0].cliente === 'BOH X TT')
+}
+
+// ── 9. Las patas quedan CLASIFICADAS al pasarlas por el motor ──────────────
+//     No alcanza con que los importes den bien. Con `externo` cargado con la misma moneda
+//     que `propio` —que es como estaba— los importes salían correctos igual, y por eso no
+//     se notaba; pero el código de operación quedaba `INGRESANDOLARESDOLARES`, que no
+//     existe en la tabla, y la fila se guardaba con `cuenta` en nulo. Un movimiento sin
+//     clasificar no se ve mal en ninguna pantalla: simplemente no aparece donde debería.
+//     Por eso esta comprobación mira lo que devuelve el MOTOR y no los campos armados.
+{
+  for (const moneda of ['DOLARES', 'PESOS', 'EUROS', 'REALES', 'USDT', 'LIBRAS']) {
+    const { patas } = armarTransferencia(base({ moneda }))
+    for (const pata of patas) {
+      const r = calcularMovimiento({
+        fecha: '2026-10-22', tipo: pata.tipo, cliente: pata.cliente,
+        operacion: pata.operacion, propio: pata.propio, externo: pata.externo,
+        monto: pata.monto, cotizacion: 0,
+      } as any)
+      asert(`9 · ${moneda} ${pata.operacion} queda en CAJA`,
+        r.cuenta === 'CAJA', `cuenta=${JSON.stringify(r.cuenta)} codop=${r.codop}`)
+    }
+  }
+}
+
+// ── 10. Y los importes siguen siendo los mismos ────────────────────────────
+//     El arreglo de arriba no tiene que mover un peso: lo único que cambia es la
+//     clasificación. Si además moviera importes, sería otro problema.
+{
+  const { patas } = armarTransferencia(base({
+    moneda: 'DOLARES',
+    entra: { participante: 'BOH X TT', monto: 10_000 },
+    sale: { participante: 'GRA X TT', monto: 9_500 },
+  }))
+  const calc = (p: typeof patas[number]) => calcularMovimiento({
+    fecha: '2026-10-22', tipo: p.tipo, cliente: p.cliente, operacion: p.operacion,
+    propio: p.propio, externo: p.externo, monto: p.monto, cotizacion: 0,
+  } as any)
+  igual('10a · lo que entra suma', calc(patas[0]).valores['DOLARES'], 10_000)
+  igual('10b · lo que sale resta', calc(patas[1]).valores['DOLARES'], -9_500)
 }
 
 console.log(fallas.length === 0
