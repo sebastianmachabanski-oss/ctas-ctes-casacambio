@@ -14,7 +14,20 @@ export const POR_PAGINA = 100
 export type ParamsTransacciones = {
   desde?: string; hasta?: string; pagina?: string
   cli?: string; tipo?: string; op?: string; notas?: string; autor?: string; monto?: string
+  propio?: string; externo?: string
 }
+
+/**
+ * Valor del filtro de moneda externa para "las que no tienen".
+ *
+ * INGRESAN, EGRESAN y GASTOS no cambian una moneda por otra, así que no declaran moneda
+ * externa. Son una porción grande del listado, y sin esta opción no habría forma de
+ * pedirlas: filtrar por cada moneda una por una nunca las traería.
+ *
+ * El valor guardado para esas filas es `null` en lo cargado desde la app y cadena vacía en
+ * parte de lo migrado, así que el filtro contempla las dos formas.
+ */
+export const SIN_EXTERNA = '(sin)'
 
 export async function traerTransacciones(
   supabase: SupabaseClient<any, any, any>,
@@ -36,6 +49,8 @@ export async function traerTransacciones(
   const fNotas = (sp.notas ?? '').trim()
   const fAutor = (sp.autor ?? '').trim()
   const fMonto = (sp.monto ?? '').trim()
+  const fPropio  = (sp.propio  ?? '').trim().toUpperCase()
+  const fExterno = (sp.externo ?? '').trim().toUpperCase()
 
   // Un solo lugar arma los filtros: lo usan la consulta de la página y la de los totales.
   // Duplicarlos sería garantizar que en algún momento dejen de coincidir.
@@ -50,6 +65,14 @@ export async function traerTransacciones(
     else if (clientesSel.length > 1) q = q.in('cliente', clientesSel)
     if (fTipo)  q = q.eq('tipo', fTipo)
     if (fOp)    q = q.eq('operacion', fOp)
+    if (fPropio) q = q.eq('propio', fPropio)
+    if (fExterno) {
+      // Las filas sin moneda externa se guardaron de dos maneras: `null` desde la app y
+      // cadena vacía en parte de lo migrado. Pedir una sola dejaría afuera a la otra.
+      q = fExterno === SIN_EXTERNA.toUpperCase()
+        ? q.or('externo.is.null,externo.eq.')
+        : q.eq('externo', fExterno)
+    }
     if (fNotas) q = q.ilike('notas', `%${fNotas}%`)
     if (fAutor) {
       q = /CARGA/i.test(fAutor)
@@ -134,6 +157,9 @@ export async function traerTransacciones(
     totalPaginas,
     desde,
     hasta,
-    filtros: { cli: fCli, tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMonto },
+    filtros: {
+      cli: fCli, tipo: fTipo, op: fOp, notas: fNotas, autor: fAutor, monto: fMonto,
+      propio: fPropio, externo: fExterno,
+    },
   }
 }
