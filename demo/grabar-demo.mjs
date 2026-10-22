@@ -58,6 +58,18 @@ if (!USUARIO || !CLAVE) salir(
 const LEER = 3200      // cuánto queda un cartel en pantalla
 const RESPIRAR = 900   // pausa después de cada acción, para que no se vea atropellado
 
+/**
+ * Le pone a TODAS las paradas la misma duración, sin tocar el guion.
+ *
+ *     $env:DEMO_ESPERA=8000
+ *
+ * Dar con el ritmo es cuestión de probar, y probar editando doce números a mano —y
+ * volviéndolos atrás si no gustó— es tedioso. Con esto se graba, se mira, y si quedó
+ * corto se cambia un número y se vuelve a grabar. Cuando el ritmo está, los valores
+ * elegidos se escriben en el guion y se deja de usar la variable.
+ */
+const ESPERA_FIJA = Number(process.env.DEMO_ESPERA) || null
+
 const pausa = ms => new Promise(r => setTimeout(r, ms))
 
 /**
@@ -235,7 +247,17 @@ async function ocultarCartel(page) {
 }
 
 // ── Grabación ──────────────────────────────────────────────────────────────
-console.log(`\n🎬 Grabando contra ${URL_BASE}\n`)
+// Se declara en voz alta qué se va a usar. Suena a detalle, pero ahorra vueltas enteras:
+// cuando un cambio parece no haber surtido efecto, la pregunta real es si el programa lo
+// tomó, y mirar el video para averiguarlo cuesta grabar, convertir y mirar. Acá se ve
+// antes de empezar.
+console.log(`
+🎬 Grabando contra ${URL_BASE}
+   guion:  ${GUION_ARCHIVO}
+   color:  fondo rgb(${FONDO}) · texto ${TEXTO}${GUION.estilo?.texto ? ' (fijado en el guion)' : ' (elegido según el fondo)'}
+   ritmo:  ${ESPERA_FIJA ? `${ESPERA_FIJA} ms en TODAS las paradas (DEMO_ESPERA)` : 'el de cada parada del guion'}
+   paradas: ${RECORRIDO.length}
+`)
 mkdirSync(SALIDA, { recursive: true })
 
 const navegador = await chromium.launch({
@@ -428,7 +450,7 @@ try {
       await mostrarCartel(page, parada.titulo, parada.texto)
       await pausa(LEER)
       if (parada.hacer) await parada.hacer(page)
-      await pausa(parada.espera ?? 2500)
+      await pausa(ESPERA_FIJA ?? parada.espera ?? 2500)
       await ocultarCartel(page)
     } catch (e) {
       if (e instanceof Fatal) { fatal = e; break }

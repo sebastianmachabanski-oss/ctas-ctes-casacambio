@@ -195,10 +195,25 @@ reemplazó seguía siendo oscuro, y a la distancia leía igual: una franja oscur
 una pantalla con otra franja oscura al costado. El claro se despega de las dos cosas, y de
 cualquier color que tenga la app — que además cambia de un cliente a otro.
 
-### Los tiempos generales
+### Los tiempos
 
-Están en `grabar-demo.mjs`, en `LEER` (cuánto queda un cartel en pantalla antes de que
-empiece el movimiento) y `RESPIRAR` (la pausa después de cada acción).
+Cada parada tiene su `espera` en el guion. Para probar un ritmo **sin editar doce números
+a mano**, hay una variable que se los pone a todas:
+
+```powershell
+$env:DEMO_ESPERA=8000
+npm run grabar
+```
+
+Se graba, se mira, y si quedó corto se cambia ese número y se vuelve a grabar. Cuando el
+ritmo está, los valores se escriben en el guion y se deja de usar la variable. Para volver
+a los tiempos del guion, `$env:DEMO_ESPERA=""`.
+
+`npm run revisar` también la toma, así que la duración que anuncia es la que va a durar el
+video de verdad.
+
+Los dos tiempos que no son por parada están en `grabar-demo.mjs`: `LEER` (cuánto queda un
+cartel antes de que empiece el movimiento) y `RESPIRAR` (la pausa después de cada acción).
 
 ---
 

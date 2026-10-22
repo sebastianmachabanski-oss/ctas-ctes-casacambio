@@ -72,11 +72,14 @@ if (problemas.length) {
 // El guion se edita parada por parada, pero el que lo mira ve un video seguido. Verlo
 // listado ayuda a notar que dos carteles dicen casi lo mismo, o que falta una transición.
 const seg = ms => (ms / 1000).toFixed(1).replace('.', ',')
+// Si está puesta la duración fija, el cálculo tiene que usarla: si no, anuncia una
+// duración que no se corresponde con la del video que se va a grabar.
+const ESPERA_FIJA = Number(process.env.DEMO_ESPERA) || null
 let total = 0
 
 console.log(`\n✅ El guion está bien escrito. ${paradas.length} paradas:\n`)
 paradas.forEach((p, i) => {
-  const dura = (p.espera ?? 2500) + 3200 + 900   // espera + lectura del cartel + respiro
+  const dura = (ESPERA_FIJA ?? p.espera ?? 2500) + 3200 + 900   // espera + lectura del cartel + respiro
   total += dura
   const quien = (p.como ?? 'staff') === 'cliente' ? '[cliente]' : '         '
   console.log(`  ${String(i + 1).padStart(2)}. ${quien} ${p.titulo}`)
