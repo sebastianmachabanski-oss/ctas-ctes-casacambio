@@ -287,6 +287,30 @@ if ((count ?? 0) > 0) salir(
   + '   irreversible en la práctica. Si de verdad es una demo que querés rehacer,\n'
   + '   vaciá `movimientos_caja` y `diario` a mano y volvé a correrlo.')
 
+/**
+ * Se anuncia a qué base se va a escribir, y se da tiempo a cortar.
+ *
+ * La comprobación de arriba cubre el caso peligroso —una base con datos reales adentro—,
+ * pero no puede cubrir uno: una base RECIÉN CREADA para un cliente nuevo está vacía, y una
+ * base vacía pasa la comprobación. Nada en los datos distingue "todavía no cargaron nada"
+ * de "es la demo".
+ *
+ * Lo único que sabe la diferencia es la persona que está mirando. Así que se le muestra el
+ * destino y se espera: cinco segundos alcanzan para leer el nombre del proyecto y apretar
+ * Ctrl+C si no era ese. Se saltea con --sin-espera para correrlo desatendido.
+ */
+{
+  console.log(`\n⚠️  Se va a ESCRIBIR en: ${new URL(URL!).host}`)
+  console.log('   Si no es la base de DEMOSTRACIÓN, cortá ahora con Ctrl+C.')
+  if (!process.argv.includes('--sin-espera')) {
+    for (let i = 5; i > 0; i--) {
+      process.stdout.write(`\r   Empezando en ${i}… `)
+      await new Promise(r => setTimeout(r, 1000))
+    }
+    process.stdout.write('\r                        \r')
+  }
+}
+
 // ── Escritura ──────────────────────────────────────────────────────────────
 // Las cuentas corrientes tienen que existir antes: el alta real las exige, y sin ellas
 // la pantalla de Cuentas Corrientes no las ofrece en el selector.

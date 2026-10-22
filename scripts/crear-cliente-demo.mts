@@ -50,6 +50,33 @@ if (!CUENTAS.map(c => c.toUpperCase()).includes(CUENTA)) salir(
 
 const db = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } })
 
+/**
+ * Se anuncia a qué base se va a escribir, y se da tiempo a cortar.
+ *
+ * Las guardas automáticas cubren el caso peligroso —una base con datos reales adentro—,
+ * pero no pueden cubrir uno: una base RECIÉN CREADA para un cliente nuevo está vacía, y
+ * una base vacía pasa todas las comprobaciones. Nada en los datos distingue "todavía no
+ * cargaron nada" de "es la demo".
+ *
+ * Lo único que sabe la diferencia es la persona que está mirando. Así que se le muestra el
+ * destino y se espera: cinco segundos alcanzan para leer el nombre del proyecto y apretar
+ * Ctrl+C si no era ese. Se saltea con --sin-espera para correrlo desatendido.
+ */
+async function avisarDestino(url: string) {
+  const host = new URL(url).host
+  console.log(`\n⚠️  Se va a ESCRIBIR en: ${host}`)
+  console.log('   Si no es la base de DEMOSTRACIÓN, cortá ahora con Ctrl+C.')
+  if (process.argv.includes('--sin-espera')) return
+  for (let i = 5; i > 0; i--) {
+    process.stdout.write(`\r   Empezando en ${i}… `)
+    await new Promise(r => setTimeout(r, 1000))
+  }
+  process.stdout.write('\r                        \r')
+}
+
+await avisarDestino(URL!)
+
+
 // ── Guarda: ¿esta base es la de demostración? ───────────────────────────────
 const { data: filas, error: errCuentas } = await db
   .from('movimientos_caja')
