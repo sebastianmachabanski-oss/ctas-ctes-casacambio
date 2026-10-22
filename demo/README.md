@@ -73,13 +73,32 @@ equivocada: cortar y revisar `.env.local`.
 
 En la primera ventana:
 
-```bash
+Las credenciales se escriben **una sola vez**, en un archivo:
+
+```powershell
 cd demo
-DEMO_USUARIO=... DEMO_CLAVE=... DEMO_CLIENTE_USUARIO=... DEMO_CLIENTE_CLAVE=... npm run grabar
+copy credenciales.local.ejemplo credenciales.local
+notepad credenciales.local
 ```
 
-Los dos primeros son el administrador; los dos últimos, el cliente. Si faltan los del
-cliente, esas paradas se saltean con un aviso y el resto del video se graba igual.
+Se completan los cuatro valores y se guarda. Desde ahí, grabar es:
+
+```powershell
+npm run grabar
+```
+
+`credenciales.local` no se sube al repositorio.
+
+Los dos primeros valores son el administrador; los dos últimos, el cliente. Si faltan los
+del cliente, esas paradas se saltean con un aviso y el resto del video se graba igual.
+
+También se pueden pasar como variables de entorno, y en ese caso **mandan sobre el
+archivo** — útil para una prueba suelta sin tener que editarlo:
+
+```powershell
+$env:DEMO_ESPERA=5000
+npm run grabar
+```
 
 Se abre una ventana de navegador que se maneja sola. **No hay que tocar nada ni mover el
 mouse**: lo que se ve ahí es lo que queda grabado. Al terminar, se cierra sola y la terminal

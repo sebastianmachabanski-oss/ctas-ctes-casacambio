@@ -19,6 +19,9 @@ import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { cargarCredenciales } from './credenciales.mjs'
+cargarCredenciales()
+
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const ARCHIVO = join(AQUI, 'guion.json')
 

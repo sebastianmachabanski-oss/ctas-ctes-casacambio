@@ -24,9 +24,14 @@ import { chromium } from 'playwright'
 import { mkdirSync, existsSync, renameSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { cargarCredenciales, ARCHIVO as ARCHIVO_CREDENCIALES } from './credenciales.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const SALIDA = join(AQUI, 'salida')
+
+// Las credenciales pueden venir del entorno o de `demo/credenciales.local`, que evita
+// tener que escribirlas en cada ventana nueva. Ver demo/credenciales.mjs.
+cargarCredenciales()
 
 const URL_BASE = process.env.DEMO_URL ?? 'http://localhost:3000'
 const USUARIO = process.env.DEMO_USUARIO
@@ -49,8 +54,16 @@ if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(URL_BASE)) salir(
   + '   Levantá la app con datos de demo:  npm run dev')
 
 if (!USUARIO || !CLAVE) salir(
-  'Faltan DEMO_USUARIO y DEMO_CLAVE: el usuario de la base de DEMOSTRACIÓN.\n'
-  + '   Si no lo creaste todavía, está en el paso 2 de docs/NUEVO-CLIENTE.md.')
+  'Faltan DEMO_USUARIO y DEMO_CLAVE: el usuario de la base de DEMOSTRACIÓN.\n\n'
+  + '   Para no volver a escribirlas en cada ventana, creá el archivo\n'
+  + `   ${ARCHIVO_CREDENCIALES}\n`
+  + '   con este contenido (ver demo/credenciales.local.ejemplo):\n\n'
+  + '     DEMO_USUARIO=demo@ejemplo.com\n'
+  + '     DEMO_CLAVE=la-clave-del-administrador\n'
+  + '     DEMO_CLIENTE_USUARIO=cliente@ejemplo.com\n'
+  + '     DEMO_CLIENTE_CLAVE=Demo1234!\n\n'
+  + '   No se sube al repositorio. Si no creaste los usuarios todavía, están en los\n'
+  + '   pasos 2 y 3 de demo/README.md.')
 
 // ── Tiempos ────────────────────────────────────────────────────────────────
 // Más lentos de lo que uno leería solo: el que mira el video no conoce la pantalla y

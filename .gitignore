@@ -14,3 +14,7 @@ backups/
 
 # Videos de demostración: pesan megas y se vuelven a generar con `npm run grabar`
 demo/salida/
+
+# Credenciales del grabador. Son de una base de demostración, pero son claves igual.
+# El modelo versionado es demo/credenciales.local.ejemplo
+demo/credenciales.local
