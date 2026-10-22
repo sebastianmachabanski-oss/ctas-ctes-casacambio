@@ -18,3 +18,10 @@ demo/salida/
 # Credenciales del grabador. Son de una base de demostración, pero son claves igual.
 # El modelo versionado es demo/credenciales.local.ejemplo
 demo/credenciales.local
+
+# Música de fondo del video. No se versiona: la música tiene dueño, y subir un archivo
+# acá sería repartir algo cuya licencia no conocemos. Cada uno pone la suya.
+demo/musica.mp3
+demo/musica.m4a
+demo/musica.wav
+demo/musica.ogg

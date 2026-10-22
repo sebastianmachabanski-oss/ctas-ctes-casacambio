@@ -416,6 +416,23 @@ async function entrar(usuario, clave) {
 }
 
 /**
+ * ¿El navegador ya está mostrando esta pantalla?
+ *
+ * Se comparan la ruta y los parámetros, que es lo que distingue una pantalla de otra
+ * (`/dashboard/ganancias?p=mes` no es lo mismo que `/dashboard/ganancias`). El host no se
+ * compara porque siempre es el mismo.
+ */
+function yaEstamosEn(ruta) {
+  try {
+    const actual = new URL(page.url())
+    const pedida = new URL(ruta, URL_BASE)
+    return actual.pathname === pedida.pathname && actual.search === pedida.search
+  } catch {
+    return false
+  }
+}
+
+/**
  * Cierra la sesión borrando las cookies, no apretando el botón de salir.
  *
  * El botón sería más fiel, pero vive en un menú que se abre y se cierra, y una grabación
@@ -455,7 +472,11 @@ try {
       }
 
       console.log(`→ ${n}  ${parada.titulo}`)
-      if (parada.ruta) {
+      // Se navega solo si hace falta. Cuando el ingreso ya dejó la pantalla pedida —el
+      // cliente aterriza en su cuenta corriente, el administrador en Inicio— volver a
+      // pedirla la cargaba DE NUEVO, y en el video se veía la misma pantalla armándose
+      // dos veces seguidas antes de que apareciera el cartel.
+      if (parada.ruta && !yaEstamosEn(parada.ruta)) {
         await page.goto(`${URL_BASE}${parada.ruta}`, { waitUntil: 'networkidle', timeout: 45_000 })
         await pausa(RESPIRAR)
       }
