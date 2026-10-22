@@ -271,6 +271,37 @@ console.log(`
    ritmo:  ${ESPERA_FIJA ? `${ESPERA_FIJA} ms en TODAS las paradas (DEMO_ESPERA)` : 'el de cada parada del guion'}
    paradas: ${RECORRIDO.length}
 `)
+
+/**
+ * ¿Está la aplicación levantada?
+ *
+ * Sin esta comprobación, una app apagada se descubre recién después del precalentado y de
+ * que las diecisiete paradas fallen una por una: cuatro minutos de reintentos para llegar
+ * a un video vacío. Un pedido que tarda medio segundo lo dice antes de empezar.
+ *
+ * El motivo más frecuente no es que esté apagada sino que esté en OTRO PUERTO: Next se
+ * corre al 3001 cuando el 3000 está ocupado por un servidor anterior que no se cortó, y lo
+ * avisa en una sola línea del arranque que es fácil pasar por alto.
+ */
+async function comprobarQueEsteLevantada() {
+  try {
+    await fetch(`${URL_BASE}/login`, { signal: AbortSignal.timeout(8_000) })
+  } catch {
+    salir(
+      `No hay nada escuchando en ${URL_BASE}.\n\n`
+      + '   Levantá la aplicación en OTRA ventana:\n'
+      + '     cd ..\n'
+      + '     npm run dev\n\n'
+      + '   Y mirá la línea "Local:" que imprime al arrancar. Si dice 3001, quedó un\n'
+      + '   servidor anterior ocupando el 3000. En PowerShell se libera así:\n'
+      + '     Get-NetTCPConnection -LocalPort 3000 -State Listen |\n'
+      + '       ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }\n\n'
+      + '   O grabá contra el puerto que esté usando:\n'
+      + '     $env:DEMO_URL="http://localhost:3001"')
+  }
+}
+await comprobarQueEsteLevantada()
+
 mkdirSync(SALIDA, { recursive: true })
 
 const navegador = await chromium.launch({
