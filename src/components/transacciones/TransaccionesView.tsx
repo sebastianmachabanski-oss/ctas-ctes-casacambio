@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PLANILLA_ACTIVA } from '@/lib/planilla'
@@ -97,6 +97,15 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   pref?: string
 }) {
   const router = useRouter()
+  /**
+   * Si el servidor está buscando.
+   *
+   * Los filtros consultan al servidor, y entre el clic y la respuesta pasan segundos en
+   * los que la pantalla sigue mostrando el resultado ANTERIOR, sin ninguna señal. Es la
+   * peor forma de esperar: uno no sabe si el filtro no anduvo, si no apretó bien, o si
+   * simplemente tarda — y vuelve a tocar, encadenando consultas.
+   */
+  const [buscando, empezarBusqueda] = useTransition()
   const [d1, setD1] = useState(desde)
   const [d2, setD2] = useState(hasta)
   // Los filtros se aplican EN EL SERVIDOR y viajan en la URL: si se filtrara la página ya
@@ -184,7 +193,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
     for (const [k, v] of Object.entries(actuales)) if (v) params.set(pref + k, v)
     if (p > 1) params.set(pref + 'pagina', String(p))
     const qs = params.toString()
-    router.replace(ruta + (qs ? '?' + qs : ''))
+    empezarBusqueda(() => router.replace(ruta + (qs ? '?' + qs : '')))
   }
 
   // Cambiar un filtro siempre vuelve a la página 1: la anterior puede no existir ya.
@@ -305,7 +314,25 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
 
       {/* Tabla con filtros por columna */}
       <div className="card">
-        <div className="tbl-wrap tbl-scroll">
+        {/* Aviso de que el servidor está buscando. Flota sobre la tabla en vez de
+            empujarla: insertando un renglón, la tabla salta cada vez que se filtra. */}
+        <div style={{ position: 'relative' }}>
+          {buscando && (
+            <div style={{
+              position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 5, background: 'var(--ink-2)', color: '#fff',
+              padding: '5px 14px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+              boxShadow: '0 2px 10px rgba(0,0,0,.18)', pointerEvents: 'none',
+            }}>
+              Buscando…
+            </div>
+          )}
+        <div className="tbl-wrap tbl-scroll" style={{
+          // Atenuada mientras llega el resultado: lo que se ve abajo todavía es el
+          // resultado anterior, y conviene que se note que no es el definitivo.
+          opacity: buscando ? 0.45 : 1,
+          transition: 'opacity .15s ease',
+        }}>
           <table className="cc-tbl densa">
             <thead>
               <tr>
@@ -460,6 +487,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               )}
             </tbody>
           </table>
+        </div>
         </div>
         <div style={{ padding: '11px 16px', color: 'var(--muted)', fontSize: 12.5, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <span>

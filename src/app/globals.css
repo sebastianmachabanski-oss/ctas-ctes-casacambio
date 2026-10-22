@@ -279,6 +279,14 @@ body.cc-navopen .cc-scrim { opacity: 1; pointer-events: auto; }
    las filas y hay que bajar hasta el final para alcanzarla — por eso el desplazamiento
    lateral solo se lograba con las flechas (25/8/2026). */
 .tbl-scroll { max-height: 62vh; overflow: auto; }
+
+/* La barra horizontal, SIEMPRE presente en el listado de transacciones.
+   Con `auto` el navegador la dibuja solo mientras hace falta y en Windows la esconde
+   cuando uno deja de scrollear: la tabla sigue hacia la derecha y no hay nada que lo
+   diga. Con `scroll` el espacio queda reservado y la barra se ve siempre.
+   Va en la combinación de las dos clases —solo la usa esta tabla— para no dejar una
+   barra vacía en las tablas angostas de Gastos y Transferencias. */
+.tbl-wrap.tbl-scroll { overflow-x: scroll; overflow-y: auto; }
 .tbl-scroll thead th { position: sticky; top: 0; background: var(--card); z-index: 2; }
 /* Segunda fila (filtros por columna): se apoya debajo de la primera. */
 .tbl-scroll thead tr.tx-filtros th { top: 25px; z-index: 2; }
