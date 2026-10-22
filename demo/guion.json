@@ -19,7 +19,6 @@
     "",
     "El color del cartel está en 'estilo', más abajo."
   ],
-
   "estilo": {
     "_comentario": [
       "'fondo' son los tres números del color (rojo, verde, azul), de 0 a 255.",
@@ -42,110 +41,101 @@
     ],
     "fondo": "228,228,233"
   },
-
   "paradas": [
     {
       "como": "staff",
       "ruta": "/dashboard/admin/usuarios",
-      "titulo": "Cada uno ve lo que le toca",
-      "texto": "Cuatro roles: operador, administrador, dueño y cliente. El rol decide qué pantallas abre cada persona, y se controla en el servidor — no alcanza con conocer la dirección.",
+      "titulo": "Posibilidad de definir usuarios con distintos roles",
+      "texto": "Superadmin, Admin, Cliente y Operador. El rol define las pantallas a mostrar y el alcance en el sistema",
       "espera": 5200
     },
     {
       "como": "cliente",
       "ruta": "/dashboard/cuenta-corriente",
-      "titulo": "El cliente consulta su cuenta solo",
-      "texto": "Entra con su propio usuario y ve su saldo y sus movimientos cuando quiere. Sin llamar ni esperar a que alguien le arme un resumen.",
+      "titulo": "El cliente accede a su cuenta corriente",
+      "texto": "Desde cualquier dispositivo, accede a su saldo y sus movimientos. Sin llamar ni esperar a que alguien le arme un resumen.",
       "espera": 5600,
       "accion": "bajar-despacio"
     },
     {
       "como": "cliente",
       "ruta": null,
-      "titulo": "Y solo la suya",
-      "texto": "No ve la caja, ni las demás cuentas, ni cuánto ganó el negocio. El mismo sistema, con otra puerta.",
+      "titulo": "Seguridad",
+      "texto": "Solo tiene acceso a su información",
       "espera": 4200
     },
     {
       "como": "staff",
       "ruta": "/dashboard/inicio",
-      "titulo": "Todo el dinero, en una pantalla",
-      "texto": "Saldos por moneda al instante: lo que hay en caja, lo que está en la calle y lo que debe cada cuenta corriente.",
+      "titulo": "Integridad",
+      "texto": "En una sola vista un dashboard completo conteniendo saldos por moneda, caja, dinero en la calle y saldos en cuenta corriente.",
       "espera": 4200
     },
     {
       "como": "staff",
       "ruta": "/dashboard/inicio",
-      "titulo": "Las operaciones del día",
-      "texto": "Debajo de los saldos, cada movimiento con su impacto. Se filtra por fecha, cliente, tipo o monto.",
+      "titulo": "Visibilidad",
+      "texto": "En la misma pantalla cada movimiento con su impacto. Se filtra por fecha, cliente, tipo o monto.",
       "espera": 3800,
       "accion": "bajar"
     },
     {
       "como": "staff",
       "ruta": "/dashboard/nueva-transaccion",
-      "titulo": "Cargar una operación",
-      "texto": "Se elige el tipo, la moneda y el monto. El sistema calcula el resto.",
-      "espera": 2600
+      "titulo": "Simplicidad",
+      "texto": "Las operaciones se cargan de forma simple y controlada, conteniendo los distintos tipos de operación y monedas",
+      "espera": 3800
     },
     {
       "como": "staff",
       "ruta": null,
-      "titulo": "El impacto se ve ANTES de guardar",
+      "titulo": "Impacto",
       "texto": "Mientras se escribe, la previsualización muestra exactamente cómo queda la caja. Sin sorpresas después.",
-      "espera": 5200,
+      "espera": 3800,
       "accion": "cargar-operacion"
     },
     {
       "como": "staff",
       "ruta": "/dashboard/transferencias",
       "titulo": "Transferencias",
-      "texto": "Las dos patas se cargan juntas, así no quedan operaciones a medio registrar. La ganancia se computa cuando la transferencia se cierra, no antes.",
+      "texto": "Carga de transferencias entre terceros, identificando los movimientos y la ganancia para la oficina.",
       "espera": 5200
     },
     {
       "como": "staff",
       "ruta": "/dashboard/gastos",
-      "titulo": "Los gastos también salen de la caja",
-      "texto": "Alquiler, sueldos, servicios. Se cargan acá y descuentan del saldo igual que cualquier otra salida: lo que muestra la caja ya los tiene adentro.",
+      "titulo": "Gastos",
+      "texto": "Alquiler, sueldos, servicios tienen impacto en la situación de caja, permite registrarlos y listarlos",
       "espera": 4800,
       "accion": "bajar-despacio"
     },
     {
       "como": "staff",
-      "_nota": [
-        "La ruta lleva '?p=mes' a propósito. Sin eso, la pantalla abre en el DÍA DE HOY,",
-        "y los datos de demostración llegan hasta el día en que se sembró la base: si se",
-        "graba un día después, Ganancias sale vacía.",
-        "Con el mes siempre hay movimientos, y además se ve el detalle día por día.",
-        "Para fijar otro período: '?p=mes&fecha=2026-09-15' o '?p=dia&fecha=2026-09-15'."
-      ],
       "ruta": "/dashboard/ganancias?p=mes",
-      "titulo": "Cuánto se ganó",
-      "texto": "Por día, semana, mes o año. Y el detalle de cómo se llegó a ese número, abierto paso a paso.",
+      "titulo": "Ganancias",
+      "texto": "Detalle por día, semana, mes o año. apertura paso a paso de como se arriba al resultado",
       "espera": 5200,
       "accion": "bajar-despacio"
     },
     {
       "como": "staff",
       "ruta": "/dashboard/admin/auditoria",
-      "titulo": "Quién hizo qué, y cuándo",
-      "texto": "Cada alta, cada corrección y cada borrado queda registrado con su autor y su hora.",
+      "titulo": "Trazabilidad",
+      "texto": "Quién hizo qué, y cuándo. Cada alta, corrección o borrado queda registrado con su autor y su hora.",
       "espera": 4600
     },
     {
       "como": "staff",
       "ruta": null,
-      "titulo": "Y qué decía antes",
-      "texto": "En una corrección se guardan los dos valores, el viejo y el nuevo. El registro no se puede editar ni borrar: la base lo impide.",
+      "titulo": "Auditable",
+      "texto": "En una corrección se guardan los dos valores, el viejo y el nuevo. El registro no se puede editar ni borrar: la trazabilidad ayuda a tener mayor control sobre lo operado",
       "espera": 5200,
       "accion": "bajar"
     }
   ],
-
   "cierre": {
-    "titulo": "Todo en un solo lugar",
-    "texto": "Caja, cuentas corrientes, transferencias y resultados. Sin planillas sueltas.",
+    "titulo": "Toda la operatoria en un solo lugar",
+    "texto": "Sin planillas sueltas. Solución segura, trazable, escalable e Innovadora",
     "espera": 4200
   }
 }
