@@ -39,7 +39,29 @@
       "probar tonos sin quedarse con un cartel ilegible. Para imponerlo a mano se agrega",
       "  \"texto\": \"#18181b\""
     ],
-    "fondo": "228,228,233"
+    "fondo": "205,206,213"
+  },
+  "portada": {
+    "_comentario": [
+      "La pantalla de presentación, antes de que se vea la aplicación.",
+      "Para sacarla, borrá este bloque entero.",
+      "'puntos' es la lista de funcionalidades: agregá o sacá renglones."
+    ],
+    "titulo": "Sistema para Casa de Cambio",
+    "subtitulo": "Toda la operatoria en un solo lugar",
+    "puntos": [
+      "Caja en todas las monedas, al instante",
+      "Cuentas corrientes que el cliente consulta solo",
+      "Carga de operaciones con el impacto a la vista",
+      "Transferencias entre terceros, con su ganancia",
+      "Gastos que descuentan de la caja",
+      "Dinero en la calle, por repartidor",
+      "Posición consolidada: quién debe y a quién",
+      "Ganancias por día, semana, mes o año",
+      "Usuarios con cuatro roles y permisos del servidor",
+      "Auditoría: quién hizo qué, sin poder borrarlo"
+    ],
+    "espera": 9000
   },
   "paradas": [
     {

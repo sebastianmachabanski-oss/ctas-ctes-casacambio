@@ -137,6 +137,11 @@ npm run mp4
 
 El valor por defecto es `0.18`, o sea el 18% del volumen original.
 
+La música se prepara antes de mezclarla: se le recortan los silencios de las dos puntas y
+las vueltas se encadenan con un cruce de dos segundos. Sin eso, una pista más corta que el
+video frena, hace un bache y vuelve a arrancar en cada vuelta — porque casi toda la música
+empieza y termina con silencio, y al repetirla esos dos silencios quedan pegados.
+
 ⚠️ **La música no viene incluida, a propósito.** Tiene dueño: subir un archivo al
 repositorio sería repartir algo cuya licencia no conocemos. Hay bibliotecas de música
 libre de regalías con pistas pensadas para presentaciones; al elegir una hay que
@@ -196,6 +201,24 @@ que dicen casi lo mismo, o una transición que falta.
 Si el archivo quedó mal escrito, el grabador también avisa antes de empezar y **no graba
 nada**: el video anterior queda intacto.
 
+### La pantalla de presentación
+
+El video abre con una portada que dice de qué se trata y lista las funcionalidades, para
+que el que mira tenga el mapa antes de que empiecen a pasar cosas. Está en `guion.json`,
+en el bloque `portada`:
+
+```json
+"portada": {
+  "titulo": "Sistema para Casa de Cambio",
+  "subtitulo": "Toda la operatoria en un solo lugar",
+  "puntos": ["Caja en todas las monedas, al instante", "…"],
+  "espera": 9000
+}
+```
+
+`puntos` se acomoda solo en dos columnas. Para que el video arranque directo en la
+aplicación, se borra el bloque entero.
+
 ### El color del cartel
 
 También en `guion.json`, en el bloque `estilo`:
@@ -212,7 +235,8 @@ transparente arriba.
 
 | Números | Color |
 |---|---|
-| `228,228,233` | gris claro (el actual) |
+| `205,206,213` | gris claro (el actual) |
+| `228,228,233` | un poco más claro |
 | `200,200,206` | gris claro un poco más apagado |
 | `245,245,245` | casi blanco |
 | `113,113,122` | gris medio |

@@ -18,7 +18,7 @@
  *   · la baja de volumen, para que no tape nada;
  *   · le hace un cierre suave en los últimos segundos, para que no termine de golpe.
  */
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync, execFile } from 'node:child_process'
@@ -66,13 +66,70 @@ const MUSICA = ['musica.mp3', 'musica.m4a', 'musica.wav', 'musica.ogg']
 const segundos = await duracion(video)
 const VOLUMEN = Number(process.env.DEMO_VOLUMEN) || 0.18   // 0 = sin música, 1 = volumen original
 const CIERRE = 3                                            // segundos de desvanecido final
+const CRUCE = 2                                             // segundos de cruce entre vueltas
+
+/**
+ * Prepara la música para que suene CONTINUA durante todo el video.
+ *
+ * EL PROBLEMA
+ * Casi toda la música empieza y termina con un poco de silencio. Repitiendo la pista tal
+ * cual, cada vuelta pega el silencio del final con el del comienzo: en el video se escucha
+ * que la música frena, hay un bache y vuelve a arrancar. Con una pista de tres minutos en
+ * un video de cuatro, eso pasa una vez y se nota muchísimo.
+ *
+ * LA SOLUCIÓN, EN DOS PASOS
+ *  1. Se recorta el silencio de las dos puntas. Esto solo ya elimina el bache.
+ *  2. Las vueltas se encadenan con un CRUCE: el final de una se superpone con el comienzo
+ *     de la siguiente, así no se escucha dónde empieza de nuevo. Sin esto no hay silencio
+ *     pero sí un salto brusco.
+ *
+ * Devuelve la ruta de un archivo temporal, ya del largo del video.
+ */
+async function prepararMusica(archivo) {
+  const recortada = join(SALIDA, '.musica-recortada.wav')
+  const loopeada = join(SALIDA, '.musica-continua.wav')
+
+  // `areverse` en el medio es el modo de recortar también el final: se recorta el
+  // comienzo, se da vuelta, se recorta el nuevo comienzo —que era el final— y se
+  // endereza. `silenceremove` solo sabe trabajar desde el principio.
+  const recorte = 'silenceremove=start_periods=1:start_threshold=-50dB:detection=peak'
+  await ejecutar('ffmpeg', ['-nostdin', '-y', '-v', 'error', '-i', archivo,
+    '-af', `${recorte},areverse,${recorte},areverse`,
+    '-ar', '48000', '-ac', '2', recortada], { maxBuffer: 1024 * 1024 * 64 })
+
+  const largo = await duracion(recortada)
+  if (!isFinite(largo) || largo < 1) salir(`La música ${basename(archivo)} quedó vacía al recortarle los silencios.`)
+
+  // Cada vuelta aporta su largo menos el cruce, que se comparte con la anterior.
+  const cruce = Math.min(CRUCE, largo / 4)
+  const vueltas = Math.max(1, Math.ceil((segundos + cruce) / (largo - cruce)))
+
+  if (vueltas === 1) return recortada
+
+  // Se encadenan de a dos: [0][1]→x1, [x1][2]→x2, y así.
+  const entradas = []
+  for (let i = 0; i < vueltas; i++) entradas.push('-i', recortada)
+  const cadena = []
+  for (let i = 1; i < vueltas; i++) {
+    const izq = i === 1 ? '[0:a]' : `[x${i - 1}]`
+    cadena.push(`${izq}[${i}:a]acrossfade=d=${cruce.toFixed(2)}[x${i}]`)
+  }
+  await ejecutar('ffmpeg', ['-nostdin', '-y', '-v', 'error', ...entradas,
+    '-filter_complex', cadena.join(';'), '-map', `[x${vueltas - 1}]`,
+    loopeada], { maxBuffer: 1024 * 1024 * 64 })
+
+  console.log(`   ${vueltas} vueltas de ${largo.toFixed(0)} s, encadenadas con ${cruce.toFixed(1)} s de cruce`)
+  return loopeada
+}
 
 const args = ['-y', '-i', video]
+const temporales = []
 
 if (MUSICA) {
+  const pista = await prepararMusica(MUSICA)
+  temporales.push(join(SALIDA, '.musica-recortada.wav'), join(SALIDA, '.musica-continua.wav'))
   args.push(
-    // Si la música es más corta que el video, se repite hasta cubrirlo.
-    '-stream_loop', '-1', '-i', MUSICA,
+    '-i', pista,
     '-filter_complex',
     `[1:a]volume=${VOLUMEN},afade=t=out:st=${Math.max(0, segundos - CIERRE).toFixed(2)}:d=${CIERRE}[a]`,
     '-map', '0:v', '-map', '[a]',
@@ -101,6 +158,9 @@ try {
 } catch (e) {
   salir(`ffmpeg no pudo convertir el video:\n   ${String(e.stderr ?? e.message).split('\n').slice(-6).join('\n   ')}`)
 }
+
+// Los archivos de trabajo de la música no tienen por qué quedar dando vueltas.
+for (const t of temporales) { try { if (existsSync(t)) unlinkSync(t) } catch {} }
 
 const mb = (statSync(destino).size / 1024 / 1024).toFixed(1)
 console.log(`\n✅ Listo: ${destino}  (${mb} MB)\n`)

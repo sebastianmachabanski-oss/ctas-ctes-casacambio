@@ -172,7 +172,7 @@ if (!RECORRIDO.length) salir(`El guion no tiene ninguna parada (${GUION_ARCHIVO}
  * Se declara en tres componentes sueltos y no como un color entero porque el fondo es un
  * degradado: el mismo color aparece opaco abajo y transparente arriba.
  */
-const FONDO = GUION.estilo?.fondo ?? '228,228,233'
+const FONDO = GUION.estilo?.fondo ?? '205,206,213'
 
 /**
  * El color del texto se deduce del fondo, salvo que el guion diga otra cosa.
@@ -475,12 +475,57 @@ async function cerrarSesion() {
   await contexto.clearCookies()
 }
 
+/**
+ * La pantalla de presentación, antes de que se vea la aplicación.
+ *
+ * Arrancar directo en el login obliga al que mira a entender qué está viendo mientras ya
+ * están pasando cosas. Una portada que diga de qué se trata y qué incluye le da el mapa
+ * antes de empezar, y de paso da tiempo a que la música entre.
+ *
+ * Se dibuja en una página en blanco del mismo navegador —no hay una pantalla así en la
+ * aplicación— y se arma con los colores del cartel, para que no parezca de otro producto.
+ */
+async function mostrarPortada() {
+  const p = GUION.portada
+  if (!p) return
+
+  const puntos = (p.puntos ?? []).map(t => `<li>${t}</li>`).join('')
+  await page.setContent(`<!doctype html><html lang="es"><head><meta charset="utf-8">
+    <style>
+      @keyframes entrar { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+      * { box-sizing: border-box; margin: 0; padding: 0 }
+      body {
+        height: 100vh; display: flex; flex-direction: column; justify-content: center;
+        padding: 0 110px; gap: 30px;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        background: rgb(${FONDO}); color: ${TEXTO};
+        animation: entrar .8s ease both;
+      }
+      h1 { font-size: 62px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05 }
+      h2 { font-size: 25px; font-weight: 400; opacity: .72; letter-spacing: -.01em }
+      .linea { width: 92px; height: 5px; border-radius: 99px; background: ${TEXTO}; opacity: .28 }
+      ul { columns: 2; column-gap: 72px; list-style: none; font-size: 19px; line-height: 2.1 }
+      li { break-inside: avoid; opacity: .9 }
+      li::before { content: '—'; opacity: .45; margin-right: 12px }
+    </style></head><body>
+      <div>
+        <h1>${p.titulo ?? ''}</h1>
+        ${p.subtitulo ? `<h2 style="margin-top:12px">${p.subtitulo}</h2>` : ''}
+      </div>
+      <div class="linea"></div>
+      <ul>${puntos}</ul>
+    </body></html>`)
+  await pausa(p.espera ?? 9000)
+}
+
 /** Con qué usuario estamos adentro ahora mismo. */
 let sesion = null
 /** Si queda cargado, el recorrido se corta y se informa al final. */
 let fatal = null
 
 try {
+  await mostrarPortada()
+
   // Recorrido
   for (const [i, parada] of RECORRIDO.entries()) {
     const n = `${i + 1}/${RECORRIDO.length}`

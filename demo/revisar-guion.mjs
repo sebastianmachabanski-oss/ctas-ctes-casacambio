@@ -81,6 +81,14 @@ const ESPERA_FIJA = Number(process.env.DEMO_ESPERA) || null
 let total = 0
 
 console.log(`\n✅ El guion está bien escrito. ${paradas.length} paradas:\n`)
+
+if (guion.portada) {
+  const p = guion.portada
+  total += p.espera ?? 9000
+  console.log(`   →  PORTADA: ${p.titulo ?? '(sin título)'}`)
+  if (p.subtitulo) console.log(`      ${p.subtitulo}`)
+  console.log(`      ${(p.puntos ?? []).length} funcionalidades listadas · ${seg(p.espera ?? 9000)} s\n`)
+}
 paradas.forEach((p, i) => {
   const dura = (ESPERA_FIJA ?? p.espera ?? 2500) + 3200 + 900   // espera + lectura del cartel + respiro
   total += dura
