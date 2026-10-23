@@ -25,7 +25,8 @@
       "Va SIN el '#' y separado por comas, porque el cartel lo usa opaco abajo y",
       "transparente arriba.",
       "",
-      "  228,228,233   gris claro (el que está)",
+      "  205,206,213   gris claro (el que está)",
+      "  228,228,233   un poco más claro",
       "  200,200,206   gris claro un poco más apagado",
       "  245,245,245   casi blanco",
       "  113,113,122   gris medio",
@@ -128,7 +129,7 @@
       "como": "staff",
       "ruta": "/dashboard/nueva-transferencia",
       "titulo": "Nueva transferencia",
-      "texto": "Texto a completar.",
+      "texto": "Las dos patas se cargan juntas y con una misma referencia, así no queda una operación a medio registrar. La ganancia se calcula sola y se ve antes de guardar.",
       "espera": 5000
     },
     {
@@ -150,7 +151,7 @@
       "como": "staff",
       "ruta": "/dashboard/calle",
       "titulo": "Dinero en calle",
-      "texto": "Texto a completar.",
+      "texto": "Lo que cada repartidor tiene en la mano, al día. Cuando rinde, se marca y vuelve a la caja. Sin anotaciones aparte.",
       "espera": 5000,
       "accion": "bajar-despacio"
     },
@@ -158,7 +159,7 @@
       "como": "staff",
       "ruta": "/dashboard/deudores",
       "titulo": "Posición Ctas Ctes",
-      "texto": "Texto a completar.",
+      "texto": "Quién le debe a la casa y a quién le debe la casa, separado y por moneda. Las cuentas con saldos cruzados aparecen en los dos lados.",
       "espera": 5000,
       "accion": "bajar-despacio"
     },
@@ -189,7 +190,7 @@
       "como": "staff",
       "ruta": "/dashboard/mi-cuenta",
       "titulo": "Mi cuenta",
-      "texto": "Texto a completar.",
+      "texto": "Cada usuario administra su propia contraseña. Nadie tiene que pedirla ni dictarla por teléfono.",
       "espera": 5000
     }
   ],
