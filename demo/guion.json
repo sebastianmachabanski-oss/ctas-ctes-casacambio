@@ -52,15 +52,15 @@
     "subtitulo": "Toda la operatoria en un solo lugar",
     "puntos": [
       "Caja en todas las monedas, al instante",
-      "Cuentas corrientes que el cliente consulta solo",
-      "Carga de operaciones con el impacto a la vista",
-      "Transferencias entre terceros, con su ganancia",
-      "Gastos que descuentan de la caja",
+      "Portal de Cuentas corrientes",
+      "Carga de Operaciones de manera simple y segura",
+      "Transferencias entre terceros",
+      "Gastos",
       "Dinero en la calle, por repartidor",
       "Posición consolidada: quién debe y a quién",
       "Ganancias por día, semana, mes o año",
-      "Usuarios con cuatro roles y permisos del servidor",
-      "Auditoría: quién hizo qué, sin poder borrarlo"
+      "Usuarios con roles y permisos diferenciados",
+      "Auditoría: La operatoria trazable a todo momento"
     ],
     "espera": 9000
   },
@@ -68,59 +68,67 @@
     {
       "como": "staff",
       "ruta": "/dashboard/admin/usuarios",
-      "titulo": "Posibilidad de definir usuarios con distintos roles",
-      "texto": "Superadmin, Admin, Cliente y Operador. El rol define las pantallas a mostrar y el alcance en el sistema",
+      "titulo": "Seguridad de la Información",
+      "texto": "Permite definir distintos roles para administrar, operar y supervisar el resultado del negocio",
       "espera": 5200
     },
     {
       "como": "cliente",
       "ruta": "/dashboard/cuenta-corriente",
-      "titulo": "El cliente accede a su cuenta corriente",
-      "texto": "Desde cualquier dispositivo, accede a su saldo y sus movimientos. Sin llamar ni esperar a que alguien le arme un resumen.",
+      "titulo": "Portal para Clientes",
+      "texto": "Desde cualquier dispositivo, accede a su saldo y sus movimientos. Sin llamar ni esperar a que alguien le arme un resumen",
       "espera": 5600,
       "accion": "bajar-despacio"
     },
     {
       "como": "cliente",
       "ruta": null,
-      "titulo": "Seguridad",
+      "titulo": "Portal para Clientes",
       "texto": "Solo tiene acceso a su información",
       "espera": 5200
     },
     {
       "como": "staff",
       "ruta": "/dashboard/inicio",
-      "titulo": "Ahora entra el administrador",
-      "texto": "Mismo sistema, otro alcance: ve la caja, todas las cuentas y los resultados del negocio.",
+      "titulo": "Gestión del Negocio",
+      "texto": "En una sola vista, la situación de caja y las ultimas operaciones",
       "espera": 5000
     },
     {
       "como": "staff",
       "ruta": null,
-      "titulo": "Visibilidad",
-      "texto": "En la misma pantalla cada movimiento con su impacto. Se filtra por fecha, cliente, tipo o monto.",
+      "titulo": "Gestión del Negocio",
+      "texto": "Cada movimiento con su impacto. Fácil acceso a las operaciones",
       "espera": 5000,
       "accion": "bajar"
     },
     {
       "como": "staff",
       "ruta": "/dashboard/cuenta-corriente",
-      "titulo": "Todas las cuentas, en un solo lugar",
-      "texto": "El administrador ve y filtra las cuentas corrientes de toda la casa de cambio, no solo una.",
+      "titulo": "Gestión del Negocio",
+      "texto": "Visualización de las cuentas corrientes para su seguimiento",
       "espera": 5600,
       "accion": "bajar-despacio"
     },
     {
       "como": "staff",
+      "ruta": "/dashboard/deudores",
+      "titulo": "Gestión del Negocio",
+      "texto": "Posición de Cuentas Corrientes",
+      "espera": 5000,
+      "accion": "bajar-despacio"
+    },
+    {
+      "como": "staff",
       "ruta": "/dashboard/nueva-transaccion",
-      "titulo": "Simplicidad",
+      "titulo": "Gestión del Negocio",
       "texto": "Las operaciones se cargan de forma simple y controlada, conteniendo los distintos tipos de operación y monedas",
       "espera": 3800
     },
     {
       "como": "staff",
       "ruta": null,
-      "titulo": "Impacto",
+      "titulo": "Gestión del Negocio",
       "texto": "Mientras se escribe, la previsualización muestra exactamente cómo queda la caja. Sin sorpresas después.",
       "espera": 5000,
       "accion": "cargar-operacion"
@@ -128,15 +136,15 @@
     {
       "como": "staff",
       "ruta": "/dashboard/nueva-transferencia",
-      "titulo": "Nueva transferencia",
-      "texto": "Las dos patas se cargan juntas y con una misma referencia, así no queda una operación a medio registrar. La ganancia se calcula sola y se ve antes de guardar.",
+      "titulo": "Transferencias entre terceros",
+      "texto": "Carga de ambas partidas dejando registrada la ganacia de la operación",
       "espera": 5000
     },
     {
       "como": "staff",
       "ruta": "/dashboard/transferencias",
       "titulo": "Transferencias",
-      "texto": "Carga de transferencias entre terceros, identificando los movimientos y la ganancia para la oficina.",
+      "texto": "Registro de las trasnferencias para su seguimiento",
       "espera": 5200
     },
     {
@@ -151,15 +159,7 @@
       "como": "staff",
       "ruta": "/dashboard/calle",
       "titulo": "Dinero en calle",
-      "texto": "Lo que cada repartidor tiene en la mano, al día. Cuando rinde, se marca y vuelve a la caja. Sin anotaciones aparte.",
-      "espera": 5000,
-      "accion": "bajar-despacio"
-    },
-    {
-      "como": "staff",
-      "ruta": "/dashboard/deudores",
-      "titulo": "Posición Ctas Ctes",
-      "texto": "Quién le debe a la casa y a quién le debe la casa, separado y por moneda. Las cuentas con saldos cruzados aparecen en los dos lados.",
+      "texto": "Dinero en poder de cada repartidor que conforman el saldo de caja. Registro de Rendición",
       "espera": 5000,
       "accion": "bajar-despacio"
     },
