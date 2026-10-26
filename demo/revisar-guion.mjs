@@ -100,7 +100,11 @@ paradas.forEach((p, i) => {
   const quien = (p.como ?? 'staff') === 'cliente' ? '[cliente]' : '         '
   console.log(`  ${String(i + 1).padStart(2)}. ${quien} ${p.titulo}`)
   console.log(`      ${p.texto}`)
-  console.log(`      ${seg(dura)} s · ${p.ruta ?? '(sigue en la misma pantalla)'}\n`)
+  // Se muestran los dos números por separado. Con uno solo —el total— uno busca ese
+  // valor en el guion para bajarlo y no lo encuentra, porque lo que está escrito ahí es
+  // el primero; el segundo le suma lo que tarda la pantalla en aparecer e irse.
+  const propio = ESPERA_FIJA ?? p.espera ?? 2500
+  console.log(`      espera ${seg(propio)} s  ·  en pantalla ${seg(dura)} s  ·  ${p.ruta ?? '(sigue en la misma pantalla)'}\n`)
 })
 
 if (guion.cierre) {
