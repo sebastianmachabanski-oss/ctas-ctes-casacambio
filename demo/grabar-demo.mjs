@@ -70,21 +70,6 @@ if (!USUARIO || !CLAVE) salir(
 // ── Tiempos ────────────────────────────────────────────────────────────────
 // Más lentos de lo que uno leería solo: el que mira el video no conoce la pantalla y
 // necesita ubicarse antes de que el cartel le diga qué mirar.
-const LEER = 3200      // cuánto queda un cartel en pantalla
-const RESPIRAR = 900   // pausa después de cada acción, para que no se vea atropellado
-
-/**
- * Le pone a TODAS las paradas la misma duración, sin tocar el guion.
- *
- *     $env:DEMO_ESPERA=8000
- *
- * Dar con el ritmo es cuestión de probar, y probar editando doce números a mano —y
- * volviéndolos atrás si no gustó— es tedioso. Con esto se graba, se mira, y si quedó
- * corto se cambia un número y se vuelve a grabar. Cuando el ritmo está, los valores
- * elegidos se escriben en el guion y se deja de usar la variable.
- */
-const ESPERA_FIJA = Number(process.env.DEMO_ESPERA) || null
-
 const pausa = ms => new Promise(r => setTimeout(r, ms))
 
 /**
@@ -135,6 +120,44 @@ const ACCIONES = {
 }
 
 const GUION = leerGuion()
+
+/**
+ * Los tiempos que NO son de cada parada, sino el ritmo general.
+ *
+ * POR QUÉ ESTÁN ACÁ ABAJO Y SE PUEDEN CAMBIAR
+ * Se repiten en las diecisiete paradas, así que pesan más de lo que parece: con los
+ * valores de antes sumaban más tiempo que todos los carteles juntos. Quien mira el video
+ * no distingue "el cartel duró poco" de "la pantalla tardó en aparecer": percibe que el
+ * video es lento. Si esto no se puede ajustar, se termina acortando los textos —que es lo
+ * único visible— sin tocar lo que de verdad lo alarga.
+ *
+ * Se configuran en `guion.json`, en el bloque `tiempos`, en milésimas de segundo.
+ */
+const T = GUION.tiempos ?? {}
+
+/** Cuánto queda el cartel quieto antes de que empiece el movimiento de la parada. */
+const LEER = T.leer ?? 1800
+/** Pausa después de cambiar de pantalla, para que no se vea atropellado. */
+const RESPIRAR = T.respirar ?? 500
+/** Lo que tarda el cartel en desaparecer antes de pasar a la parada siguiente. */
+const SALIDA_CARTEL = T.salidaCartel ?? 300
+/** El ritmo del ingreso: lo que tarda en escribir el usuario y la clave. */
+const TIPEO = T.tipeo ?? 300
+/** La pausa después de entrar, con la pantalla ya cargada. */
+const TRAS_INGRESAR = T.trasIngresar ?? 1100
+
+/**
+ * Le pone a TODAS las paradas la misma duración, sin tocar el guion.
+ *
+ *     $env:DEMO_ESPERA=8000
+ *
+ * Dar con el ritmo es cuestión de probar, y probar editando doce números a mano —y
+ * volviéndolos atrás si no gustó— es tedioso. Con esto se graba, se mira, y si quedó
+ * corto se cambia un número y se vuelve a grabar. Cuando el ritmo está, los valores
+ * elegidos se escriben en el guion y se deja de usar la variable.
+ */
+const ESPERA_FIJA = Number(process.env.DEMO_ESPERA) || null
+
 
 const RECORRIDO = (GUION.paradas ?? []).map((p, i) => {
   if (p.accion && !ACCIONES[p.accion]) salir(
@@ -249,7 +272,7 @@ async function mostrarCartel(page, titulo, texto) {
 
 async function ocultarCartel(page) {
   await page.evaluate(() => document.getElementById('demo-cartel')?.classList.remove('visible')).catch(() => {})
-  await pausa(500)
+  await pausa(SALIDA_CARTEL)
 }
 
 // ── Grabación ──────────────────────────────────────────────────────────────
@@ -422,9 +445,9 @@ async function entrar(usuario, clave) {
   // nombre de usuario y no con una dirección de correo, y el de la clave cambia de
   // `password` a `text` cuando se aprieta el ojito. Buscar por tipo falla en los dos casos.
   await page.locator('#email').fill(usuario)
-  await pausa(500)
+  await pausa(TIPEO)
   await page.locator('#password').fill(clave)
-  await pausa(500)
+  await pausa(TIPEO)
   await page.locator('button[type="submit"]').first().click()
 
   // El timeout es holgado por si el precalentado falló: en ese caso acá se paga la
@@ -436,7 +459,7 @@ async function entrar(usuario, clave) {
     + '   Suele ser la app compilando la pantalla por primera vez. Probá de nuevo:\n'
     + '   la segunda corrida encuentra todo compilado.')
 
-  await pausa(1800)
+  await pausa(TRAS_INGRESAR)
 }
 
 /**

@@ -68,6 +68,14 @@ const seg = ms => (ms / 1000).toFixed(1).replace('.', ',')
 // Si está puesta la duración fija, el cálculo tiene que usarla: si no, anuncia una
 // duración que no se corresponde con la del video que se va a grabar.
 const ESPERA_FIJA = Number(process.env.DEMO_ESPERA) || null
+
+// Los mismos valores por defecto que usa el grabador. Si no coincidieran, el revisor
+// anunciaría una duración que no es la del video, que es peor que no anunciar ninguna.
+const T = guion.tiempos ?? {}
+const LEER = T.leer ?? 1800
+const RESPIRAR = T.respirar ?? 500
+const SALIDA_CARTEL = T.salidaCartel ?? 300
+const POR_PARADA = LEER + RESPIRAR + SALIDA_CARTEL
 let total = 0
 
 console.log(`\n✅ El guion está bien escrito. ${paradas.length} paradas:\n`)
@@ -87,7 +95,7 @@ if (guion.portada) {
   console.log(`      ${cuantas} funcionalidades en total · ${seg(p.espera ?? 9000)} s\n`)
 }
 paradas.forEach((p, i) => {
-  const dura = (ESPERA_FIJA ?? p.espera ?? 2500) + 3200 + 900   // espera + lectura del cartel + respiro
+  const dura = (ESPERA_FIJA ?? p.espera ?? 2500) + POR_PARADA
   total += dura
   const quien = (p.como ?? 'staff') === 'cliente' ? '[cliente]' : '         '
   console.log(`  ${String(i + 1).padStart(2)}. ${quien} ${p.titulo}`)
@@ -101,7 +109,32 @@ if (guion.cierre) {
   console.log(`      ${guion.cierre.texto}\n`)
 }
 
-const m = Math.floor(total / 60000)
-const s = Math.round((total % 60000) / 1000)
-console.log(`  Duración aproximada: ${m} min ${String(s).padStart(2, '0')} s`)
-console.log('  (el número real varía unos segundos según lo que tarde cada pantalla)\n')
+// ── En qué se va el tiempo ─────────────────────────────────────────────────
+// Sin este desglose uno acorta los textos, que es lo único visible, mientras la mayor
+// parte del tiempo se va en algo que ni se ve: la pausa entre pantalla y pantalla.
+const carteles = paradas.reduce((n, p) => n + (ESPERA_FIJA ?? p.espera ?? 2500), 0)
+const entre = paradas.length * POR_PARADA
+const tapas = (guion.portada?.espera ?? 0) + (guion.cierre?.espera ?? 0)
+const ingresos = 3 * ((T.tipeo ?? 300) * 2 + (T.trasIngresar ?? 1100) + 3000)
+
+const reloj = ms => `${Math.floor(ms / 60000)} min ${String(Math.round((ms % 60000) / 1000)).padStart(2, '0')} s`
+const fila = (etiqueta, ms) =>
+  console.log(`     ${etiqueta.padEnd(34)} ${reloj(ms).padStart(10)}   ${'█'.repeat(Math.round(ms / (total + ingresos) * 34))}`)
+
+if (ESPERA_FIJA) {
+  console.log(`  ⚠️  DEMO_ESPERA=${ESPERA_FIJA} está puesta: TODAS las paradas duran ${(ESPERA_FIJA / 1000).toFixed(1)} s`)
+  console.log('      y los tiempos escritos en el guion se ignoran.')
+  console.log('      Para usar los del guion, comentá esa línea en demo/credenciales.local.\n')
+}
+
+console.log('  En qué se va el tiempo:\n')
+fila('Los carteles (lo que se lee)', carteles)
+fila(`Entre pantallas (${paradas.length} × ${(POR_PARADA / 1000).toFixed(1)} s)`, entre)
+fila('Portada y cierre', tapas)
+fila('Los tres ingresos', ingresos)
+console.log(`\n     ${'TOTAL APROXIMADO'.padEnd(34)} ${reloj(total + ingresos).padStart(10)}`)
+console.log(`
+  Si quedó largo, mirá primero el renglón más largo de arriba.
+  "Entre pantallas" se acorta en el bloque "tiempos" del guion; los carteles,
+  uno por uno, en su "espera".
+`)
