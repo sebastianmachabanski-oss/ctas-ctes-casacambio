@@ -31,9 +31,13 @@ if (!GUION.portada) {
   process.exit(1)
 }
 
-const DESDE = 'async function mostrarPortada() {'
-const HASTA = '/** Con qué usuario estamos adentro ahora mismo. */'
-const cuerpo = fuente.slice(fuente.indexOf(DESDE), fuente.indexOf(HASTA))
+// Se recortan del grabador las dos funciones y el fondo que comparten, para dibujar
+// EXACTAMENTE lo que va a salir en el video. Copiarlas acá seria garantizar que en algun
+// momento la vista previa muestre algo distinto de lo grabado.
+const trozo = (desde, hasta) => fuente.slice(fuente.indexOf(desde), fuente.indexOf(hasta))
+const FONDO = trozo('const FONDO_LAMINA = `', '/**\n * La pantalla de cierre')
+const CIERRE = trozo('async function mostrarCierre() {', 'async function mostrarPortada() {')
+const PORTADA = trozo('async function mostrarPortada() {', '/** Con qué usuario estamos adentro ahora mismo. */')
 
 mkdirSync(SALIDA, { recursive: true })
 const navegador = await chromium.launch({
@@ -42,13 +46,23 @@ const navegador = await chromium.launch({
 })
 const page = await (await navegador.newContext({ viewport: { width: 1600, height: 900 } })).newPage()
 
-const mostrar = new Function('GUION', 'page', 'pausa',
-  `return (${cuerpo.replace(DESDE, 'async function () {')})()`)
-// La pausa se anula: acá no hay que esperar los doce segundos, solo dibujar.
-await mostrar(GUION, page, async () => {})
-// Lo justo para que terminen las animaciones de entrada.
-await new Promise(r => setTimeout(r, 2500))
-await page.screenshot({ path: DESTINO })
+/** Dibuja una de las dos láminas y saca la foto. La pausa se anula: acá solo se dibuja. */
+async function foto(nombre, cuerpo, marca, archivo) {
+  const dibujar = new Function('GUION', 'page', 'pausa', 'FONDO_LAMINA',
+    `return (${cuerpo.replace(marca, 'async function () {')})()`)
+  const fondo = new Function(`${FONDO}\nreturn FONDO_LAMINA`)()
+  await dibujar(GUION, page, async () => {}, fondo)
+  // Lo justo para que terminen las animaciones de entrada.
+  await new Promise(r => setTimeout(r, 2500))
+  await page.screenshot({ path: archivo })
+  console.log(`   ${nombre}: ${archivo}`)
+}
+
+console.log('')
+await foto('Entrada', PORTADA, 'async function mostrarPortada() {', DESTINO)
+if (GUION.cierre) {
+  await foto('Salida ', CIERRE, 'async function mostrarCierre() {', DESTINO.replace(/\.png$/, '-cierre.png'))
+}
 await navegador.close()
 
-console.log(`\n✅ Portada: ${DESTINO}\n   Abrila, mirá si entra todo, y si no ajustá guion.json y volvé a correr esto.\n`)
+console.log('\n   Miralas, y si algo no entra ajustá guion.json y volvé a correr esto.\n')

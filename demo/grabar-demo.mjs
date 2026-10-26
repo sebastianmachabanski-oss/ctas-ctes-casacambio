@@ -477,6 +477,64 @@ async function cerrarSesion() {
  * Se dibuja en una página en blanco del mismo navegador —no hay una pantalla así en la
  * aplicación— y se arma con los colores del cartel, para que no parezca de otro producto.
  */
+/**
+ * El fondo de las dos pantallas de texto, la de entrada y la de salida.
+ *
+ * Es el MISMO de la pantalla de ingreso de la aplicación: así el video empieza y termina
+ * dentro del producto y no en dos láminas que podrían ser de cualquier otro.
+ */
+const FONDO_LAMINA = `
+  radial-gradient(circle at 1px 1px, rgba(255,255,255,.11) 1.3px, transparent 0) 0 0 / 20px 20px,
+  radial-gradient(900px 480px at 50% -6%, rgba(59,130,246,.38), transparent 62%),
+  linear-gradient(180deg, #17213b, #0b1120)`
+
+/**
+ * La pantalla de cierre: el mensaje final, solo, en el centro.
+ *
+ * Antes era un cartel más, sobreimpreso sobre la última pantalla de la aplicación. El
+ * video terminaba entonces mirando una tabla, con la frase de cierre encima como si fuera
+ * una explicación más. Puesta sola y centrada, cierra: la última imagen es el mensaje y no
+ * un listado cualquiera.
+ *
+ * Comparte el fondo y la tipografía con la portada, para que se lean como las dos tapas
+ * de lo mismo.
+ */
+async function mostrarCierre() {
+  const c = GUION.cierre
+  if (!c) return
+
+  await page.setContent(`<!doctype html><html lang="es"><head><meta charset="utf-8">
+    <style>
+      @keyframes sube { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
+      * { box-sizing: border-box; margin: 0; padding: 0 }
+      body {
+        height: 100vh; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; text-align: center;
+        padding: 0 140px; gap: 26px; color: #eef2f8; overflow: hidden;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        background: ${FONDO_LAMINA};
+      }
+      h1 {
+        font-size: 60px; font-weight: 800; letter-spacing: -.035em; line-height: 1.08;
+        max-width: 1100px; animation: sube .8s ease both;
+      }
+      h1 b { color: #7dd3fc; font-weight: 800 }
+      .linea {
+        width: 86px; height: 5px; border-radius: 99px; background: #60a5fa; opacity: .7;
+        animation: sube .8s ease .35s both;
+      }
+      p {
+        font-size: 25px; line-height: 1.5; color: #9fb3cd; max-width: 900px;
+        animation: sube .8s ease .55s both;
+      }
+    </style></head><body>
+      <h1>${c.titulo ?? ''}</h1>
+      <div class="linea"></div>
+      ${c.texto ? `<p>${c.texto}</p>` : ''}
+    </body></html>`)
+  await pausa(c.espera ?? 6000)
+}
+
 async function mostrarPortada() {
   const p = GUION.portada
   if (!p) return
@@ -511,10 +569,7 @@ async function mostrarPortada() {
         font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
         /* El mismo fondo que la pantalla de ingreso de la aplicación: así la portada y la
            primera pantalla del video se ven del mismo producto, no de dos. */
-        background:
-          radial-gradient(circle at 1px 1px, rgba(255,255,255,.11) 1.3px, transparent 0) 0 0 / 20px 20px,
-          radial-gradient(900px 480px at 50% -6%, rgba(59,130,246,.38), transparent 62%),
-          linear-gradient(180deg, #17213b, #0b1120);
+        background: ${FONDO_LAMINA};
       }
       /* Cada bloque entra un instante después del anterior: la vista sigue un orden en
          lugar de recibir todo de golpe. */
@@ -613,11 +668,7 @@ try {
     }
   }
 
-  if (!fatal && GUION.cierre) {
-    await prepararCartel(page)
-    await mostrarCartel(page, GUION.cierre.titulo, GUION.cierre.texto)
-    await pausa(GUION.cierre.espera ?? 4200)
-  }
+  if (!fatal) await mostrarCierre()
 } finally {
   await contexto.close()   // recién acá Playwright escribe el archivo
   await navegador.close()
