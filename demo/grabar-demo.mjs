@@ -25,6 +25,7 @@ import { mkdirSync, existsSync, renameSync, readdirSync, readFileSync, statSync,
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cargarCredenciales, ARCHIVO as ARCHIVO_CREDENCIALES } from './credenciales.mjs'
+import { leerGuion, ARCHIVO_GUION } from './leer-guion.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const SALIDA = join(AQUI, 'salida')
@@ -132,16 +133,7 @@ const ACCIONES = {
   },
 }
 
-const GUION_ARCHIVO = join(AQUI, 'guion.json')
-
-let GUION
-try {
-  GUION = JSON.parse(readFileSync(GUION_ARCHIVO, 'utf8'))
-} catch (e) {
-  salir(`No se pudo leer el guion (${GUION_ARCHIVO}):\n   ${e.message}\n\n`
-    + '   Suele ser una coma de más o de menos. Todos los bloques llevan coma al final\n'
-    + '   MENOS el último. No se grabó nada: el archivo anterior sigue intacto.')
-}
+const GUION = leerGuion()
 
 const RECORRIDO = (GUION.paradas ?? []).map((p, i) => {
   if (p.accion && !ACCIONES[p.accion]) salir(
@@ -150,7 +142,7 @@ const RECORRIDO = (GUION.paradas ?? []).map((p, i) => {
   return { ...p, hacer: p.accion ? ACCIONES[p.accion] : undefined }
 })
 
-if (!RECORRIDO.length) salir(`El guion no tiene ninguna parada (${GUION_ARCHIVO}).`)
+if (!RECORRIDO.length) salir(`El guion no tiene ninguna parada (${ARCHIVO_GUION}).`)
 
 // ── Cartel sobreimpreso ────────────────────────────────────────────────────
 // Se dibuja DENTRO de la página porque Playwright graba lo que el navegador muestra: un
@@ -266,7 +258,7 @@ async function ocultarCartel(page) {
 // antes de empezar.
 console.log(`
 🎬 Grabando contra ${URL_BASE}
-   guion:  ${GUION_ARCHIVO}
+   guion:  ${ARCHIVO_GUION}
    color:  fondo rgb(${FONDO}) · texto ${TEXTO}${GUION.estilo?.texto ? ' (fijado en el guion)' : ' (elegido según el fondo)'}
    ritmo:  ${ESPERA_FIJA ? `${ESPERA_FIJA} ms en TODAS las paradas (DEMO_ESPERA)` : 'el de cada parada del guion'}
    paradas: ${RECORRIDO.length}

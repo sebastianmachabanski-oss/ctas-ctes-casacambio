@@ -15,7 +15,7 @@
  * estén entre las disponibles. Son los errores que no rompen el archivo pero arruinan el
  * video, y se descubrirían recién al mirarlo.
  */
-import { readFileSync } from 'node:fs'
+import { leerGuion } from './leer-guion.mjs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -29,17 +29,7 @@ const ARCHIVO = join(AQUI, 'guion.json')
 const ACCIONES = ['bajar', 'bajar-despacio', 'cargar-operacion']
 const USUARIOS = ['staff', 'cliente']
 
-let guion
-try {
-  guion = JSON.parse(readFileSync(ARCHIVO, 'utf8'))
-} catch (e) {
-  console.error(`\n❌ El archivo está mal escrito:\n   ${e.message}\n`)
-  console.error('   Los dedazos típicos:')
-  console.error('     · una comilla que falta o que se reemplazó por una letra')
-  console.error('     · una coma de más en el último bloque, o de menos en los otros')
-  console.error('     · un acento que quedó adentro de un nombre de campo\n')
-  process.exit(1)
-}
+const guion = leerGuion()
 
 const problemas = []
 const paradas = guion.paradas ?? []

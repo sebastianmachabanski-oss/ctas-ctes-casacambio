@@ -15,6 +15,7 @@
  */
 import { chromium } from 'playwright'
 import { readFileSync, mkdirSync } from 'node:fs'
+import { leerGuion } from './leer-guion.mjs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -23,13 +24,8 @@ const SALIDA = join(AQUI, 'salida')
 const DESTINO = process.argv[2] || join(SALIDA, 'portada.png')
 
 const fuente = readFileSync(join(AQUI, 'grabar-demo.mjs'), 'utf8')
-let GUION
-try {
-  GUION = JSON.parse(readFileSync(join(AQUI, 'guion.json'), 'utf8'))
-} catch (e) {
-  console.error(`\n❌ El guion está mal escrito:\n   ${e.message}\n`)
-  process.exit(1)
-}
+const GUION = leerGuion()
+
 if (!GUION.portada) {
   console.error('\n❌ El guion no tiene bloque "portada".\n')
   process.exit(1)

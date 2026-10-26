@@ -198,8 +198,24 @@ el video.
 Leer el recorrido seguido ayuda a notar lo que parada por parada no se ve: dos carteles
 que dicen casi lo mismo, o una transición que falta.
 
-Si el archivo quedó mal escrito, el grabador también avisa antes de empezar y **no graba
-nada**: el video anterior queda intacto.
+Si quedó un dedazo, cualquiera de los tres comandos te muestra **el renglón**, con los de
+alrededor y una marca debajo del carácter exacto:
+
+```
+❌ El guion está mal escrito.
+   Renglón 189, columna 7:
+
+     187 |       "ruta": "/dashboard/transferencias",
+     188 |       "titulo": "Transferencias"
+   > 189 |       "texto": "Registro de las transferencias",
+         |       ^
+```
+
+Ojo: **el problema suele estar en el renglón marcado o en el anterior.** Una coma que
+falta se nota recién al leer el renglón siguiente — en el ejemplo, lo que falta es la coma
+al final del 188.
+
+Y no graba nada: el video anterior queda intacto.
 
 ### La pantalla de presentación
 
