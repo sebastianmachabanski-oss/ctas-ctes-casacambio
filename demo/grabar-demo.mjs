@@ -489,33 +489,84 @@ async function mostrarPortada() {
   const p = GUION.portada
   if (!p) return
 
-  const puntos = (p.puntos ?? []).map(t => `<li>${t}</li>`).join('')
+  // Los puntos pueden venir agrupados o como una lista suelta. Lo segundo es la forma
+  // vieja del guion y se sigue aceptando: una portada que deja de funcionar porque cambió
+  // el formato es una portada que nadie va a querer tocar.
+  const grupos = p.grupos ?? (p.puntos ? [{ puntos: p.puntos }] : [])
+
+  const destacados = (p.destacados ?? []).map(d => `
+    <div class="d">
+      <div class="di">${d.icono ?? ''}</div>
+      <div>
+        <div class="dt">${d.titulo ?? ''}</div>
+        <div class="dx">${d.texto ?? ''}</div>
+      </div>
+    </div>`).join('')
+
+  const columnas = grupos.map(g => `
+    <div class="g">
+      ${g.titulo ? `<div class="gt">${g.titulo}</div>` : ''}
+      <ul>${(g.puntos ?? []).map(t => `<li>${t}</li>`).join('')}</ul>
+    </div>`).join('')
+
   await page.setContent(`<!doctype html><html lang="es"><head><meta charset="utf-8">
     <style>
-      @keyframes entrar { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: none } }
+      @keyframes sube { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
       * { box-sizing: border-box; margin: 0; padding: 0 }
       body {
         height: 100vh; display: flex; flex-direction: column; justify-content: center;
-        padding: 0 110px; gap: 30px;
+        padding: 0 96px; gap: 40px; color: #eef2f8; overflow: hidden;
         font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-        background: rgb(${FONDO}); color: ${TEXTO};
-        animation: entrar .8s ease both;
+        /* El mismo fondo que la pantalla de ingreso de la aplicación: así la portada y la
+           primera pantalla del video se ven del mismo producto, no de dos. */
+        background:
+          radial-gradient(circle at 1px 1px, rgba(255,255,255,.11) 1.3px, transparent 0) 0 0 / 20px 20px,
+          radial-gradient(900px 480px at 50% -6%, rgba(59,130,246,.38), transparent 62%),
+          linear-gradient(180deg, #17213b, #0b1120);
       }
-      h1 { font-size: 62px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05 }
-      h2 { font-size: 25px; font-weight: 400; opacity: .72; letter-spacing: -.01em }
-      .linea { width: 92px; height: 5px; border-radius: 99px; background: ${TEXTO}; opacity: .28 }
-      ul { columns: 2; column-gap: 72px; list-style: none; font-size: 19px; line-height: 2.1 }
-      li { break-inside: avoid; opacity: .9 }
-      li::before { content: '—'; opacity: .45; margin-right: 12px }
+      /* Cada bloque entra un instante después del anterior: la vista sigue un orden en
+         lugar de recibir todo de golpe. */
+      .a1 { animation: sube .7s ease both }
+      .a2 { animation: sube .7s ease .45s both }
+      .a3 { animation: sube .7s ease .9s both }
+
+      h1 { font-size: 64px; font-weight: 800; letter-spacing: -.035em; line-height: 1.02 }
+      h1 b { color: #7dd3fc; font-weight: 800 }
+      h2 { font-size: 24px; font-weight: 400; color: #9fb3cd; margin-top: 14px; letter-spacing: -.01em }
+
+      /* Los tres mensajes que no son funcionalidades sino condiciones del producto. */
+      .dd { display: flex; gap: 14px }
+      .d {
+        flex: 1; display: flex; gap: 14px; align-items: flex-start;
+        background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.1);
+        border-radius: 14px; padding: 18px 20px;
+      }
+      .di { font-size: 26px; line-height: 1 }
+      .dt { font-size: 17px; font-weight: 700; margin-bottom: 3px }
+      .dx { font-size: 14.5px; color: #9fb3cd; line-height: 1.4 }
+
+      .gg { display: flex; gap: 56px }
+      .g { flex: 1 }
+      .gt {
+        font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+        color: #60a5fa; padding-bottom: 9px; margin-bottom: 11px;
+        border-bottom: 1px solid rgba(255,255,255,.12);
+      }
+      ul { list-style: none; font-size: 16px; line-height: 1.95 }
+      li { color: #cbd8e8; padding-left: 19px; position: relative }
+      li::before {
+        content: ''; position: absolute; left: 0; top: .78em;
+        width: 6px; height: 6px; border-radius: 99px; background: #60a5fa; opacity: .75;
+      }
     </style></head><body>
-      <div>
+      <div class="a1">
         <h1>${p.titulo ?? ''}</h1>
-        ${p.subtitulo ? `<h2 style="margin-top:12px">${p.subtitulo}</h2>` : ''}
+        ${p.subtitulo ? `<h2>${p.subtitulo}</h2>` : ''}
       </div>
-      <div class="linea"></div>
-      <ul>${puntos}</ul>
+      ${destacados ? `<div class="dd a2">${destacados}</div>` : ''}
+      ${columnas ? `<div class="gg a3">${columnas}</div>` : ''}
     </body></html>`)
-  await pausa(p.espera ?? 9000)
+  await pausa(p.espera ?? 11_000)
 }
 
 /** Con qué usuario estamos adentro ahora mismo. */

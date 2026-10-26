@@ -46,23 +46,65 @@
     "_comentario": [
       "La pantalla de presentación, antes de que se vea la aplicación.",
       "Para sacarla, borrá este bloque entero.",
-      "'puntos' es la lista de funcionalidades: agregá o sacá renglones."
+      "",
+      "  titulo / subtitulo  — los dos renglones grandes. En el título, lo que vaya",
+      "                        entre <b> y </b> se resalta en celeste.",
+      "  destacados          — las tres tarjetas de arriba: no son funcionalidades sino",
+      "                        condiciones del producto (dónde corre, en qué se usa).",
+      "  grupos              — las funcionalidades, en columnas con su encabezado.",
+      "                        Agregá o sacá renglones; tres columnas entran cómodas.",
+      "  espera              — cuánto dura en pantalla, en milésimas de segundo."
     ],
-    "titulo": "Sistema para Casa de Cambio",
-    "subtitulo": "Toda la operatoria en un solo lugar",
-    "puntos": [
-      "Caja en todas las monedas, al instante",
-      "Portal de Cuentas corrientes",
-      "Carga de Operaciones de manera simple y segura",
-      "Transferencias entre terceros",
-      "Gastos",
-      "Dinero en la calle, por repartidor",
-      "Posición consolidada: quién debe y a quién",
-      "Ganancias por día, semana, mes o año",
-      "Usuarios con roles y permisos diferenciados",
-      "Auditoría: La operatoria trazable a todo momento"
+    "titulo": "El sistema de la <b>casa de cambio</b>",
+    "subtitulo": "Toda la operatoria en un solo lugar: caja, cuentas corrientes y resultados.",
+    "destacados": [
+      {
+        "icono": "☁️",
+        "titulo": "En la nube",
+        "texto": "Sin servidores ni equipos que comprar y mantener."
+      },
+      {
+        "icono": "📱",
+        "titulo": "En cualquier dispositivo",
+        "texto": "Computadora, tablet o teléfono. Nada que instalar."
+      },
+      {
+        "icono": "🔒",
+        "titulo": "Cada uno ve lo suyo",
+        "texto": "Roles y permisos controlados en el servidor."
+      }
     ],
-    "espera": 9000
+    "grupos": [
+      {
+        "titulo": "Operación diaria",
+        "puntos": [
+          "Caja en todas las monedas, al instante",
+          "Carga de operaciones simple y segura",
+          "Transferencias entre terceros",
+          "Gastos que descuentan de la caja",
+          "Dinero en la calle, por repartidor"
+        ]
+      },
+      {
+        "titulo": "Cuentas corrientes",
+        "puntos": [
+          "Portal para que el cliente consulte su cuenta",
+          "Movimientos con saldo acumulado",
+          "Posición consolidada: quién debe y a quién",
+          "Extracto para enviar al cliente"
+        ]
+      },
+      {
+        "titulo": "Control y gestión",
+        "puntos": [
+          "Ganancias por día, semana, mes o año",
+          "Usuarios con roles diferenciados",
+          "Auditoría de toda la operatoria",
+          "Registro que no se puede alterar"
+        ]
+      }
+    ],
+    "espera": 12000
   },
   "paradas": [
     {

@@ -87,7 +87,14 @@ if (guion.portada) {
   total += p.espera ?? 9000
   console.log(`   →  PORTADA: ${p.titulo ?? '(sin título)'}`)
   if (p.subtitulo) console.log(`      ${p.subtitulo}`)
-  console.log(`      ${(p.puntos ?? []).length} funcionalidades listadas · ${seg(p.espera ?? 9000)} s\n`)
+  const grupos = p.grupos ?? (p.puntos ? [{ puntos: p.puntos }] : [])
+  const cuantas = grupos.reduce((n, g) => n + (g.puntos ?? []).length, 0)
+  const dest = (p.destacados ?? []).map(d => d.titulo).filter(Boolean)
+  if (dest.length) console.log(`      destacados: ${dest.join(' · ')}`)
+  for (const g of grupos) {
+    if (g.titulo) console.log(`      ${g.titulo}: ${(g.puntos ?? []).length} puntos`)
+  }
+  console.log(`      ${cuantas} funcionalidades en total · ${seg(p.espera ?? 9000)} s\n`)
 }
 paradas.forEach((p, i) => {
   const dura = (ESPERA_FIJA ?? p.espera ?? 2500) + 3200 + 900   // espera + lectura del cartel + respiro
