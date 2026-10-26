@@ -14,8 +14,9 @@
  * va a salir en el video, que es peor que no tener vista previa.
  */
 import { chromium } from 'playwright'
-import { readFileSync, mkdirSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { leerGuion } from './leer-guion.mjs'
+import { mostrarPortada, mostrarCierre } from './laminas.mjs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -23,21 +24,12 @@ const AQUI = dirname(fileURLToPath(import.meta.url))
 const SALIDA = join(AQUI, 'salida')
 const DESTINO = process.argv[2] || join(SALIDA, 'portada.png')
 
-const fuente = readFileSync(join(AQUI, 'grabar-demo.mjs'), 'utf8')
 const GUION = leerGuion()
 
 if (!GUION.portada) {
   console.error('\n❌ El guion no tiene bloque "portada".\n')
   process.exit(1)
 }
-
-// Se recortan del grabador las dos funciones y el fondo que comparten, para dibujar
-// EXACTAMENTE lo que va a salir en el video. Copiarlas acá seria garantizar que en algun
-// momento la vista previa muestre algo distinto de lo grabado.
-const trozo = (desde, hasta) => fuente.slice(fuente.indexOf(desde), fuente.indexOf(hasta))
-const FONDO = trozo('const FONDO_LAMINA = `', '/**\n * La pantalla de cierre')
-const CIERRE = trozo('async function mostrarCierre() {', 'async function mostrarPortada() {')
-const PORTADA = trozo('async function mostrarPortada() {', '/** Con qué usuario estamos adentro ahora mismo. */')
 
 mkdirSync(SALIDA, { recursive: true })
 const navegador = await chromium.launch({
@@ -46,12 +38,9 @@ const navegador = await chromium.launch({
 })
 const page = await (await navegador.newContext({ viewport: { width: 1600, height: 900 } })).newPage()
 
-/** Dibuja una de las dos láminas y saca la foto. La pausa se anula: acá solo se dibuja. */
-async function foto(nombre, cuerpo, marca, archivo) {
-  const dibujar = new Function('GUION', 'page', 'pausa', 'FONDO_LAMINA',
-    `return (${cuerpo.replace(marca, 'async function () {')})()`)
-  const fondo = new Function(`${FONDO}\nreturn FONDO_LAMINA`)()
-  await dibujar(GUION, page, async () => {}, fondo)
+/** Dibuja una lámina y saca la foto. La pausa se anula: acá solo se dibuja, no se espera. */
+async function foto(nombre, dibujar, archivo) {
+  await dibujar(page, GUION, async () => {})
   // Lo justo para que terminen las animaciones de entrada.
   await new Promise(r => setTimeout(r, 2500))
   await page.screenshot({ path: archivo })
@@ -59,10 +48,8 @@ async function foto(nombre, cuerpo, marca, archivo) {
 }
 
 console.log('')
-await foto('Entrada', PORTADA, 'async function mostrarPortada() {', DESTINO)
-if (GUION.cierre) {
-  await foto('Salida ', CIERRE, 'async function mostrarCierre() {', DESTINO.replace(/\.png$/, '-cierre.png'))
-}
+await foto('Entrada', mostrarPortada, DESTINO)
+if (GUION.cierre) await foto('Salida ', mostrarCierre, DESTINO.replace(/\.png$/, '-cierre.png'))
 await navegador.close()
 
 console.log('\n   Miralas, y si algo no entra ajustá guion.json y volvé a correr esto.\n')
