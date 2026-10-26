@@ -36,10 +36,37 @@ function ubicar(texto, mensaje) {
   const trozo = mensaje.match(/\.\.\."([\s\S]*?)"\.\.\./)
   if (!trozo) return null
   const buscado = trozo[1].replace(/\\n/g, '\n').replace(/\\"/g, '"')
+
+  // Solo se informa el renglón si ese pedazo aparece UNA sola vez. Apareciendo varias, o
+  // ninguna —pasa con los archivos guardados en Windows, que separan los renglones de otra
+  // manera que el mensaje—, cualquier elección sería una adivinanza. Y señalar el renglón
+  // equivocado es peor que no señalar ninguno: manda a buscar el problema donde no está.
   const donde = texto.indexOf(buscado)
-  if (donde < 0) return null
+  if (donde < 0 || texto.indexOf(buscado, donde + 1) >= 0) return null
+
   const antes = texto.slice(0, donde).split('\n')
   return { linea: antes.length, columna: antes[antes.length - 1].length + 1 }
+}
+
+/**
+ * Busca comas de más: un renglón que termina en coma seguido de uno que cierra.
+ *
+ * Es el dedazo más frecuente de todos, y es el que peor informa el lector de JSON: dice
+ * `Unexpected token ']'` y muestra un pedazo —un corchete y una llave— que en este archivo
+ * aparece una vez por cada grupo. Con eso no se puede ubicar nada; buscándolo así, sí.
+ *
+ * Se informan TODAS las que encuentre, no la primera: si hay dos, arreglar una sola deja
+ * el archivo roto igual y la próxima corrida parece decir que no se arregló nada.
+ */
+function comasDeMas(texto) {
+  const lineas = texto.split(/\r?\n/)
+  const encontradas = []
+  for (let i = 0; i < lineas.length - 1; i++) {
+    if (/,\s*$/.test(lineas[i]) && /^\s*[\]}]/.test(lineas[i + 1])) {
+      encontradas.push({ linea: i + 1, texto: lineas[i].trim() })
+    }
+  }
+  return encontradas
 }
 
 /** El renglón del problema y dos de contexto a cada lado, con una marca abajo. */
@@ -71,15 +98,30 @@ export function leerGuion() {
   try {
     return JSON.parse(texto)
   } catch (e) {
-    const donde = ubicar(texto, e.message)
     console.error(`\n❌ El guion está mal escrito.\n`)
     console.error(`   ${ARCHIVO_GUION}`)
+
+    // Antes que nada, el dedazo más común. Si hay comas de más, es casi seguro la causa, y
+    // decirlo acá evita el rodeo de traducir un mensaje que para este caso no ubica nada.
+    const sobrantes = comasDeMas(texto)
+    if (sobrantes.length) {
+      console.error(`\n   ${sobrantes.length === 1 ? 'Sobra una coma' : `Sobran ${sobrantes.length} comas`}: el último de una lista no lleva.\n`)
+      for (const s of sobrantes) console.error(`     Renglón ${s.linea}:  ${s.texto}`)
+      console.error('\n   Sacá esa(s) coma(s) y volvé a probar.\n')
+      process.exit(1)
+    }
+
+    const donde = ubicar(texto, e.message)
     if (donde) {
       console.error(`   Renglón ${donde.linea}, columna ${donde.columna}:\n`)
       console.error(alrededor(texto, donde.linea, donde.columna))
     } else {
-      console.error(`   ${e.message}`)
+      console.error('   No se pudo ubicar el renglón exacto.')
     }
+    // El mensaje original SIEMPRE, aunque se haya podido ubicar el renglón. Es la única
+    // fuente que no pasó por este archivo: si la ubicación estuviera mal, con esto se
+    // puede comprobar en vez de salir a buscar a ciegas.
+    console.error(`\n   Lo que informa el lector de JSON:\n   ${e.message}`)
     console.error(`
    Los dedazos típicos, en orden de frecuencia:
      · falta una coma al final de un renglón, o sobra en el último de un bloque
