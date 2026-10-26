@@ -55,7 +55,7 @@
       "                        Agregá o sacá renglones; tres columnas entran cómodas.",
       "  espera              — cuánto dura en pantalla, en milésimas de segundo."
     ],
-    "titulo": "El sistema de la <b>casa de cambio</b>",
+    "titulo": "Aplicación para la Gestión de <b>Casas de Cambio</b>",
     "subtitulo": "Toda la operatoria en un solo lugar: caja, cuentas corrientes y resultados.",
     "destacados": [
       {
@@ -65,12 +65,12 @@
       },
       {
         "icono": "📱",
-        "titulo": "En cualquier dispositivo",
+        "titulo": "Solución Multiplataforma",
         "texto": "Computadora, tablet o teléfono. Nada que instalar."
       },
       {
         "icono": "🔒",
-        "titulo": "Cada uno ve lo suyo",
+        "titulo": "Gestión de la Seguridad y Visibilidad",
         "texto": "Roles y permisos controlados en el servidor."
       }
     ],
@@ -81,7 +81,7 @@
           "Caja en todas las monedas, al instante",
           "Carga de operaciones simple y segura",
           "Transferencias entre terceros",
-          "Gastos que descuentan de la caja",
+          "Gastos del Negocio",
           "Dinero en la calle, por repartidor"
         ]
       },
@@ -90,7 +90,7 @@
         "puntos": [
           "Portal para que el cliente consulte su cuenta",
           "Movimientos con saldo acumulado",
-          "Posición consolidada: quién debe y a quién",
+          "Posición consolidada",
           "Extracto para enviar al cliente"
         ]
       },
@@ -99,8 +99,7 @@
         "puntos": [
           "Ganancias por día, semana, mes o año",
           "Usuarios con roles diferenciados",
-          "Auditoría de toda la operatoria",
-          "Registro que no se puede alterar"
+          "Operación trazable y auditable",
         ]
       }
     ],
