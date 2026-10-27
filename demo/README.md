@@ -174,6 +174,34 @@ Cada parada es un bloque como este:
 | `como` | con qué usuario: `"staff"` (el administrador) o `"cliente"` |
 | `accion` | opcional: `"bajar"`, `"bajar-despacio"` o `"cargar-operacion"` |
 
+### Dos clases de parada
+
+**Lámina de sección** (`"tipo": "lamina"`) — anuncia lo que viene. No muestra la
+aplicación:
+
+```json
+{
+  "tipo": "lamina",
+  "seccion": "01 · OPERACIÓN DIARIA",
+  "titulo": "La caja, siempre al día",
+  "puntos": ["Todas las monedas", "Carga en segundos", "Impacto a la vista"],
+  "espera": 4200
+}
+```
+
+**Pantalla** — muestra la aplicación. Con `etiqueta` aparece solo el nombre en un rincón,
+para las que pasan rápido después de una lámina; con `texto`, el cartel grande de abajo,
+para lo que hay que explicar.
+
+```json
+{ "ruta": "/dashboard/inicio", "etiqueta": "Inicio", "espera": 3000 }
+```
+
+Está armado así porque el video recorría diecisiete pantallas seguidas, cada una con su
+explicación: quien ya conoce el sistema lo seguía, quien no lo había visto nunca se
+perdía. Partido en secciones, cada una se anuncia primero y después se ve rápido — y las
+pantallas pueden pasar mucho más rápido justamente porque ya le dijeron qué va a ver.
+
 **Para cambiar un texto**, cambiá lo que está entre comillas y guardá. Listo.
 
 **Para sacar una parada**, borrá su bloque entre llaves. **Para agregar una**, copiá uno

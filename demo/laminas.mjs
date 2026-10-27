@@ -147,3 +147,77 @@ export async function mostrarPortada(page, GUION, pausa) {
     </body></html>`)
   await pausa(p.espera ?? 11_000)
 }
+
+/**
+ * Una lámina de sección: anuncia lo que viene antes de mostrarlo.
+ *
+ * POR QUÉ EXISTEN
+ * El video recorría diecisiete pantallas seguidas, cada una con su explicación. Quien ya
+ * conoce el sistema lo sigue; quien no lo vio nunca recibe diecisiete cosas sin saber
+ * cuántas faltan ni cómo se relacionan, y se pierde. Es lo que pasó al mostrárselo a
+ * alguien de afuera.
+ *
+ * Partido en secciones, cada una se anuncia primero —qué es y qué incluye— y después se
+ * ve rápido. El que mira siempre sabe dónde está parado, y las pantallas pueden pasar
+ * mucho más rápido porque ya le dijeron qué va a ver.
+ */
+export async function mostrarLamina(page, lamina, pausa) {
+  const puntos = (lamina.puntos ?? []).map(t => `<li>${t}</li>`).join('')
+
+  await page.setContent(`<!doctype html><html lang="es"><head><meta charset="utf-8">
+    <style>
+      @keyframes sube { from { opacity: 0; transform: translateY(16px) } to { opacity: 1; transform: none } }
+      * { box-sizing: border-box; margin: 0; padding: 0 }
+      body {
+        height: 100vh; display: flex; flex-direction: column; justify-content: center;
+        padding: 0 120px; gap: 22px; color: #eef2f8; overflow: hidden;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        background: ${FONDO_LAMINA};
+      }
+      .n {
+        font-size: 13px; font-weight: 700; letter-spacing: .22em; color: #60a5fa;
+        animation: sube .6s ease both;
+      }
+      h1 {
+        font-size: 56px; font-weight: 800; letter-spacing: -.035em; line-height: 1.05;
+        animation: sube .6s ease .18s both;
+      }
+      ul {
+        list-style: none; display: flex; gap: 40px; flex-wrap: wrap;
+        font-size: 19px; margin-top: 6px; animation: sube .6s ease .36s both;
+      }
+      li { color: #9fb3cd; padding-left: 18px; position: relative }
+      li::before {
+        content: ''; position: absolute; left: 0; top: .62em;
+        width: 6px; height: 6px; border-radius: 99px; background: #60a5fa;
+      }
+    </style></head><body>
+      ${lamina.seccion ? `<div class="n">${lamina.seccion}</div>` : ''}
+      <h1>${lamina.titulo ?? ''}</h1>
+      ${puntos ? `<ul>${puntos}</ul>` : ''}
+    </body></html>`)
+  await pausa(lamina.espera ?? 4500)
+}
+
+/**
+ * Una etiqueta chica en un rincón, para las pantallas que pasan rápido.
+ *
+ * La sección ya explicó qué se va a ver, así que acá no hace falta un párrafo: alcanza
+ * con nombrar la pantalla para que no haya dudas de qué se está mirando. Un cartel
+ * grande, además, taparía justo lo que se quiere mostrar.
+ */
+export async function mostrarEtiqueta(page, texto) {
+  await page.evaluate(t => {
+    document.getElementById('demo-etiqueta')?.remove()
+    if (!t) return
+    const d = document.createElement('div')
+    d.id = 'demo-etiqueta'
+    d.textContent = t
+    d.style.cssText = `
+      position: fixed; top: 20px; right: 24px; z-index: 2147483647;
+      background: rgba(8,13,24,.9); color: #fff; border: 1px solid rgba(255,255,255,.14);
+      padding: 7px 16px; border-radius: 999px; pointer-events: none;
+      font: 600 14px/1 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: .01em;`
+    document.body.appendChild(d)
+  }, texto).catch(() => {})
+}

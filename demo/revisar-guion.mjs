@@ -38,8 +38,14 @@ if (!paradas.length) problemas.push('El guion no tiene ninguna parada.')
 
 paradas.forEach((p, i) => {
   const donde = `Parada ${i + 1}${p.titulo ? ` ("${p.titulo}")` : ''}`
+  const esLamina = p.tipo === 'lamina'
   if (!p.titulo) problemas.push(`${donde}: le falta el título.`)
-  if (!p.texto) problemas.push(`${donde}: le falta el texto.`)
+  // Una pantalla puede presentarse con el cartel grande (`texto`) o con la etiqueta del
+  // rincón (`etiqueta`). Sin ninguna de las dos, aparece sin que se sepa qué es.
+  if (!esLamina && !p.texto && !p.etiqueta) {
+    problemas.push(`${donde}: no tiene ni "texto" ni "etiqueta", así que aparece sin nombre.`)
+  }
+  if (esLamina && p.ruta) problemas.push(`${donde}: es una lámina, no lleva "ruta".`)
   if (p.como && !USUARIOS.includes(p.como)) {
     problemas.push(`${donde}: "como" dice "${p.como}". Solo vale ${USUARIOS.map(u => `"${u}"`).join(' o ')}.`)
   }
@@ -95,11 +101,15 @@ if (guion.portada) {
   console.log(`      ${cuantas} funcionalidades en total · ${seg(p.espera ?? 9000)} s\n`)
 }
 paradas.forEach((p, i) => {
-  const dura = (ESPERA_FIJA ?? p.espera ?? 2500) + POR_PARADA
+  // Una lámina se dibuja sobre la misma página: no navega ni muestra cartel, así que no
+  // paga la sobrecarga de una pantalla.
+  const dura = (ESPERA_FIJA ?? p.espera ?? 2500) + (p.tipo === 'lamina' ? 0 : POR_PARADA)
   total += dura
   const quien = (p.como ?? 'staff') === 'cliente' ? '[cliente]' : '         '
-  console.log(`  ${String(i + 1).padStart(2)}. ${quien} ${p.titulo}`)
-  console.log(`      ${p.texto}`)
+  const marca = p.tipo === 'lamina' ? '▌' : ' '
+  console.log(`  ${String(i + 1).padStart(2)}.${marca}${quien} ${p.titulo}`)
+  if (p.texto) console.log(`      ${p.texto}`)
+  else if (p.puntos) console.log(`      ${p.puntos.join('  ·  ')}`)
   // Se muestran los dos números por separado. Con uno solo —el total— uno busca ese
   // valor en el guion para bajarlo y no lo encuentra, porque lo que está escrito ahí es
   // el primero; el segundo le suma lo que tarda la pantalla en aparecer e irse.
@@ -116,10 +126,16 @@ if (guion.cierre) {
 // ── En qué se va el tiempo ─────────────────────────────────────────────────
 // Sin este desglose uno acorta los textos, que es lo único visible, mientras la mayor
 // parte del tiempo se va en algo que ni se ve: la pausa entre pantalla y pantalla.
-const carteles = paradas.reduce((n, p) => n + (ESPERA_FIJA ?? p.espera ?? 2500), 0)
-const entre = paradas.length * POR_PARADA
+const pantallas = paradas.filter(p => p.tipo !== 'lamina')
+const seccionesL = paradas.filter(p => p.tipo === 'lamina')
+const carteles = pantallas.reduce((n, p) => n + (ESPERA_FIJA ?? p.espera ?? 2500), 0)
+const laminasT = seccionesL.reduce((n, p) => n + (ESPERA_FIJA ?? p.espera ?? 2500), 0)
+const entre = pantallas.length * POR_PARADA
 const tapas = (guion.portada?.espera ?? 0) + (guion.cierre?.espera ?? 0)
-const ingresos = 3 * ((T.tipeo ?? 300) * 2 + (T.trasIngresar ?? 1100) + 3000)
+// Un ingreso por cada cambio de usuario, más el primero.
+const cambios = paradas.reduce((n, p, i) =>
+  n + ((p.como ?? 'staff') !== (paradas[i - 1]?.como ?? 'staff') ? 1 : 0), 1)
+const ingresos = cambios * ((T.tipeo ?? 300) * 2 + (T.trasIngresar ?? 1100) + 3000)
 
 const reloj = ms => `${Math.floor(ms / 60000)} min ${String(Math.round((ms % 60000) / 1000)).padStart(2, '0')} s`
 const fila = (etiqueta, ms) =>
@@ -132,10 +148,11 @@ if (ESPERA_FIJA) {
 }
 
 console.log('  En qué se va el tiempo:\n')
-fila('Los carteles (lo que se lee)', carteles)
-fila(`Entre pantallas (${paradas.length} × ${(POR_PARADA / 1000).toFixed(1)} s)`, entre)
+fila(`Las pantallas (${pantallas.length})`, carteles)
+fila(`Entre pantallas (${pantallas.length} × ${(POR_PARADA / 1000).toFixed(1)} s)`, entre)
+if (laminasT) fila(`Las láminas de sección (${seccionesL.length})`, laminasT)
 fila('Portada y cierre', tapas)
-fila('Los tres ingresos', ingresos)
+fila(`Los ingresos (${cambios})`, ingresos)
 console.log(`\n     ${'TOTAL APROXIMADO'.padEnd(34)} ${reloj(total + ingresos).padStart(10)}`)
 console.log(`
   Si quedó largo, mirá primero el renglón más largo de arriba.

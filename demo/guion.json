@@ -103,141 +103,182 @@
         ]
       }
     ],
-    "espera": 12000
+    "espera": 10000
   },
   "paradas": [
     {
-      "como": "staff",
-      "ruta": "/dashboard/admin/usuarios",
-      "titulo": "Seguridad de la Información",
-      "texto": "Permite definir distintos roles para administrar, operar y supervisar el resultado del negocio",
-      "espera": 5200
+      "tipo": "lamina",
+      "seccion": "01 · OPERACIÓN DIARIA",
+      "titulo": "La caja, siempre al día",
+      "puntos": [
+        "Todas las monedas",
+        "Carga en segundos",
+        "Impacto a la vista"
+      ],
+      "espera": 4200
     },
     {
-      "como": "cliente",
-      "ruta": "/dashboard/cuenta-corriente",
-      "titulo": "Portal para Clientes",
-      "texto": "Desde cualquier dispositivo, accede a su saldo y sus movimientos. Sin llamar ni esperar a que alguien le arme un resumen",
-      "espera": 5600,
-      "accion": "bajar-despacio"
-    },
-    {
-      "como": "cliente",
-      "ruta": null,
-      "titulo": "Portal para Clientes",
-      "texto": "Solo tiene acceso a su información",
-      "espera": 5200
-    },
-    {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/inicio",
-      "titulo": "Gestión del Negocio",
-      "texto": "En una sola vista, la situación de caja y las ultimas operaciones",
-      "espera": 5000
+      "titulo": "Inicio",
+      "etiqueta": "Inicio",
+      "espera": 3000
     },
     {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": null,
-      "titulo": "Gestión del Negocio",
-      "texto": "Cada movimiento con su impacto. Fácil acceso a las operaciones",
-      "espera": 5000,
+      "titulo": "Movimientos del día",
+      "etiqueta": "Movimientos del día",
+      "espera": 2600,
       "accion": "bajar"
     },
     {
-      "como": "staff",
-      "ruta": "/dashboard/cuenta-corriente",
-      "titulo": "Gestión del Negocio",
-      "texto": "Visualización de las cuentas corrientes para su seguimiento",
-      "espera": 5600,
-      "accion": "bajar-despacio"
-    },
-    {
-      "como": "staff",
-      "ruta": "/dashboard/deudores",
-      "titulo": "Gestión del Negocio",
-      "texto": "Posición de Cuentas Corrientes",
-      "espera": 5000,
-      "accion": "bajar-despacio"
-    },
-    {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/nueva-transaccion",
-      "titulo": "Gestión del Negocio",
-      "texto": "Las operaciones se cargan de forma simple y controlada, conteniendo los distintos tipos de operación y monedas",
-      "espera": 3800
-    },
-    {
-      "como": "staff",
-      "ruta": null,
-      "titulo": "Gestión del Negocio",
-      "texto": "Mientras se escribe, la previsualización muestra exactamente cómo queda la caja. Sin sorpresas después.",
-      "espera": 5000,
+      "titulo": "Nueva operación",
+      "etiqueta": "Nueva operación",
+      "espera": 3400,
       "accion": "cargar-operacion"
     },
     {
-      "como": "staff",
-      "ruta": "/dashboard/nueva-transferencia",
-      "titulo": "Transferencias entre terceros",
-      "texto": "Carga de ambas partidas dejando registrada la ganacia de la operación",
-      "espera": 5000
-    },
-    {
-      "como": "staff",
-      "ruta": "/dashboard/transferencias",
-      "titulo": "Transferencias",
-      "texto": "Registro de las transferencias para su seguimiento",
-      "espera": 5200
-    },
-    {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/gastos",
       "titulo": "Gastos",
-      "texto": "Alquiler, sueldos, servicios tienen impacto en la situación de caja, permite registrarlos y listarlos",
-      "espera": 4800,
-      "accion": "bajar-despacio"
+      "etiqueta": "Gastos",
+      "espera": 2400
     },
     {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/calle",
-      "titulo": "Dinero en calle",
-      "texto": "Dinero en poder de cada repartidor que conforman el saldo de caja. Registro de Rendición",
-      "espera": 5000,
-      "accion": "bajar-despacio"
+      "titulo": "Dinero en la calle",
+      "etiqueta": "Dinero en la calle",
+      "espera": 2400
     },
     {
+      "tipo": "lamina",
+      "seccion": "02 · CUENTAS CORRIENTES",
+      "titulo": "Quién debe, y cuánto",
+      "puntos": [
+        "Todas las cuentas",
+        "Saldo acumulado",
+        "Posición consolidada"
+      ],
+      "espera": 4200
+    },
+    {
+      "tipo": "pantalla",
+      "como": "staff",
+      "ruta": "/dashboard/cuenta-corriente",
+      "titulo": "Cuentas corrientes",
+      "etiqueta": "Cuentas corrientes",
+      "espera": 3000
+    },
+    {
+      "tipo": "pantalla",
+      "como": "staff",
+      "ruta": "/dashboard/deudores",
+      "titulo": "Posición consolidada",
+      "etiqueta": "Posición consolidada",
+      "espera": 2600
+    },
+    {
+      "tipo": "lamina",
+      "seccion": "03 · TRANSFERENCIAS",
+      "titulo": "Entre terceros, sin cabos sueltos",
+      "puntos": [
+        "Las dos patas juntas",
+        "Ganancia calculada",
+        "Nada a medio registrar"
+      ],
+      "espera": 4200
+    },
+    {
+      "tipo": "pantalla",
+      "como": "staff",
+      "ruta": "/dashboard/nueva-transferencia",
+      "titulo": "Nueva transferencia",
+      "etiqueta": "Nueva transferencia",
+      "espera": 2800
+    },
+    {
+      "tipo": "pantalla",
+      "como": "staff",
+      "ruta": "/dashboard/transferencias",
+      "titulo": "Transferencias",
+      "etiqueta": "Transferencias",
+      "espera": 2400
+    },
+    {
+      "tipo": "lamina",
+      "seccion": "04 · CONTROL",
+      "titulo": "El resultado, y quién hizo qué",
+      "puntos": [
+        "Ganancias por período",
+        "Auditoría inalterable",
+        "Roles y permisos"
+      ],
+      "espera": 4200
+    },
+    {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/ganancias?p=mes",
       "titulo": "Ganancias",
-      "texto": "Detalle por día, semana, mes o año. apertura paso a paso de como se arriba al resultado",
-      "espera": 5200,
-      "accion": "bajar-despacio"
+      "etiqueta": "Ganancias",
+      "espera": 3200
     },
     {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/admin/auditoria",
-      "titulo": "Trazabilidad",
-      "texto": "Quién hizo qué, y cuándo. Cada alta, corrección o borrado queda registrado con su autor y su hora.",
-      "espera": 4600
+      "titulo": "Auditoría",
+      "etiqueta": "Auditoría",
+      "espera": 2800
     },
     {
+      "tipo": "pantalla",
       "como": "staff",
-      "ruta": null,
-      "titulo": "Auditable",
-      "texto": "En una corrección se guardan los dos valores, el viejo y el nuevo. El registro no se puede editar ni borrar.",
-      "espera": 5000,
-      "accion": "bajar"
+      "ruta": "/dashboard/admin/usuarios",
+      "titulo": "Usuarios y roles",
+      "etiqueta": "Usuarios y roles",
+      "espera": 2400
     },
     {
-      "como": "staff",
-      "ruta": "/dashboard/mi-cuenta",
-      "titulo": "Mi cuenta",
-      "texto": "Cada usuario administra su propia contraseña. Nadie tiene que pedirla ni dictarla por teléfono.",
-      "espera": 5000
+      "tipo": "lamina",
+      "seccion": "05 · EL CLIENTE",
+      "titulo": "Consulta su cuenta desde su propio usuario",
+      "puntos": [
+        "Sin llamar por teléfono",
+        "Desde cualquier dispositivo",
+        "Solo ve lo suyo"
+      ],
+      "espera": 4200
+    },
+    {
+      "tipo": "pantalla",
+      "como": "cliente",
+      "ruta": "/dashboard/cuenta-corriente",
+      "titulo": "Portal del cliente",
+      "etiqueta": "Portal del cliente",
+      "espera": 3600,
+      "accion": "bajar-despacio"
     }
   ],
   "cierre": {
     "titulo": "Toda la operatoria en un solo lugar",
     "texto": "Sin planillas sueltas. Solución segura, trazable, escalable e Innovadora",
-    "espera": 4200
+    "espera": 6000
+  },
+  "tiempos": {
+    "leer": 1800,
+    "respirar": 500,
+    "salidaCartel": 300,
+    "tipeo": 250,
+    "trasIngresar": 900
   }
 }

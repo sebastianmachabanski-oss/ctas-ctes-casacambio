@@ -26,7 +26,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cargarCredenciales, ARCHIVO as ARCHIVO_CREDENCIALES } from './credenciales.mjs'
 import { leerGuion, ARCHIVO_GUION } from './leer-guion.mjs'
-import { mostrarPortada, mostrarCierre } from './laminas.mjs'
+import { mostrarPortada, mostrarCierre, mostrarLamina, mostrarEtiqueta } from './laminas.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const SALIDA = join(AQUI, 'salida')
@@ -511,6 +511,8 @@ async function cerrarSesion() {
 let sesion = null
 /** Si queda cargado, el recorrido se corta y se informa al final. */
 let fatal = null
+/** Si lo último que se dibujó fue una lámina, la pantalla siguiente hay que volver a pedirla. */
+let laminaEnPantalla = false
 
 try {
   await mostrarPortada(page, GUION, pausa)
@@ -536,21 +538,41 @@ try {
         sesion = quiere
       }
 
-      console.log(`→ ${n}  ${parada.titulo}`)
+      console.log(`→ ${n}  ${parada.seccion ? `[${parada.seccion}] ` : ''}${parada.titulo}`)
+
+      // Una LÁMINA no muestra la aplicación: anuncia la sección que viene. Se dibuja
+      // sobre la misma página, así que después hay que volver a pedir la pantalla aunque
+      // el navegador crea que ya está ahí.
+      if (parada.tipo === 'lamina') {
+        await mostrarLamina(page, { ...parada, espera: ESPERA_FIJA ?? parada.espera }, pausa)
+        laminaEnPantalla = true
+        continue
+      }
+
       // Se navega solo si hace falta. Cuando el ingreso ya dejó la pantalla pedida —el
       // cliente aterriza en su cuenta corriente, el administrador en Inicio— volver a
       // pedirla la cargaba DE NUEVO, y en el video se veía la misma pantalla armándose
       // dos veces seguidas antes de que apareciera el cartel.
-      if (parada.ruta && !yaEstamosEn(parada.ruta)) {
+      if (parada.ruta && (laminaEnPantalla || !yaEstamosEn(parada.ruta))) {
         await page.goto(`${URL_BASE}${parada.ruta}`, { waitUntil: 'networkidle', timeout: 45_000 })
         await pausa(RESPIRAR)
       }
-      await prepararCartel(page)
-      await mostrarCartel(page, parada.titulo, parada.texto)
-      await pausa(LEER)
+      laminaEnPantalla = false
+
+      // Dos maneras de presentar una pantalla, según para qué esté:
+      //  · con `texto`, el cartel grande de siempre, para lo que hay que explicar;
+      //  · con `etiqueta`, solo el nombre en un rincón, para las que pasan rápido
+      //    después de una lámina que ya dijo lo que se va a ver. Un cartel grande ahí
+      //    taparía justo lo que se quiere mostrar, y nadie llega a leerlo.
+      await mostrarEtiqueta(page, parada.etiqueta)
+      if (parada.texto) {
+        await prepararCartel(page)
+        await mostrarCartel(page, parada.titulo, parada.texto)
+        await pausa(LEER)
+      }
       if (parada.hacer) await parada.hacer(page)
       await pausa(ESPERA_FIJA ?? parada.espera ?? 2500)
-      await ocultarCartel(page)
+      if (parada.texto) await ocultarCartel(page)
     } catch (e) {
       if (e instanceof Fatal) { fatal = e; break }
       // Una parada que falla no se lleva puesta la grabación entera.
