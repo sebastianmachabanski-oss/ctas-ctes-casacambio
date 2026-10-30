@@ -6,7 +6,7 @@
  * No toca la base. Cubre el caso real del 5/10/2026: la cuenta EDY tenía dos ingresos de
  * U$S 5.000 el mismo día ("MATI RAFA" y "RAFA") y al borrar uno el saldo quedaba mal.
  */
-import { desempatar, sonIndistinguibles } from '../src/lib/diario'
+import { desempatar, sonIndistinguibles, hayColumnaVinculo, olvidarColumnaVinculo, sincronizarDiario } from '../src/lib/diario'
 
 let ok = 0
 const fallas: string[] = []
@@ -118,6 +118,55 @@ const fila = (id: string, evento: string | null, notas: string | null = null) =>
     { ...base, id: 'a', cc_dolares: -19300 },
     { ...base, id: 'b', cc_dolares: '-19300.00' as any },
   ]))
+}
+
+// ── 11. LA BASE SIN LA COLUMNA `vinculo` ───────────────────────────────────
+//     Cada cliente corre sus migraciones a mano, así que este código va a llegar a alguna
+//     base donde todavía no se corrió. Mandar una columna inexistente no deja la fila a
+//     medias: falla el INSERT ENTERO. Si eso pasara en el alta, el operador se quedaría sin
+//     poder cargar una transacción — mucho peor que el problema que todo esto arregla.
+//
+//     Se prueba con una base de mentira que contesta como contestaría PostgREST.
+{
+  const baseFalsa = (tieneColumna: boolean) => {
+    const escrito: Record<string, unknown>[] = []
+    const api: any = {
+      escrito,
+      from: () => api,
+      select: (cols: string) => {
+        // La pregunta por la columna: sin ella, PostgREST devuelve error.
+        if (cols === 'vinculo') {
+          return { limit: () => Promise.resolve(tieneColumna ? { error: null } : { error: { message: 'column diario.vinculo does not exist' } }) }
+        }
+        return { single: () => Promise.resolve({ data: { id: 'nueva' }, error: null }) }
+      },
+      insert: (fila: Record<string, unknown>) => { escrito.push(fila); return api },
+    }
+    return api
+  }
+
+  const cambios: any = {
+    fecha: '2026-10-30', cuenta_cte: 'EDY', operacion: 'INGRESAN',
+    concepto: 'DOLARES → DOLARES', moneda: 'DOLARES', monto: 100, cotizacion: null,
+    cc_pesos: 0, cc_dolares: -100, cc_euros: 0, cc_reales: 0, cc_usdt: 0, cc_libras: 0,
+    evento: null, notas: null, vinculo: 'uuid-del-alta',
+  }
+  const original: any = { tipo: 'CAJA', cliente: 'EDY', fecha: '2026-10-30', operacion: 'INGRESAN', monto: 100 }
+
+  olvidarColumnaVinculo()
+  const sin = baseFalsa(false)
+  asert('11a · sin la columna, la base dice que no', (await hayColumnaVinculo(sin)) === false)
+  await sincronizarDiario(sin, original, 'CTA CTE', cambios, 'prueba')
+  asert('11b · y la fila se escribe SIN el campo', !('vinculo' in sin.escrito[0]),
+    `se escribió ${JSON.stringify(Object.keys(sin.escrito[0] ?? {}))}`)
+  asert('11c · pero con todo lo demás', sin.escrito[0]?.cuenta_cte === 'EDY' && sin.escrito[0]?.monto === 100)
+
+  olvidarColumnaVinculo()
+  const con = baseFalsa(true)
+  asert('11d · con la columna, la base dice que sí', (await hayColumnaVinculo(con)) === true)
+  await sincronizarDiario(con, original, 'CTA CTE', cambios, 'prueba')
+  asert('11e · y la fila se escribe CON el vínculo', con.escrito[0]?.vinculo === 'uuid-del-alta')
+  olvidarColumnaVinculo()
 }
 
 console.log(fallas.length === 0

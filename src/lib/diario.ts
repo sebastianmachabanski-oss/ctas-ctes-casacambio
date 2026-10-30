@@ -36,6 +36,46 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * algo, porque ahí sí elegir mal cambia la plata de un cliente.
  */
 
+/**
+ * ¿La base ya tiene la columna `vinculo`?
+ *
+ * POR QUÉ SE PREGUNTA EN VEZ DE DARLO POR HECHO
+ * Cada cliente tiene SU base, y las migraciones las corre una persona a mano, una por una.
+ * O sea que el código nuevo va a llegar, sí o sí, a alguna base donde la migración todavía
+ * no se corrió. Si el alta mandara `vinculo` ahí, el insert fallaría entero y el operador
+ * no podría cargar una transacción: una mejora en el borrado dejaría la aplicación sin su
+ * función principal, que es muchísimo peor que el problema que vino a resolver.
+ *
+ * Preguntando, el código funciona igual antes y después de la migración: con la columna usa
+ * el vínculo, sin ella se comporta exactamente como la versión anterior. La migración deja
+ * de ser un paso bloqueante y pasa a ser una mejora que entra cuando entra.
+ *
+ * La respuesta se recuerda por proceso: es una consulta de una fila y cambia una sola vez
+ * en la vida de cada base.
+ */
+let columnaVinculo: Promise<boolean> | null = null
+
+export async function hayColumnaVinculo(supabase: SupabaseClient<any, any, any>): Promise<boolean> {
+  if (!columnaVinculo) {
+    // Ante un error de red no se concluye que la columna falta: se vuelve a preguntar la
+    // próxima vez. Recordar un "no" por un corte de red dejaría el vínculo apagado hasta
+    // el siguiente despliegue.
+    columnaVinculo = (async () => {
+      try {
+        const { error } = await supabase.from('diario').select('vinculo').limit(1)
+        return !error
+      } catch {
+        columnaVinculo = null
+        return false
+      }
+    })()
+  }
+  return columnaVinculo
+}
+
+/** Solo para las pruebas: olvida lo averiguado. */
+export function olvidarColumnaVinculo() { columnaVinculo = null }
+
 export type ResultadoDiario =
   | { estado: 'no_aplica' }            // el movimiento no es de cuenta corriente
   | { estado: 'ok'; id: string; porVinculo?: boolean; identicas?: number }
@@ -238,6 +278,22 @@ export type CambiosDiario = {
 }
 
 /**
+ * Los campos a escribir en `diario`, con el vínculo puesto solo si la base lo soporta.
+ *
+ * Mandar una columna que no existe no deja la fila a medias: falla el insert COMPLETO. Por
+ * eso el campo se saca en lugar de mandarlo en null.
+ */
+async function conVinculo(
+  supabase: SupabaseClient<any, any, any>,
+  cambios: CambiosDiario,
+  vinculo: string | null,
+): Promise<Record<string, unknown>> {
+  const { vinculo: _descartado, ...resto } = cambios
+  if (!(await hayColumnaVinculo(supabase))) return resto
+  return { ...resto, vinculo }
+}
+
+/**
  * Deja `diario` como corresponda cuando una edición puede cambiar el TIPO del movimiento.
  *
  * Cambiar CAJA ↔ CTA CTE no es editar un campo más: decide si el movimiento existe o no
@@ -266,8 +322,7 @@ export async function sincronizarDiario(
   // CAJA → CTA CTE: el movimiento pasa a tocar la cuenta del cliente y necesita su fila.
   // Nace con el vínculo del movimiento, así el borrado posterior no tiene que deducir nada.
   const { data, error } = await supabase.from('diario').insert({
-    ...cambios,
-    vinculo: cambios.vinculo ?? original.vinculo ?? null,
+    ...(await conVinculo(supabase, cambios, cambios.vinculo ?? original.vinculo ?? null)),
     tipo: 'CTA CTE',
     detalle: original.op ?? 'C',
     origen: original.origen ?? 'sheet',
@@ -291,7 +346,9 @@ export async function actualizarEnDiario(
   const encontrada = await buscarEnDiario(supabase, mov)
   if (encontrada.estado !== 'ok') return encontrada
 
-  const { error } = await supabase.from('diario').update(cambios).eq('id', encontrada.id)
+  const { error } = await supabase.from('diario')
+    .update(await conVinculo(supabase, cambios, cambios.vinculo ?? null))
+    .eq('id', encontrada.id)
   if (error) return { estado: 'error', error: error.message }
   return encontrada
 }

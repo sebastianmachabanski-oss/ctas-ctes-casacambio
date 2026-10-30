@@ -5,6 +5,7 @@ import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 import { registrarAuditoria, calcularHuella, describirMovimiento } from '@/lib/auditoria'
 import { esStaff } from '@/lib/roles'
 import { pareceCuentaCorriente, avisoCajaVsCtaCte } from '@/lib/caja-vs-ctacte'
+import { hayColumnaVinculo } from '@/lib/diario'
 
 export const maxDuration = 30
 
@@ -156,11 +157,18 @@ export async function POST(request: Request) {
   // de U$S 19.300 el mismo día en la misma cuenta, los dos sin referencia; al borrar uno,
   // la búsqueda encontró dos filas idénticas, no eligió ninguna y el saldo del cliente
   // siguió contando el movimiento borrado. Con el vínculo no hay nada que elegir.
-  const vinculo = randomUUID()
+  //
+  // Se pregunta si la base ya tiene la columna: cada cliente corre sus migraciones a mano,
+  // así que este código va a llegar a alguna base donde todavía no se corrió. Mandando una
+  // columna inexistente fallaría el alta ENTERA, y dejar al operador sin poder cargar una
+  // transacción sería mucho peor que el problema que esto arregla. Sin la columna, se
+  // comporta igual que la versión anterior.
+  const vinculo = (await hayColumnaVinculo(supabase)) ? randomUUID() : null
+  const conVinculo = vinculo ? { vinculo } : {}
 
   // Insert into Supabase
   const { error: insertError } = await supabase.from('diario').insert({
-    vinculo,
+    ...conVinculo,
     fecha,
     tipo,
     cuenta_cte,
@@ -195,7 +203,7 @@ export async function POST(request: Request) {
   // convivencia, el próximo sync full reemplaza esta fila por la copia que venga de la
   // planilla (idéntica si la escritura al Sheet salió bien) — sin duplicados.
   const { error: cajaError } = await supabase.from('movimientos_caja').insert({
-    vinculo,
+    ...conVinculo,
     fila_sheet: null,
     origen: involucraUsdt ? 'app' : 'sheet',
     // Marcador de transferencia: la pantalla lo pide como "Op" (C/T) y hasta ahora se
