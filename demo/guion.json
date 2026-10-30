@@ -44,7 +44,7 @@
     "titulo": "El sistema de la <b>casa de cambio</b>",
     "subtitulo": "Toda la operatoria en un solo lugar",
     "voz": "Un sistema pensado para una casa de cambio.",
-    "espera": 2000
+    "espera": 1800
   },
   "paradas": [
     {
@@ -54,7 +54,7 @@
       "titulo": "La caja del día",
       "etiqueta": "La caja del día",
       "voz": "La caja, en todas las monedas, al día.",
-      "espera": 2000
+      "espera": 1800
     },
     {
       "tipo": "pantalla",
@@ -63,7 +63,7 @@
       "titulo": "Cargar una operación",
       "etiqueta": "Cargar una operación",
       "voz": "Cada operación se carga en segundos, y se ve el impacto antes de guardar.",
-      "espera": 2000,
+      "espera": 1800,
       "accion": "cargar-operacion"
     },
     {
@@ -73,7 +73,7 @@
       "titulo": "Cuentas corrientes",
       "etiqueta": "Cuentas corrientes",
       "voz": "Las cuentas corrientes, con el saldo de cada cliente.",
-      "espera": 2000
+      "espera": 1800
     },
     {
       "tipo": "pantalla",
@@ -82,7 +82,7 @@
       "titulo": "El cliente, desde su usuario",
       "etiqueta": "El cliente, desde su usuario",
       "voz": "Que él mismo puede consultar, desde el teléfono.",
-      "espera": 2000
+      "espera": 1800
     },
     {
       "tipo": "pantalla",
@@ -91,7 +91,7 @@
       "titulo": "Transferencias",
       "etiqueta": "Transferencias",
       "voz": "Las transferencias, con su ganancia calculada.",
-      "espera": 2000
+      "espera": 1800
     },
     {
       "tipo": "pantalla",
@@ -100,7 +100,7 @@
       "titulo": "Ganancias",
       "etiqueta": "Ganancias",
       "voz": "Cuánto se ganó, por día, por semana o por mes.",
-      "espera": 2000
+      "espera": 1800
     },
     {
       "tipo": "pantalla",
@@ -109,7 +109,7 @@
       "titulo": "Auditoría",
       "etiqueta": "Auditoría",
       "voz": "Y quién hizo qué, registrado y sin poder alterarse.",
-      "espera": 2000
+      "espera": 1800
     },
     {
       "tipo": "lamina",
@@ -121,20 +121,20 @@
         "Desde el teléfono"
       ],
       "voz": "En la nube. En cualquier dispositivo.",
-      "espera": 2000
+      "espera": 1800
     }
   ],
   "cierre": {
     "titulo": "Tu operación, bajo control",
     "texto": "Caja, cuentas corrientes y resultados, en un solo lugar.",
     "voz": "Tu operación, bajo control.",
-    "espera": 2400
+    "espera": 2000
   },
   "tiempos": {
     "leer": 0,
-    "respirar": 400,
+    "respirar": 150,
     "salidaCartel": 0,
-    "palabrasPorMinuto": 145,
-    "respiroVoz": 500
+    "palabrasPorMinuto": 118,
+    "respiroVoz": 0
   }
 }
