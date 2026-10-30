@@ -141,11 +141,69 @@ después, todas las frases terminaban hablando sobre la pantalla siguiente.
 ```
 
 Con ese texto se genera la voz donde se prefiera —NotebookLM, o cualquier servicio de voz
-sintética— y el archivo se guarda como **`demo/narracion.mp3`**. `npm run mp4` lo mezcla
-solo.
+sintética— y el archivo se guarda como **`demo/narracion.mp3`** (también vale `.m4a`,
+`.wav` o `.ogg`). `npm run mp4` lo mezcla solo.
 
 El relato **no se repite ni se recorta**: dura lo que dura. Si sobra video al final, se ve
 la lámina de cierre en silencio, que es un final y no un error.
+
+#### El video sigue a la voz, no al revés
+
+**Si el archivo de voz ya está cuando se graba, el guion deja de decidir los tiempos.** El
+grabador mide la narración, encuentra en qué segundo arranca cada frase y le da a cada
+pantalla exactamente ese tramo.
+
+Esto no es un refinamiento: es lo único que sincroniza. Calcular la duración del texto
+—tantas palabras a tantas palabras por minuto— sirve para escribir el guion, pero la voz
+grabada no respeta ese cálculo. Una frase sale medio segundo más corta, la siguiente un
+segundo más larga, y como cada pantalla empezaba cuando terminaba la anterior, **los
+errores se sumaban**: a la quinta pantalla el relato ya hablaba de otra cosa, y el video
+terminaba mostrando cuentas corrientes mientras la voz decía el cierre.
+
+Siguiendo la voz, cada pantalla tiene su segundo FIJO. Una que tarde de más se come su
+propio tiempo y nada más: el desfasaje no pasa a la siguiente.
+
+Lo mismo vale para la carga: la pantalla se **pide antes** de que le toque, durante el
+final de la anterior, usando lo que tardó en el precalentado. Mientras el servidor
+contesta se sigue viendo la pantalla vieja, así que no hay parpadeo en blanco y las dos se
+ven su rato. Sin esto, contra una base de verdad —tres segundos por pantalla— una pantalla
+de tres segundos y medio se veía medio segundo.
+
+`npm run revisar` imprime el reparto medido ANTES de grabar:
+
+```
+  ── LA VOZ MEDIDA ─────────────────────────────────────────────────
+  narracion.m4a · 41,3 s de relato · 12 frases detectadas
+
+  Cada pantalla, en el segundo del video:
+
+       0,0 →    4,0 s   PORTADA                            4,0 s
+                           «Un sistema pensado para una casa de cambio.»
+       4,0 →    8,9 s   La caja del día                    4,9 s
+                           «La caja, en todas las monedas, al día.»
+  ...
+     EL VIDEO VA A DURAR                      42,2 s
+```
+
+**Conviene mirarlo.** El programa no entiende lo que dice la voz: empareja frases con
+renglones por orden y por largo. Si el texto que se le pasó al generador no es el que
+imprime `npm run revisar` —sobra una frase, falta otra, cambió el orden— el emparejamiento
+sale mal, y acá se ve en dos segundos en lugar de descubrirlo en el video.
+
+Si algo no cierra, el grabador lo dice y sigue con los tiempos calculados del texto, que no
+sincronizan pero tampoco mienten. Los casos: no hay archivo de voz, no está ffmpeg, alguna
+parada no tiene `voz` (con una pantalla muda en el medio no hay forma de saber cuándo
+termina), o la cantidad de frases no se puede repartir entre los renglones.
+
+Los números finos, en el bloque `tiempos` del guion:
+
+| | |
+|---|---|
+| `anticipoVoz` | cuánto antes de su frase aparece la pantalla (350 ms) |
+| `colitaVoz` | el silencio de cierre después de la última palabra (900 ms) |
+| `corteVoz` | el silencio que separa una frase de otra (600 ms) |
+| `minimoEnPantalla` | lo mínimo que algo se ve antes de pedir lo que sigue (1200 ms) |
+| `cojinVoz` | lo que se le suma a la carga medida, por las dudas (250 ms) |
 
 Si hay relato y música a la vez, la música baja al 6%: acompaña, no se escucha como
 música. Una música al mismo volumen que la voz obliga a esforzarse para entender, y quien

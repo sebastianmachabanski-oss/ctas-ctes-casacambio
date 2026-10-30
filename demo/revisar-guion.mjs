@@ -16,7 +16,8 @@
  * video, y se descubrirían recién al mirarlo.
  */
 import { leerGuion, duracionDeParada } from './leer-guion.mjs'
-import { join, dirname } from 'node:path'
+import { planDeVoz } from './pistas-voz.mjs'
+import { join, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { cargarCredenciales } from './credenciales.mjs'
@@ -182,10 +183,44 @@ if (conVoz.length) {
   }
 }
 
+// ── La voz grabada, si ya está ─────────────────────────────────────────────
+// Todo lo de arriba es un CÁLCULO: palabras divididas por palabras por minuto. Sirve para
+// escribir el guion, no para saber cómo va a quedar. En cuanto hay archivo de voz se puede
+// medir de verdad, y lo que vale es esto.
+//
+// Se imprime el reparto completo para poder controlarlo ANTES de grabar. El programa
+// empareja frases con renglones por orden y por largo, sin entender lo que dice la voz: si
+// el emparejamiento sale mal, acá se ve en dos segundos, y en el video se descubriría
+// después de grabar, convertir y mirar.
+const PLAN = await planDeVoz(guion, { dir: AQUI })
+if (PLAN?.aviso) {
+  console.log(`  ⚠️  Está ${basename(PLAN.archivo)} pero el video NO va a poder seguirlo:`)
+  console.log(`      ${PLAN.aviso.split('\n').join('\n      ')}\n`)
+} else if (PLAN) {
+  console.log(`  ── LA VOZ MEDIDA ─────────────────────────────────────────────────`)
+  console.log(`  ${basename(PLAN.archivo)} · ${seg(PLAN.duracion * 1000)} s de relato · ${PLAN.tramos.length} frases detectadas\n`)
+  console.log('  Cada pantalla, en el segundo del video:\n')
+  for (const r of PLAN.renglones) {
+    console.log(`    ${seg(r.aparece * 1000).padStart(6)} → ${seg(r.hasta * 1000).padStart(6)} s   ${String(r.titulo).padEnd(30)} ${seg(r.dura * 1000).padStart(5)} s`)
+    console.log(`                           «${r.voz}»`)
+  }
+  console.log(`\n     ${'EL VIDEO VA A DURAR'.padEnd(34)} ${seg(PLAN.fin * 1000).padStart(10)} s`)
+  console.log('     (lo manda la voz: los tiempos escritos en el guion quedan de lado)\n')
+  // Una pantalla con menos de un segundo pasa como un parpadeo, y encima si la carga tarda
+  // más que eso no llega a verse nada. Se avisa acá, donde todavía se puede alargar la frase.
+  const cortas = PLAN.renglones.filter(r => r.dura < 1.2 && r.parada !== undefined)
+  if (cortas.length) {
+    console.log(`  ⚠️  ${cortas.length} pantalla(s) duran menos de 1,2 s: van a pasar como un parpadeo.`)
+    for (const c of cortas) console.log(`       ${String(c.titulo).padEnd(30)} ${seg(c.dura * 1000)} s`)
+    console.log('      Alargá su "voz" en el guion y volvé a generar la narración.\n')
+  }
+}
+
 // ── El límite ──────────────────────────────────────────────────────────────
 const LIMITE = Number(process.env.DEMO_LIMITE || 45)
-if ((total + ingresos) / 1000 > LIMITE) {
-  console.log(`  ⚠️  Se pasa del límite de ${LIMITE} s por ${((total + ingresos) / 1000 - LIMITE).toFixed(0)} s.\n`)
+const duracionReal = PLAN && !PLAN.aviso ? PLAN.fin : (total + ingresos) / 1000
+if (duracionReal > LIMITE) {
+  console.log(`  ⚠️  Se pasa del límite de ${LIMITE} s por ${(duracionReal - LIMITE).toFixed(0)} s.\n`)
 }
 
 console.log(`
