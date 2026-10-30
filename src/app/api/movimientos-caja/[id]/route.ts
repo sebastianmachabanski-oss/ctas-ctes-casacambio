@@ -139,6 +139,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     // `notas` para los movimientos viejos.
     evento: notas?.trim() || null,
     notas: notas?.trim() || null,
+    // El vínculo se arrastra: es lo que va a permitir encontrar esta misma fila cuando se
+    // la borre. Editar no puede hacérselo perder.
+    vinculo: (original as any).vinculo ?? null,
   }, (profile as any)?.nombre ?? user.email ?? 'app')
   const avisoCtaCte = avisoDiario(rDiario, 'editar')
 

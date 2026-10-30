@@ -25,6 +25,9 @@ import { mkdirSync, existsSync, renameSync, readdirSync, readFileSync, statSync,
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cargarCredenciales, ARCHIVO as ARCHIVO_CREDENCIALES } from './credenciales.mjs'
+import { leerGuion, ARCHIVO_GUION, duracionDeParada } from './leer-guion.mjs'
+import { mostrarPortada, mostrarCierre, mostrarLamina, mostrarEtiqueta } from './laminas.mjs'
+import { planDeVoz } from './pistas-voz.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const SALIDA = join(AQUI, 'salida')
@@ -68,21 +71,6 @@ if (!USUARIO || !CLAVE) salir(
 // ── Tiempos ────────────────────────────────────────────────────────────────
 // Más lentos de lo que uno leería solo: el que mira el video no conoce la pantalla y
 // necesita ubicarse antes de que el cartel le diga qué mirar.
-const LEER = 3200      // cuánto queda un cartel en pantalla
-const RESPIRAR = 900   // pausa después de cada acción, para que no se vea atropellado
-
-/**
- * Le pone a TODAS las paradas la misma duración, sin tocar el guion.
- *
- *     $env:DEMO_ESPERA=8000
- *
- * Dar con el ritmo es cuestión de probar, y probar editando doce números a mano —y
- * volviéndolos atrás si no gustó— es tedioso. Con esto se graba, se mira, y si quedó
- * corto se cambia un número y se vuelve a grabar. Cuando el ritmo está, los valores
- * elegidos se escriben en el guion y se deja de usar la variable.
- */
-const ESPERA_FIJA = Number(process.env.DEMO_ESPERA) || null
-
 const pausa = ms => new Promise(r => setTimeout(r, ms))
 
 /**
@@ -132,16 +120,48 @@ const ACCIONES = {
   },
 }
 
-const GUION_ARCHIVO = join(AQUI, 'guion.json')
+const GUION = leerGuion()
 
-let GUION
-try {
-  GUION = JSON.parse(readFileSync(GUION_ARCHIVO, 'utf8'))
-} catch (e) {
-  salir(`No se pudo leer el guion (${GUION_ARCHIVO}):\n   ${e.message}\n\n`
-    + '   Suele ser una coma de más o de menos. Todos los bloques llevan coma al final\n'
-    + '   MENOS el último. No se grabó nada: el archivo anterior sigue intacto.')
-}
+/**
+ * Los tiempos que NO son de cada parada, sino el ritmo general.
+ *
+ * POR QUÉ ESTÁN ACÁ ABAJO Y SE PUEDEN CAMBIAR
+ * Se repiten en las diecisiete paradas, así que pesan más de lo que parece: con los
+ * valores de antes sumaban más tiempo que todos los carteles juntos. Quien mira el video
+ * no distingue "el cartel duró poco" de "la pantalla tardó en aparecer": percibe que el
+ * video es lento. Si esto no se puede ajustar, se termina acortando los textos —que es lo
+ * único visible— sin tocar lo que de verdad lo alarga.
+ *
+ * Se configuran en `guion.json`, en el bloque `tiempos`, en milésimas de segundo.
+ */
+const T = GUION.tiempos ?? {}
+
+/** Cuánto queda el cartel quieto antes de que empiece el movimiento de la parada. */
+const LEER = T.leer ?? 1800
+/** Pausa después de cambiar de pantalla, para que no se vea atropellado. */
+const RESPIRAR = T.respirar ?? 500
+/** Lo que tarda el cartel en desaparecer antes de pasar a la parada siguiente. */
+const SALIDA_CARTEL = T.salidaCartel ?? 300
+/** Lo mínimo que una pantalla tiene que quedar a la vista, aunque haya tardado en cargar. */
+const MINIMO_VISIBLE = T.minimoVisible ?? 700
+
+/** El ritmo del ingreso: lo que tarda en escribir el usuario y la clave. */
+const TIPEO = T.tipeo ?? 300
+/** La pausa después de entrar, con la pantalla ya cargada. */
+const TRAS_INGRESAR = T.trasIngresar ?? 1100
+
+/**
+ * Le pone a TODAS las paradas la misma duración, sin tocar el guion.
+ *
+ *     $env:DEMO_ESPERA=8000
+ *
+ * Dar con el ritmo es cuestión de probar, y probar editando doce números a mano —y
+ * volviéndolos atrás si no gustó— es tedioso. Con esto se graba, se mira, y si quedó
+ * corto se cambia un número y se vuelve a grabar. Cuando el ritmo está, los valores
+ * elegidos se escriben en el guion y se deja de usar la variable.
+ */
+const ESPERA_FIJA = Number(process.env.DEMO_ESPERA) || null
+
 
 const RECORRIDO = (GUION.paradas ?? []).map((p, i) => {
   if (p.accion && !ACCIONES[p.accion]) salir(
@@ -150,7 +170,23 @@ const RECORRIDO = (GUION.paradas ?? []).map((p, i) => {
   return { ...p, hacer: p.accion ? ACCIONES[p.accion] : undefined }
 })
 
-if (!RECORRIDO.length) salir(`El guion no tiene ninguna parada (${GUION_ARCHIVO}).`)
+if (!RECORRIDO.length) salir(`El guion no tiene ninguna parada (${ARCHIVO_GUION}).`)
+
+// ── El relato manda el ritmo ───────────────────────────────────────────────
+// Si está el archivo de voz, el video se arma siguiéndolo: cada pantalla aparece en el
+// segundo en que la voz empieza a hablar de ella. Ver demo/pistas-voz.mjs.
+//
+// Sin archivo de voz —o con DEMO_ESPERA puesta, que es un pedido explícito de otra cosa—
+// se vuelve al cálculo por palabras de antes. Sincroniza peor, pero sigue sirviendo para
+// probar el recorrido sin tener la voz todavía.
+const PLAN = ESPERA_FIJA ? null : await planDeVoz(GUION, { dir: AQUI })
+if (PLAN?.aviso) {
+  console.warn(`\n⚠️  Hay archivo de voz (${PLAN.archivo.split(/[/\\]/).pop()}) pero NO se puede seguir:`)
+  console.warn(`   ${PLAN.aviso}`)
+  console.warn('   Se graba con los tiempos calculados del texto, que no van a coincidir.\n')
+}
+/** El plan solo se usa si se pudo armar entero. */
+const VOZ = PLAN && !PLAN.aviso ? PLAN : null
 
 // ── Cartel sobreimpreso ────────────────────────────────────────────────────
 // Se dibuja DENTRO de la página porque Playwright graba lo que el navegador muestra: un
@@ -172,7 +208,7 @@ if (!RECORRIDO.length) salir(`El guion no tiene ninguna parada (${GUION_ARCHIVO}
  * Se declara en tres componentes sueltos y no como un color entero porque el fondo es un
  * degradado: el mismo color aparece opaco abajo y transparente arriba.
  */
-const FONDO = GUION.estilo?.fondo ?? '228,228,233'
+const FONDO = GUION.estilo?.fondo ?? '205,206,213'
 
 /**
  * El color del texto se deduce del fondo, salvo que el guion diga otra cosa.
@@ -256,7 +292,7 @@ async function mostrarCartel(page, titulo, texto) {
 
 async function ocultarCartel(page) {
   await page.evaluate(() => document.getElementById('demo-cartel')?.classList.remove('visible')).catch(() => {})
-  await pausa(500)
+  await pausa(SALIDA_CARTEL)
 }
 
 // ── Grabación ──────────────────────────────────────────────────────────────
@@ -266,11 +302,55 @@ async function ocultarCartel(page) {
 // antes de empezar.
 console.log(`
 🎬 Grabando contra ${URL_BASE}
-   guion:  ${GUION_ARCHIVO}
+   guion:  ${ARCHIVO_GUION}
    color:  fondo rgb(${FONDO}) · texto ${TEXTO}${GUION.estilo?.texto ? ' (fijado en el guion)' : ' (elegido según el fondo)'}
-   ritmo:  ${ESPERA_FIJA ? `${ESPERA_FIJA} ms en TODAS las paradas (DEMO_ESPERA)` : 'el de cada parada del guion'}
+   ritmo:  ${ESPERA_FIJA
+    ? `${ESPERA_FIJA} ms en TODAS las paradas (DEMO_ESPERA)`
+    : VOZ
+      ? `el del relato: ${VOZ.archivo.split(/[/\\]/).pop()}, ${VOZ.duracion.toFixed(1).replace('.', ',')} s medidos`
+      : 'calculado del texto (no hay archivo de voz en demo/)'}
    paradas: ${RECORRIDO.length}
 `)
+if (VOZ) {
+  // Se imprime el reparto antes de grabar. Es lo único que delata un emparejamiento
+  // equivocado sin tener que hacer el video y mirarlo.
+  console.log('   Cada pantalla, en el segundo del relato:\n')
+  for (const r of VOZ.renglones) {
+    console.log(`     ${r.aparece.toFixed(1).padStart(5)}s → ${r.hasta.toFixed(1).padStart(5)}s  ${String(r.titulo).padEnd(30)} «${r.voz}»`)
+  }
+  console.log('')
+}
+
+/**
+ * ¿Está la aplicación levantada?
+ *
+ * Sin esta comprobación, una app apagada se descubre recién después del precalentado y de
+ * que las diecisiete paradas fallen una por una: cuatro minutos de reintentos para llegar
+ * a un video vacío. Un pedido que tarda medio segundo lo dice antes de empezar.
+ *
+ * El motivo más frecuente no es que esté apagada sino que esté en OTRO PUERTO: Next se
+ * corre al 3001 cuando el 3000 está ocupado por un servidor anterior que no se cortó, y lo
+ * avisa en una sola línea del arranque que es fácil pasar por alto.
+ */
+async function comprobarQueEsteLevantada() {
+  try {
+    await fetch(`${URL_BASE}/login`, { signal: AbortSignal.timeout(8_000) })
+  } catch {
+    salir(
+      `No hay nada escuchando en ${URL_BASE}.\n\n`
+      + '   Levantá la aplicación en OTRA ventana:\n'
+      + '     cd ..\n'
+      + '     npm run dev\n\n'
+      + '   Y mirá la línea "Local:" que imprime al arrancar. Si dice 3001, quedó un\n'
+      + '   servidor anterior ocupando el 3000. En PowerShell se libera así:\n'
+      + '     Get-NetTCPConnection -LocalPort 3000 -State Listen |\n'
+      + '       ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }\n\n'
+      + '   O grabá contra el puerto que esté usando:\n'
+      + '     $env:DEMO_URL="http://localhost:3001"')
+  }
+}
+await comprobarQueEsteLevantada()
+
 mkdirSync(SALIDA, { recursive: true })
 
 const navegador = await chromium.launch({
@@ -320,6 +400,17 @@ const avisoClave = usuario =>
   + '   DOBLES y tiene un $, se interpreta como variable y llega cortada.\n'
   + "   Con comillas simples no pasa:  $env:DEMO_CLAVE='tu-clave'"
 
+/**
+ * Lo que tarda cada pantalla en aparecer, medido en el precalentado.
+ *
+ * NO se usa para calcular el ritmo —ese intento falló, está explicado en LA PAUSA ES LA
+ * VENTANA DE CARGA—. Se usa para avisar: si la pantalla más lenta tarda más que la pausa
+ * entre frases, las pantallas van a entrar metidas en su propia frase, y lo que hay que
+ * hacer es alargar la pausa. Es un número que conviene ver, aunque sea de arriba: contra
+ * la aplicación de verdad suele ser más grande de lo que uno supone.
+ */
+const CARGAS = new Map()
+
 async function precalentar() {
   const ctx = await navegador.newContext({ viewport: { width: 1600, height: 900 } })
   const p = await ctx.newPage()
@@ -339,7 +430,19 @@ async function precalentar() {
       for (const r of destinos) {
         await p.goto(`${URL_BASE}${r}`, { waitUntil: 'networkidle', timeout: 120_000 }).catch(() => {})
       }
+      // Segunda vuelta, YA COMPILADO y con el mismo criterio que usa la grabación. Esto es
+      // lo que tarda de verdad cada pantalla contra la base, y es el dato con el que se
+      // decide cuánto antes hay que pedirla. La primera vuelta no sirve para medir: incluye
+      // la compilación, que no se vuelve a pagar.
+      for (const r of destinos) {
+        const desde = Date.now()
+        await p.goto(`${URL_BASE}${r}`, { waitUntil: 'domcontentloaded', timeout: 120_000 }).catch(() => {})
+        CARGAS.set(r, Math.max(CARGAS.get(r) ?? 0, Date.now() - desde))
+      }
+      // Se guarda la sesión ya iniciada. Ver SESIONES, más abajo.
+      const guardado = await ctx.storageState()
       await ctx.clearCookies()
+      return guardado
     } catch (e) {
       // Que falle el precalentado no justifica abortar: se graba igual, más lento.
       console.warn(`   ⚠️  precalentado incompleto: ${e.message.split('\n')[0]}`)
@@ -347,16 +450,49 @@ async function precalentar() {
   }
 
   console.log('→ Precalentando las pantallas (no se graba)…')
-  await visitar(USUARIO, CLAVE, rutas)
-  if (HAY_CLIENTE) await visitar(CLIENTE_USUARIO, CLIENTE_CLAVE, ['/dashboard/cuenta-corriente'])
+  const staff = await visitar(USUARIO, CLAVE, rutas)
+  const cliente = HAY_CLIENTE
+    ? await visitar(CLIENTE_USUARIO, CLIENTE_CLAVE, ['/dashboard/cuenta-corriente'])
+    : null
   await ctx.close()
-  console.log('   listo\n')
+  if (CARGAS.size) {
+    const peor = [...CARGAS.entries()].sort((a, b) => b[1] - a[1])[0]
+    const s = n => (n / 1000).toFixed(1).replace('.', ',')
+    console.log(`   listo · la más lenta es ${peor[0]} con ${s(peor[1])} s de carga`)
+    const pausa = T.pausaEntreFrases ?? 0
+    if (VOZ && peor[1] > pausa) {
+      console.log(`\n   ⚠️  La pausa entre frases es de ${s(pausa)} s y esa pantalla tarda ${s(peor[1])} s.`)
+      console.log('      Va a entrar con la voz ya hablando. Para darle aire, subí')
+      console.log(`      "pausaEntreFrases" en el bloque "tiempos" del guion a ${s(Math.ceil(peor[1] / 100) * 100 + 300)} s o más`)
+      console.log('      y volvé a correr `npm run revisar`.')
+    }
+    console.log('')
+  } else {
+    console.log('   listo\n')
+  }
+  return { staff, cliente }
 }
 
-await precalentar()
+const SESIONES = await precalentar()
 
+/**
+ * SESIONES
+ *
+ * El contexto que graba arranca con la sesión del administrador YA iniciada, y el cambio
+ * al usuario del cliente se hace poniéndole las cookies de la otra sesión, no entrando de
+ * nuevo por la pantalla de ingreso.
+ *
+ * POR QUÉ
+ * Cada ingreso son cuatro o cinco segundos de video mirando un formulario que se llena
+ * solo. En un recorrido de dos minutos se tolera; en uno de cuarenta y cinco segundos son
+ * veinte por ciento del aviso gastados en algo que no muestra el producto.
+ *
+ * Las dos sesiones se consiguen en el precalentado, que no se graba. Si por lo que sea no
+ * se consiguieron, el recorrido entra por la pantalla de ingreso como antes.
+ */
 const contexto = await navegador.newContext({
   viewport: { width: 1600, height: 900 },
+  ...(SESIONES.staff ? { storageState: SESIONES.staff } : {}),
   recordVideo: { dir: SALIDA, size: { width: 1600, height: 900 } },
   locale: 'es-AR',
   timezoneId: 'America/Argentina/Buenos_Aires',
@@ -378,7 +514,108 @@ await contexto.addInitScript(css => {
   else document.addEventListener('DOMContentLoaded', poner, { once: true })
 }, OCULTAR_INDICADOR_DEV)
 
+/**
+ * EL SEGUNDO CERO DEL VIDEO.
+ *
+ * Playwright empieza a grabar al crear la página, así que este instante es el comienzo del
+ * archivo — y también el comienzo del relato, porque `npm run mp4` pega el audio desde el
+ * principio del video.
+ *
+ * Tener un cero común es lo que permite trabajar con momentos ABSOLUTOS en lugar de
+ * duraciones encadenadas, y es lo único que evita que los errores se sumen: cada pantalla
+ * tiene su segundo de aparición fijo, así que una que tarda de más no corre a las demás.
+ *
+ * Se toma ANTES de pedir la página y no después: `newPage()` tarda medio segundo en
+ * volver, y la cámara ya está grabando durante ese rato. Tomándolo después, todo el video
+ * quedaba medio segundo corrido respecto del audio — poco, pero del lado que se nota,
+ * porque la voz entraba antes que la imagen.
+ */
+const T0 = Date.now()
 const page = await contexto.newPage()
+
+/** Cuánto se corre el audio respecto del video, si hiciera falta. En general, nada. */
+const DESFASE = T.desfaseVoz ?? 0
+
+/**
+ * Espera hasta el segundo `cuando` del video. Devuelve lo que sobró —negativo si se
+ * llegó tarde—, que es el dato con el que se avisa al final.
+ */
+async function esperarHasta(cuando) {
+  const sobra = T0 + Math.round(cuando * 1000) + DESFASE - Date.now()
+  if (sobra > 0) await pausa(sobra)
+  return sobra
+}
+
+// ── LA PAUSA ES LA VENTANA DE CARGA ────────────────────────────────────────
+// La pantalla se pide EN CUANTO LA VOZ TERMINA DE HABLAR DE LA ANTERIOR, y mientras el
+// servidor contesta se sigue viendo la pantalla vieja. Cuando contesta, la nueva aparece —
+// durante el silencio que hay antes de su frase, que es justo cuando conviene que aparezca:
+// se la ve un momento en silencio y recién entonces la voz la explica.
+//
+// Esa pausa entre frases es la que da el aire, y se gradúa en el guion
+// (`tiempos.pausaEntreFrases`). Si la pausa alcanza para la carga, la pantalla llega a
+// horario; si no, entra un poco metida en su propia frase, que es el error chico.
+//
+// ── POR QUÉ NO SE ADELANTA SEGÚN LO QUE TARDA ──────────────────────────────
+// El intento anterior calculaba el adelanto con lo que había tardado cada pantalla en el
+// precalentado. Falló feo contra la aplicación de verdad: la medición del precalentado sale
+// MUCHO más lenta que la carga durante la grabación —la primera vez se paga la conexión a
+// la base, el caché frío, todo—, así que el adelanto quedaba enorme y la pantalla aparecía
+// SOLA, hasta cinco segundos antes de que la voz la nombrara. Se veía como que el video
+// "va todo más rápido".
+//
+// Predecir cuánto va a tardar algo que varía máquina por máquina y corrida por corrida es
+// la clase de cuenta que acierta en la máquina donde se probó. No predecir nada y empezar
+// cuando corresponde no puede adelantarse nunca: la pantalla aparece apenas puede, y el
+// error es siempre del lado chico.
+
+/**
+ * ¿La parada `i` va a tener que pedirle la pantalla al servidor?
+ *
+ * Si no —porque ya está en esa misma pantalla— no hay nada que adelantar, y adelantarlo
+ * igual le robaría tiempo a la anterior sin ganar nada.
+ */
+function pedirAlServidor(i) {
+  const p = RECORRIDO[i]
+  if (!p || p.tipo === 'lamina' || !p.ruta) return false
+  const anterior = RECORRIDO[i - 1]
+  if (!anterior) return true                                            // la primera
+  if (anterior.tipo === 'lamina') return true                           // la lámina tapó la página
+  if ((anterior.como ?? 'staff') !== (p.como ?? 'staff')) return true   // cambió el usuario
+  return anterior.ruta !== p.ruta
+}
+
+/**
+ * En qué segundo del video arrancar lo que viene después del compás `actual`.
+ *
+ *  · Si lo que sigue hay que PEDIRLE AL SERVIDOR, en cuanto la voz termina de hablar de lo
+ *    que se está viendo. Lo que tarde la carga transcurre durante el silencio.
+ *  · Si lo que sigue es instantáneo —una lámina, el cierre, o la misma pantalla de antes—,
+ *    recién un instante antes de su frase. Ponerlo apenas termina la frase anterior lo
+ *    dejaría un silencio entero en pantalla sin que nadie lo explique.
+ */
+function cuandoArranca(iSiguiente, actual) {
+  const proximo = VOZ.proximo(actual)
+  if (!proximo) return VOZ.fin
+  return pedirAlServidor(iSiguiente) ? actual.fin : proximo.aparece
+}
+
+/**
+ * Cuánto se vio de verdad cada cosa.
+ *
+ * Se mide de aparición a aparición y no por lo que se esperó: desde que las pantallas se
+ * piden antes de tiempo, la anterior sigue a la vista mientras la siguiente carga, y
+ * contarlo de otra manera informaría pantallas como invisibles cuando se vieron bien.
+ */
+let enPantalla = null
+function marcar(titulo, previsto, carga = 0) {
+  if (enPantalla?.carga) {
+    const visible = (Date.now() - enPantalla.desde) / 1000
+    if (visible < MINIMO_VISIBLE / 1000) lentas.push({ ...enPantalla, visible })
+  }
+  enPantalla = { parada: titulo, previsto, carga, desde: Date.now() }
+}
+
 let fallas = 0
 
 /**
@@ -398,9 +635,9 @@ async function entrar(usuario, clave) {
   // nombre de usuario y no con una dirección de correo, y el de la clave cambia de
   // `password` a `text` cuando se aprieta el ojito. Buscar por tipo falla en los dos casos.
   await page.locator('#email').fill(usuario)
-  await pausa(500)
+  await pausa(TIPEO)
   await page.locator('#password').fill(clave)
-  await pausa(500)
+  await pausa(TIPEO)
   await page.locator('button[type="submit"]').first().click()
 
   // El timeout es holgado por si el precalentado falló: en ese caso acá se paga la
@@ -412,7 +649,7 @@ async function entrar(usuario, clave) {
     + '   Suele ser la app compilando la pantalla por primera vez. Probá de nuevo:\n'
     + '   la segunda corrida encuentra todo compilado.')
 
-  await pausa(1800)
+  await pausa(TRAS_INGRESAR)
 }
 
 /**
@@ -444,15 +681,48 @@ async function cerrarSesion() {
   await contexto.clearCookies()
 }
 
-/** Con qué usuario estamos adentro ahora mismo. */
-let sesion = null
+/**
+ * La pantalla de presentación, antes de que se vea la aplicación.
+ *
+ * Arrancar directo en el login obliga al que mira a entender qué está viendo mientras ya
+ * están pasando cosas. Una portada que diga de qué se trata y qué incluye le da el mapa
+ * antes de empezar, y de paso da tiempo a que la música entre.
+ *
+ * Se dibuja en una página en blanco del mismo navegador —no hay una pantalla así en la
+ * aplicación— y se arma con los colores del cartel, para que no parezca de otro producto.
+ */
+/**
+ * El fondo de las dos pantallas de texto, la de entrada y la de salida.
+ *
+ * Es el MISMO de la pantalla de ingreso de la aplicación: así el video empieza y termina
+ * dentro del producto y no en dos láminas que podrían ser de cualquier otro.
+ */
+/** Con qué usuario estamos adentro ahora mismo. Si el precalentado dejó la sesión del
+ *  administrador puesta, el recorrido ya empieza adentro. */
+let sesion = SESIONES.staff ? 'staff' : null
 /** Si queda cargado, el recorrido se corta y se informa al final. */
 let fatal = null
+/** Si lo último que se dibujó fue una lámina, la pantalla siguiente hay que volver a pedirla. */
+let laminaEnPantalla = false
+/** Pantallas que tardaron más en cargar que lo que duraban: se informan al final. */
+const lentas = []
 
 try {
+  // Con relato, la portada no dura lo que dice el guion sino hasta que la voz empieza a
+  // hablar de la primera pantalla. Se le pasa espera 0 y se espera acá, contra el reloj
+  // del video.
+  const portada = VOZ?.de('portada')
+  await mostrarPortada(page, portada ? { ...GUION, portada: { ...GUION.portada, espera: 0 } } : GUION, pausa)
+  if (portada) {
+    marcar('PORTADA', portada.dura)
+    await esperarHasta(cuandoArranca(0, portada))
+  }
+
   // Recorrido
   for (const [i, parada] of RECORRIDO.entries()) {
     const n = `${i + 1}/${RECORRIDO.length}`
+    /** El renglón de relato de esta parada, cuando el ritmo lo manda la voz. */
+    const compas = VOZ?.porParada.get(i)
     try {
       // ¿Hay que cambiar de usuario para esta parada?
       const quiere = parada.como ?? 'staff'
@@ -462,30 +732,108 @@ try {
         continue
       }
       if (quiere !== sesion) {
-        console.log(`→ ${n}  Entrando como ${quiere}…`)
-        if (sesion !== null) await cerrarSesion()
-        await entrar(
-          quiere === 'cliente' ? CLIENTE_USUARIO : USUARIO,
-          quiere === 'cliente' ? CLIENTE_CLAVE : CLAVE,
-        )
+        const guardada = quiere === 'cliente' ? SESIONES.cliente : SESIONES.staff
+        if (guardada) {
+          // Se cambia de usuario poniendo las cookies de la otra sesión. No se ve nada:
+          // la pantalla siguiente ya aparece con el usuario nuevo.
+          console.log(`→ ${n}  Cambiando a ${quiere} (sin pasar por el ingreso)`)
+          await contexto.clearCookies()
+          await contexto.addCookies(guardada.cookies)
+          laminaEnPantalla = true   // obliga a volver a pedir la pantalla
+        } else {
+          console.log(`→ ${n}  Entrando como ${quiere}…`)
+          if (sesion !== null) await cerrarSesion()
+          await entrar(
+            quiere === 'cliente' ? CLIENTE_USUARIO : USUARIO,
+            quiere === 'cliente' ? CLIENTE_CLAVE : CLAVE,
+          )
+        }
         sesion = quiere
       }
 
-      console.log(`→ ${n}  ${parada.titulo}`)
+      console.log(`→ ${n}  ${parada.seccion ? `[${parada.seccion}] ` : ''}${parada.titulo}`)
+
+      // Una LÁMINA no muestra la aplicación: anuncia la sección que viene. Se dibuja
+      // sobre la misma página, así que después hay que volver a pedir la pantalla aunque
+      // el navegador crea que ya está ahí.
+      if (parada.tipo === 'lamina') {
+        await mostrarLamina(page, {
+          ...parada,
+          espera: compas ? 0 : ESPERA_FIJA ?? duracionDeParada(parada, T),
+        }, pausa)
+        laminaEnPantalla = true
+        if (compas) {
+          marcar(parada.titulo, compas.dura)
+          await esperarHasta(cuandoArranca(i + 1, compas))
+        }
+        continue
+      }
+
       // Se navega solo si hace falta. Cuando el ingreso ya dejó la pantalla pedida —el
       // cliente aterriza en su cuenta corriente, el administrador en Inicio— volver a
       // pedirla la cargaba DE NUEVO, y en el video se veía la misma pantalla armándose
       // dos veces seguidas antes de que apareciera el cartel.
-      if (parada.ruta && !yaEstamosEn(parada.ruta)) {
-        await page.goto(`${URL_BASE}${parada.ruta}`, { waitUntil: 'networkidle', timeout: 45_000 })
+      //
+      // EL RELOJ DE LA PARADA ARRANCA ACÁ, ANTES DE PEDIR LA PANTALLA.
+      //
+      // Este es el punto donde se arruinaba la sincronización con el relato. Antes se
+      // esperaba a que la pantalla cargara y RECIÉN AHÍ empezaba a contar su duración, así
+      // que lo que tardaba en cargar se sumaba por fuera. Contra una base de verdad eso
+      // son dos a cuatro segundos por pantalla: ocho pantallas convirtieron un video de
+      // 46 segundos en uno de 75, con el relato terminando treinta segundos antes que la
+      // imagen. En mi máquina no se veía, porque la aplicación de prueba responde al
+      // instante — el defecto solo aparecía con datos reales.
+      //
+      // Contando desde acá, la parada dura lo mismo en cualquier máquina: lo que tarde la
+      // carga se descuenta de su tiempo en pantalla, no se agrega al video.
+      const arranque = Date.now()
+
+      if (parada.ruta && (laminaEnPantalla || !yaEstamosEn(parada.ruta))) {
+        // `domcontentloaded` y no `networkidle`: la aplicación dibuja la pantalla en el
+        // servidor, así que cuando llega el documento YA se ve con sus datos. Esperar a
+        // que no quede ni un pedido en vuelo agrega segundos que no cambian lo que se ve
+        // —hay un sondeo periódico que nunca deja la red del todo quieta—.
+        await page.goto(`${URL_BASE}${parada.ruta}`, { waitUntil: 'domcontentloaded', timeout: 45_000 })
         await pausa(RESPIRAR)
       }
-      await prepararCartel(page)
-      await mostrarCartel(page, parada.titulo, parada.texto)
-      await pausa(LEER)
+      laminaEnPantalla = false
+      if (compas) marcar(parada.titulo, compas.dura, (Date.now() - arranque) / 1000)
+
+      // Dos maneras de presentar una pantalla, según para qué esté:
+      //  · con `texto`, el cartel grande de siempre, para lo que hay que explicar;
+      //  · con `etiqueta`, solo el nombre en un rincón, para las que pasan rápido
+      //    después de una lámina que ya dijo lo que se va a ver. Un cartel grande ahí
+      //    taparía justo lo que se quiere mostrar, y nadie llega a leerlo.
+      await mostrarEtiqueta(page, parada.etiqueta)
+      if (parada.texto) {
+        await prepararCartel(page)
+        await mostrarCartel(page, parada.titulo, parada.texto)
+        await pausa(LEER)
+      }
       if (parada.hacer) await parada.hacer(page)
-      await pausa(ESPERA_FIJA ?? parada.espera ?? 2500)
-      await ocultarCartel(page)
+
+      if (compas) {
+        // CON RELATO: se espera hasta el segundo del video en que arranca la frase
+        // siguiente. No se encadena ninguna duración, así que una pantalla lenta no corre
+        // a las que vienen: se come su propio tiempo y nada más.
+        //
+        // Tampoco se le garantiza un mínimo en pantalla, y es a propósito. Un mínimo acá
+        // volvería a correr todo lo que sigue —medio segundo por pantalla, ocho pantallas,
+        // y la voz otra vez hablando sobre la imagen equivocada—. Si una pantalla no llega
+        // a verse, el arreglo es alargar su frase en el guion, y para eso se avisa abajo.
+        await esperarHasta(cuandoArranca(i + 1, compas))
+      } else {
+        // SIN RELATO: lo que ya se consumió cargando y actuando se descuenta. El mínimo
+        // existe para que una pantalla lenta igual llegue a verse: mejor perder medio
+        // segundo de sincronía que mostrar un parpadeo.
+        const total = ESPERA_FIJA ?? duracionDeParada(parada, T)
+        const consumido = Date.now() - arranque
+        if (consumido > total) {
+          lentas.push({ parada: parada.titulo, visible: MINIMO_VISIBLE / 1000, previsto: total / 1000, carga: consumido / 1000 })
+        }
+        await pausa(Math.max(MINIMO_VISIBLE, total - consumido))
+      }
+      if (parada.texto) await ocultarCartel(page)
     } catch (e) {
       if (e instanceof Fatal) { fatal = e; break }
       // Una parada que falla no se lleva puesta la grabación entera.
@@ -494,11 +842,16 @@ try {
     }
   }
 
-  if (!fatal && GUION.cierre) {
-    await prepararCartel(page)
-    await mostrarCartel(page, GUION.cierre.titulo, GUION.cierre.texto)
-    await pausa(GUION.cierre.espera ?? 4200)
+  if (!fatal) {
+    // El cierre se queda hasta que termine la voz, más la colita de silencio. Así la
+    // última imagen del video es el mensaje final y no una pantalla cualquiera.
+    const cierre = VOZ?.de('cierre')
+    if (cierre) marcar('CIERRE', cierre.dura)
+    await mostrarCierre(page, cierre ? { ...GUION, cierre: { ...GUION.cierre, espera: 0 } } : GUION, pausa)
+    if (cierre) await esperarHasta(VOZ.fin)
   }
+  // Cierra la cuenta de la última cosa que quedó en pantalla.
+  marcar(null, 0)
 } finally {
   await contexto.close()   // recién acá Playwright escribe el archivo
   await navegador.close()
@@ -533,6 +886,20 @@ if (reciente !== destino) {
 // sabe cuál es cuál. Se van, porque el que vale ya tiene nombre.
 for (const f of readdirSync(SALIDA).filter(f => f.endsWith('.webm')).map(f => join(SALIDA, f))) {
   if (f !== destino) { try { unlinkSync(f) } catch {} }
+}
+
+if (lentas.length) {
+  const s = n => n.toFixed(1).replace('.', ',')
+  console.log(`\n⚠️  ${lentas.length} pantalla(s) tardaron MÁS en cargar que lo que les toca en el video.`)
+  console.log(VOZ
+    ? '   El relato NO se corre por eso —cada pantalla tiene su segundo fijo—, pero esas\n   se ven muy poco:\n'
+    : '   Se ven lo mínimo y el video se alarga, así que el relato se va corriendo:\n')
+  for (const l of lentas) {
+    console.log(`     ${String(l.parada).padEnd(30)} cargó en ${s(l.carga)} s · le tocaban ${s(l.previsto)} s · se vio ${s(l.visible)} s`)
+  }
+  console.log(VOZ
+    ? '\n   El arreglo es darle más relato a esa frase: alargá su "voz" en el guion,\n   volvé a generar la narración y grabá de nuevo.\n'
+    : '\n   Alargá esas paradas en el guion, o acortá el relato de esa frase.\n')
 }
 
 console.log(`

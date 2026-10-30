@@ -121,6 +121,192 @@ hay que cerrar y volver a abrir la terminal).
 El archivo sale en WebM porque es lo único que sabe grabar el navegador. WebM se ve bien
 en cualquier navegador, pero para mandarlo por WhatsApp o por correo conviene MP4.
 
+#### El relato
+
+El video va **relatado**: una voz cuenta lo que se ve. Cada parada del guion tiene su
+renglón en `voz`, y **ese texto decide cuánto dura la parada** — lo que tarda en decirse
+más un respiro. Al revés no funciona: fijando los tiempos a mano y escribiendo el texto
+después, todas las frases terminaban hablando sobre la pantalla siguiente.
+
+`npm run revisar` imprime el relato completo y seguido, listo para copiar:
+
+```
+  ── EL RELATO ─────────────────────────────────────────────────────
+  83 palabras · unos 34 s hablados
+
+  Un sistema pensado para una casa de cambio.
+  La caja, en todas las monedas, al día.
+  ...
+  ✓ Entra, con 9 s de aire repartidos entre las frases.
+```
+
+Con ese texto se genera la voz donde se prefiera —NotebookLM, o cualquier servicio de voz
+sintética— y el archivo se guarda como **`demo/narracion.mp3`** (también vale `.m4a`,
+`.wav` o `.ogg`). `npm run mp4` lo mezcla solo.
+
+El relato **no se repite ni se recorta**: dura lo que dura. Si sobra video al final, se ve
+la lámina de cierre en silencio, que es un final y no un error.
+
+#### El video sigue a la voz, no al revés
+
+**Si el archivo de voz ya está cuando se graba, el guion deja de decidir los tiempos.** El
+grabador mide la narración, encuentra en qué segundo arranca cada frase y le da a cada
+pantalla exactamente ese tramo.
+
+Esto no es un refinamiento: es lo único que sincroniza. Calcular la duración del texto
+—tantas palabras a tantas palabras por minuto— sirve para escribir el guion, pero la voz
+grabada no respeta ese cálculo. Una frase sale medio segundo más corta, la siguiente un
+segundo más larga, y como cada pantalla empezaba cuando terminaba la anterior, **los
+errores se sumaban**: a la quinta pantalla el relato ya hablaba de otra cosa, y el video
+terminaba mostrando cuentas corrientes mientras la voz decía el cierre.
+
+Siguiendo la voz, cada pantalla tiene su segundo FIJO. Una que tarde de más se come su
+propio tiempo y nada más: el desfasaje no pasa a la siguiente.
+
+#### Las pausas entre frases
+
+El relato generado viene pegado: una frase atrás de la otra con un segundo de aire. Para un
+video de pantallas eso queda apurado, por dos motivos distintos.
+
+- **La pantalla tarda en cargar.** Contra una base de verdad son dos o tres segundos. Con un
+  segundo de aire, la pantalla no llega a aparecer antes de que la voz empiece a hablar de
+  ella.
+- **Quien mira no conoce el sistema.** Una pantalla llena de números necesita un momento de
+  silencio para que el ojo la recorra antes de que le cuenten qué es.
+
+Las dos cosas se arreglan con el mismo número, en el bloque `tiempos` del guion:
+
+```json
+"pausaEntreFrases": 2200
+```
+
+El programa **estira los silencios del archivo de voz que ya está**, sin volver a
+generarlo. La voz no se altera —no se acelera, no se corta, no se vuelve a sintetizar—: se
+recortan los tramos hablados tal cual y se los pega con más silencio en el medio. Los
+silencios de ADENTRO de una frase no se tocan; estirarlos la haría sonar dictada.
+
+El archivo espaciado queda en `demo/salida/voz-con-pausas.wav` y se rehace solo cuando
+cambia algo. Es el que suena en el video y contra el que sincroniza el grabador.
+
+Para darle más aire a una pantalla en particular, se le pone su propio número — se suma a
+la pausa general y vale para el silencio que va DESPUÉS de su frase:
+
+```json
+{ "titulo": "Auditoría", "voz": "...", "pausaDespues": 800 }
+```
+
+Así es como se alarga el video: con 2,2 s de pausa, 41 s de relato se vuelven 52 s de
+video, y cada pantalla pasa de tres segundos y medio a entre cuatro y siete.
+
+#### La carga entra en la pausa
+
+La pantalla se pide **en cuanto la voz termina de hablar de la anterior**, y mientras el
+servidor contesta se sigue viendo la pantalla vieja. Cuando contesta, la nueva aparece
+durante el silencio — que es justo cuando conviene: se la ve un momento callada y recién
+entonces la voz la explica.
+
+Por eso la pausa tiene que ser **más larga que la pantalla más lenta**. El precalentado las
+mide y el grabador avisa si no alcanza:
+
+```
+   listo · la más lenta es /dashboard/cuenta-corriente con 3,0 s de carga
+
+   ⚠️  La pausa entre frases es de 2,2 s y esa pantalla tarda 3,0 s.
+      Va a entrar con la voz ya hablando.
+```
+
+**No se intenta adivinar cuánto va a tardar cada pantalla para adelantarse.** Se probó y
+salió mal: la medición del precalentado da mucho más lenta que la carga real durante la
+grabación —la primera vez se paga la conexión a la base y el caché frío—, así que el
+adelanto quedaba enorme y la pantalla aparecía **sola, hasta cinco segundos antes** de que
+la voz la nombrara. Se veía como que el video va todo apurado. Empezando cuando
+corresponde, la pantalla no puede adelantarse nunca: aparece apenas puede, y el error
+siempre es del lado chico.
+
+`npm run revisar` imprime el reparto medido ANTES de grabar:
+
+```
+  ── LA VOZ MEDIDA ─────────────────────────────────────────────────
+  narracion.m4a · 41,3 s de relato · 12 frases detectadas
+
+  Cada pantalla, en el segundo del video:
+
+       0,0 →    4,0 s   PORTADA                            4,0 s
+                           «Un sistema pensado para una casa de cambio.»
+       4,0 →    8,9 s   La caja del día                    4,9 s
+                           «La caja, en todas las monedas, al día.»
+  ...
+     EL VIDEO VA A DURAR                      42,2 s
+```
+
+**Conviene mirarlo.** El programa no entiende lo que dice la voz: empareja frases con
+renglones por orden y por largo. Si el texto que se le pasó al generador no es el que
+imprime `npm run revisar` —sobra una frase, falta otra, cambió el orden— el emparejamiento
+sale mal, y acá se ve en dos segundos en lugar de descubrirlo en el video.
+
+#### Cuando el reparto sale mal: `npm run frases`
+
+Pasó, y costó tres grabaciones descubrirlo: el generador de voz **reescribió el texto**.
+Unió dos renglones en una sola frase y agregó dos palabras sueltas que no estaban en el
+guion. El reparto automático no tenía manera de saberlo, así que corrió todo y una pantalla
+se quedó siete segundos mientras la voz ya hablaba de otra cosa.
+
+Deducirlo mejor no tiene arreglo: sin entender el audio no hay forma. Lo que sí tiene
+arreglo es poder comprobarlo:
+
+```powershell
+npm run frases
+```
+
+Deja en `demo/salida/frases/` cada frase del audio en su propio archivo, numerada, y
+imprime a qué renglón le tocó cada una. Se escuchan de a una —son dos segundos cada una— y
+se ve enseguida cuál no está donde debería.
+
+Marca con `← revisar` los renglones cuyo tiempo no da para decir ese texto. Ese aviso es
+fuerte: si a nueve palabras les tocaron nueve décimas de segundo, no es que quedó justo, es
+que esa frase no es la suya.
+
+Una vez visto, se clava en el guion cuántas frases ocupa cada renglón:
+
+```json
+{ "titulo": "Auditoría", "voz": "...", "frases": 2 }
+```
+
+Con `frases` puesto el reparto deja de ser una deducción y pasa a ser un dato. Los números
+tienen que sumar la cantidad de frases que detectó. Los renglones sin `frases` se reparten
+lo que sobre.
+
+Si la voz dice algo bastante distinto del guion, lo que corresponde es **poner el guion de
+acuerdo con lo que la voz dice** —es el texto que se va a escuchar— o generar la voz de
+nuevo con el texto tal cual lo imprime `npm run revisar`.
+
+Si algo no cierra, el grabador lo dice y sigue con los tiempos calculados del texto, que no
+sincronizan pero tampoco mienten. Los casos: no hay archivo de voz, no está ffmpeg, alguna
+parada no tiene `voz` (con una pantalla muda en el medio no hay forma de saber cuándo
+termina), o la cantidad de frases no se puede repartir entre los renglones.
+
+Los números finos, en el bloque `tiempos` del guion:
+
+| | |
+|---|---|
+| `pausaEntreFrases` | el silencio entre una frase y la siguiente (2200 ms) |
+| `anticipoVoz` | cuánto antes de su frase entra una lámina o el cierre (350 ms) |
+| `colitaVoz` | el silencio de cierre después de la última palabra (900 ms) |
+| `corteVoz` | a partir de qué silencio se considera que terminó una frase (600 ms) |
+| `frases` (por parada) | cuántas frases del audio ocupa ese renglón. Lo clava. |
+
+Y en cada parada, `pausaDespues`: lo que se le suma a la pausa general después de esa.
+
+Si hay relato y música a la vez, la música baja al 6%: acompaña, no se escucha como
+música. Una música al mismo volumen que la voz obliga a esforzarse para entender, y quien
+mira un aviso de cuarenta y cinco segundos no se esfuerza: lo cierra.
+
+```powershell
+$env:DEMO_VOLUMEN_VOZ=1.3       # la voz, más fuerte
+$env:DEMO_VOLUMEN_MUSICA=0.04   # la música, más baja
+npm run mp4
+```
+
 #### La música
 
 Poné un archivo llamado **`musica.mp3`** en la carpeta `demo` y volvé a correr
@@ -136,6 +322,11 @@ npm run mp4
 ```
 
 El valor por defecto es `0.18`, o sea el 18% del volumen original.
+
+La música se prepara antes de mezclarla: se le recortan los silencios de las dos puntas y
+las vueltas se encadenan con un cruce de dos segundos. Sin eso, una pista más corta que el
+video frena, hace un bache y vuelve a arrancar en cada vuelta — porque casi toda la música
+empieza y termina con silencio, y al repetirla esos dos silencios quedan pegados.
 
 ⚠️ **La música no viene incluida, a propósito.** Tiene dueño: subir un archivo al
 repositorio sería repartir algo cuya licencia no conocemos. Hay bibliotecas de música
@@ -169,6 +360,34 @@ Cada parada es un bloque como este:
 | `como` | con qué usuario: `"staff"` (el administrador) o `"cliente"` |
 | `accion` | opcional: `"bajar"`, `"bajar-despacio"` o `"cargar-operacion"` |
 
+### Dos clases de parada
+
+**Lámina de sección** (`"tipo": "lamina"`) — anuncia lo que viene. No muestra la
+aplicación:
+
+```json
+{
+  "tipo": "lamina",
+  "seccion": "01 · OPERACIÓN DIARIA",
+  "titulo": "La caja, siempre al día",
+  "puntos": ["Todas las monedas", "Carga en segundos", "Impacto a la vista"],
+  "espera": 4200
+}
+```
+
+**Pantalla** — muestra la aplicación. Con `etiqueta` aparece solo el nombre en un rincón,
+para las que pasan rápido después de una lámina; con `texto`, el cartel grande de abajo,
+para lo que hay que explicar.
+
+```json
+{ "ruta": "/dashboard/inicio", "etiqueta": "Inicio", "espera": 3000 }
+```
+
+Está armado así porque el video recorría diecisiete pantallas seguidas, cada una con su
+explicación: quien ya conoce el sistema lo seguía, quien no lo había visto nunca se
+perdía. Partido en secciones, cada una se anuncia primero y después se ve rápido — y las
+pantallas pueden pasar mucho más rápido justamente porque ya le dijeron qué va a ver.
+
 **Para cambiar un texto**, cambiá lo que está entre comillas y guardá. Listo.
 
 **Para sacar una parada**, borrá su bloque entre llaves. **Para agregar una**, copiá uno
@@ -193,8 +412,42 @@ el video.
 Leer el recorrido seguido ayuda a notar lo que parada por parada no se ve: dos carteles
 que dicen casi lo mismo, o una transición que falta.
 
-Si el archivo quedó mal escrito, el grabador también avisa antes de empezar y **no graba
-nada**: el video anterior queda intacto.
+Si quedó un dedazo, cualquiera de los tres comandos te muestra **el renglón**, con los de
+alrededor y una marca debajo del carácter exacto:
+
+```
+❌ El guion está mal escrito.
+   Renglón 189, columna 7:
+
+     187 |       "ruta": "/dashboard/transferencias",
+     188 |       "titulo": "Transferencias"
+   > 189 |       "texto": "Registro de las transferencias",
+         |       ^
+```
+
+Ojo: **el problema suele estar en el renglón marcado o en el anterior.** Una coma que
+falta se nota recién al leer el renglón siguiente — en el ejemplo, lo que falta es la coma
+al final del 188.
+
+Y no graba nada: el video anterior queda intacto.
+
+### La pantalla de presentación
+
+El video abre con una portada que dice de qué se trata y lista las funcionalidades, para
+que el que mira tenga el mapa antes de que empiecen a pasar cosas. Está en `guion.json`,
+en el bloque `portada`:
+
+```json
+"portada": {
+  "titulo": "Sistema para Casa de Cambio",
+  "subtitulo": "Toda la operatoria en un solo lugar",
+  "puntos": ["Caja en todas las monedas, al instante", "…"],
+  "espera": 9000
+}
+```
+
+`puntos` se acomoda solo en dos columnas. Para que el video arranque directo en la
+aplicación, se borra el bloque entero.
 
 ### El color del cartel
 
@@ -212,7 +465,8 @@ transparente arriba.
 
 | Números | Color |
 |---|---|
-| `228,228,233` | gris claro (el actual) |
+| `205,206,213` | gris claro (el actual) |
+| `228,228,233` | un poco más claro |
 | `200,200,206` | gris claro un poco más apagado |
 | `245,245,245` | casi blanco |
 | `113,113,122` | gris medio |

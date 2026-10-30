@@ -26,6 +26,8 @@ DEMO_CLAVE=la-clave-del-administrador
 DEMO_CLIENTE_USUARIO=cliente@ejemplo.com
 DEMO_CLIENTE_CLAVE=Demo1234!
 
-# Opcional: le pone la misma duración a TODAS las paradas, para probar el ritmo sin
-# editar el guion. Borrá o comentá esta línea para usar los tiempos de cada parada.
-DEMO_ESPERA=8000
+# Opcional, y por eso viene APAGADA: le pone la misma duración a TODAS las paradas
+# y hace que los tiempos escritos en el guion se ignoren. Sirve para tantear un ritmo
+# de una sola pasada; dejarla prendida sin querer alarga el video y confunde, porque
+# uno ajusta el guion y el video no cambia.
+# DEMO_ESPERA=8000
