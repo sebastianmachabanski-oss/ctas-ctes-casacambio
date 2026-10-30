@@ -14,16 +14,31 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * pantalla, que es lo peor de todo — nadie tenía cómo enterarse.
  *
  * COMO SE ENCUENTRA LA FILA GEMELA
- * Las dos tablas no comparten un id: `diario` es anterior y el sync regenera los uuid en
- * cada corrida full, así que un vínculo por id no sobreviviría. Se identifica por
- * CONTENIDO, con el mismo criterio que la limpieza de la planilla: solo se toca si la
- * coincidencia es UNICA. Con cero o con varias no se adivina — se informa y que lo
- * resuelva una persona.
+ * Por `vinculo`: un uuid que el alta escribe IGUAL en las dos tablas. Es un dato, no una
+ * deducción, y es lo único que identifica la fila sin ambigüedad posible.
+ *
+ * Para lo cargado antes del 30/10/2026 —y para lo que trae el sync desde la planilla, que
+ * no tiene cómo saber el vínculo— se cae a la búsqueda por CONTENIDO de siempre: cuenta +
+ * fecha + operación + monto, desempatando por referencia. Esa búsqueda no es confiable
+ * cuando el contenido se repite, y de ahí salió el `vinculo`:
+ *
+ *   30/10/2026, producción. Se cargaron DOS ingresos de U$S 19.300 el mismo día en la misma
+ *   cuenta, los dos sin referencia. Al borrar uno, la búsqueda por contenido encontró dos
+ *   filas idénticas en `diario`, no se animó a elegir y no borró ninguna: el movimiento
+ *   desapareció del listado y el saldo del cliente siguió contándolo. La referencia, que es
+ *   lo que desempata desde el 7/10, acá no servía porque las dos estaban vacías.
+ *
+ * CUANDO EL EMPATE ES ENTRE FILAS IDÉNTICAS
+ * Se toca una. No es adivinar: si las dos filas dicen exactamente lo mismo —mismo importe,
+ * misma moneda, mismas patas, misma referencia—, son intercambiables y borrar cualquiera de
+ * las dos deja el mismo saldo. Negarse ahí no es prudencia: deja el saldo MAL, que es
+ * precisamente lo que se quería evitar. Se sigue avisando cuando las candidatas DIFIEREN en
+ * algo, porque ahí sí elegir mal cambia la plata de un cliente.
  */
 
 export type ResultadoDiario =
   | { estado: 'no_aplica' }            // el movimiento no es de cuenta corriente
-  | { estado: 'ok'; id: string }
+  | { estado: 'ok'; id: string; porVinculo?: boolean; identicas?: number }
   | { estado: 'no_encontrada' }
   | { estado: 'multiple'; candidatas: number }
   | { estado: 'error'; error: string }
@@ -40,12 +55,58 @@ export type Movimiento = {
    * desempatar cuando el contenido deja más de una candidata (ver `desempatar`).
    */
   notas?: string | null
+  /** El uuid compartido con la fila de `diario`. Null en lo anterior al 30/10/2026. */
+  vinculo?: string | null
 }
 
 const esCtaCte = (m: Movimiento) => (m.tipo ?? '').toUpperCase() === 'CTA CTE'
 
-/** Fila de `diario` con lo necesario para desempatar. */
-type Candidata = { id: string; evento: string | null; notas: string | null }
+/** Fila de `diario` con lo necesario para desempatar y para comparar entre sí. */
+type Candidata = {
+  id: string
+  evento: string | null
+  notas: string | null
+  [campo: string]: unknown
+}
+
+/**
+ * Los campos que tienen que coincidir para considerar dos filas INTERCAMBIABLES.
+ *
+ * No están todos: `id`, `creado_por` y `creado_at` quedan afuera a propósito. Dos ingresos
+ * iguales cargados por dos personas distintas siguen siendo la misma plata, y el saldo no
+ * distingue quién los cargó. Lo que entra es lo que se ve y lo que mueve el saldo.
+ *
+ * La cuenta, la fecha, la operación y el monto no están porque ya vienen fijados por la
+ * búsqueda: todas las candidatas los comparten por definición.
+ */
+const CAMPOS_COMPARABLES = [
+  'concepto', 'detalle', 'moneda', 'cotizacion', 'origen', 'evento', 'notas',
+  'cc_pesos', 'cc_dolares', 'cc_euros', 'cc_reales', 'cc_usdt', 'cc_libras',
+] as const
+
+/** Una huella del contenido de la fila, para comparar candidatas entre sí. */
+function huellaFila(c: Candidata): string {
+  return CAMPOS_COMPARABLES.map(campo => {
+    const v = c[campo]
+    if (v === null || v === undefined || v === '') return ''
+    // Los importes llegan como number o como string según el driver: se comparan por valor,
+    // no por texto, o "0" y "0.00" parecerían filas distintas.
+    const n = Number(v)
+    return Number.isFinite(n) && typeof v !== 'boolean' ? String(n) : String(v).trim().toUpperCase()
+  }).join('\u0001')
+}
+
+/**
+ * ¿Son todas la misma fila repetida?
+ *
+ * Si lo son, cualquiera sirve y se puede tocar una sin riesgo. Si alguna difiere en algo,
+ * elegir al azar cambiaría la plata de un cliente y corresponde avisar.
+ */
+export function sonIndistinguibles(candidatas: Candidata[]): boolean {
+  if (candidatas.length < 2) return true
+  const primera = huellaFila(candidatas[0])
+  return candidatas.every(c => huellaFila(c) === primera)
+}
 
 /** Normaliza una referencia para comparar: sin espacios de sobra y sin distinguir mayúsculas. */
 const normRef = (s: string | null | undefined) => (s ?? '').trim().toUpperCase()
@@ -89,9 +150,23 @@ export async function buscarEnDiario(
 ): Promise<ResultadoDiario> {
   if (!esCtaCte(mov)) return { estado: 'no_aplica' }
 
+  // 1. POR VÍNCULO. Es un dato guardado, no una deducción: si está, no hay nada que
+  //    decidir. Solo lo tienen las filas que cargó la app desde el 30/10/2026.
+  if (mov.vinculo) {
+    const { data, error } = await supabase
+      .from('diario').select('id').eq('vinculo', mov.vinculo).eq('anulado', false)
+    if (error) return { estado: 'error', error: error.message }
+    const porVinculo = (data ?? []) as { id: string }[]
+    if (porVinculo.length) return { estado: 'ok', id: porVinculo[0].id, porVinculo: true }
+    // Sin resultado NO se corta: el sync pudo haber regenerado la fila desde la planilla
+    // y ahí el vínculo se pierde. Se sigue con la búsqueda de siempre.
+  }
+
+  // 2. POR CONTENIDO, como antes del vínculo. Se traen los campos comparables para poder
+  //    decidir después si las candidatas son la misma fila repetida.
   const { data, error } = await supabase
     .from('diario')
-    .select('id, evento, notas')
+    .select(`id, evento, notas, ${CAMPOS_COMPARABLES.join(', ')}`)
     .eq('tipo', 'CTA CTE')
     .eq('anulado', false)
     .eq('cuenta_cte', mov.cliente ?? '')
@@ -100,16 +175,31 @@ export async function buscarEnDiario(
     .eq('monto', Number(mov.monto))
 
   if (error) return { estado: 'error', error: error.message }
-  const filas = (data ?? []) as Candidata[]
+  // `unknown` en el medio porque la lista de columnas se arma desde CAMPOS_COMPARABLES y
+  // el tipado de Supabase solo entiende un select escrito a mano. Repetir las columnas
+  // acá para contentarlo sería peor: la lista quedaría en dos lugares y la próxima que se
+  // agregue se olvidaría en uno de los dos, que es exactamente el error que esto arregla.
+  const filas = (data ?? []) as unknown as Candidata[]
   if (filas.length === 0) return { estado: 'no_encontrada' }
   if (filas.length === 1) return { estado: 'ok', id: filas[0].id }
 
-  // Empate: dos o más filas con el mismo contenido. La referencia suele distinguirlas.
+  // 3. Empate: dos o más filas con el mismo contenido. La referencia suele distinguirlas.
   const finalistas = desempatar(filas, mov.notas)
   if (finalistas.length === 1) return { estado: 'ok', id: finalistas[0].id }
 
-  // Sigue sin poder decidirse: se informa el empate ORIGINAL y no se toca nada. Con cero
-  // o con varias no se adivina — es plata de un cliente.
+  // 4. Sigue empatado. Si las filas son LA MISMA repetida, se toca una: son
+  //    intercambiables y el saldo queda igual se elija la que se elija. Negarse acá es lo
+  //    que dejó el saldo mal el 30/10/2026.
+  const empatadas = finalistas.length > 1 ? finalistas : filas
+  if (sonIndistinguibles(empatadas)) {
+    // Se ordena por id para que la elección sea siempre la misma: dos corridas sobre los
+    // mismos datos tienen que hacer lo mismo, si no un problema no se puede reproducir.
+    const elegida = [...empatadas].sort((a, b) => a.id.localeCompare(b.id))[0]
+    return { estado: 'ok', id: elegida.id, identicas: empatadas.length }
+  }
+
+  // 5. Difieren en algo y la referencia no alcanzó. Acá sí elegir mal cambia la plata de
+  //    un cliente: se informa el empate ORIGINAL y no se toca nada.
   return { estado: 'multiple', candidatas: filas.length }
 }
 
@@ -143,6 +233,8 @@ export type CambiosDiario = {
   cc_libras: number
   evento: string | null
   notas: string | null
+  /** Se arrastra al editar para que la fila no pierda el vínculo con su gemela. */
+  vinculo?: string | null
 }
 
 /**
@@ -172,8 +264,10 @@ export async function sincronizarDiario(
   if (era && !es) return borrarDeDiario(supabase, original)
 
   // CAJA → CTA CTE: el movimiento pasa a tocar la cuenta del cliente y necesita su fila.
+  // Nace con el vínculo del movimiento, así el borrado posterior no tiene que deducir nada.
   const { data, error } = await supabase.from('diario').insert({
     ...cambios,
+    vinculo: cambios.vinculo ?? original.vinculo ?? null,
     tipo: 'CTA CTE',
     detalle: original.op ?? 'C',
     origen: original.origen ?? 'sheet',
@@ -204,7 +298,15 @@ export async function actualizarEnDiario(
 
 /** Aviso para el operador cuando la fila de cuenta corriente no se pudo tocar. */
 export function avisoDiario(r: ResultadoDiario, accion: 'borrar' | 'editar'): string | null {
-  if (r.estado === 'ok' || r.estado === 'no_aplica') return null
+  if (r.estado === 'no_aplica') return null
+  if (r.estado === 'ok') {
+    // Se hizo lo correcto, así que no es una advertencia. Pero que haya movimientos
+    // repetidos en una cuenta es algo que conviene saber: casi siempre es una carga
+    // duplicada sin querer, y nadie la mira si nadie la nombra.
+    if (!r.identicas) return null
+    const q = accion === 'borrar' ? 'se quitó uno' : 'se actualizó uno'
+    return `Ojo: en la cuenta corriente había ${r.identicas} movimientos idénticos (misma fecha, misma operación y mismo importe). ${q}, que es lo que corresponde. Si los demás también están de más, borralos desde el listado.`
+  }
   const que = accion === 'borrar' ? 'se borró' : 'se editó'
   if (r.estado === 'no_encontrada') {
     return `El movimiento ${que}, pero no se encontró su registro en la cuenta corriente. Verificá el saldo de la cuenta.`

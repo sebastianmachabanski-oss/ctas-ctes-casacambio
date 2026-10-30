@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
@@ -145,8 +146,21 @@ export async function POST(request: Request) {
   // entre conservar el saldo USDT de la cuenta corriente y perderlo en la próxima corrida.
   const involucraUsdt = monedaNorm === 'USDT' || mapMoneda(String(externo)) === 'USDT'
 
+  // EL VÍNCULO ENTRE LAS DOS TABLAS (30/10/2026).
+  //
+  // El mismo uuid en la fila de `diario` y en la de `movimientos_caja`. No cambia nada de
+  // lo que se ve: existe para que BORRAR y EDITAR después puedan encontrar la fila gemela
+  // sin deducirla del contenido.
+  //
+  // La deducción fallaba justo cuando más importaba. En producción se cargaron dos ingresos
+  // de U$S 19.300 el mismo día en la misma cuenta, los dos sin referencia; al borrar uno,
+  // la búsqueda encontró dos filas idénticas, no eligió ninguna y el saldo del cliente
+  // siguió contando el movimiento borrado. Con el vínculo no hay nada que elegir.
+  const vinculo = randomUUID()
+
   // Insert into Supabase
   const { error: insertError } = await supabase.from('diario').insert({
+    vinculo,
     fecha,
     tipo,
     cuenta_cte,
@@ -181,6 +195,7 @@ export async function POST(request: Request) {
   // convivencia, el próximo sync full reemplaza esta fila por la copia que venga de la
   // planilla (idéntica si la escritura al Sheet salió bien) — sin duplicados.
   const { error: cajaError } = await supabase.from('movimientos_caja').insert({
+    vinculo,
     fila_sheet: null,
     origen: involucraUsdt ? 'app' : 'sheet',
     // Marcador de transferencia: la pantalla lo pide como "Op" (C/T) y hasta ahora se
