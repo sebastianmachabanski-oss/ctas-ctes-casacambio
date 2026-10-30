@@ -141,6 +141,9 @@ const LEER = T.leer ?? 1800
 const RESPIRAR = T.respirar ?? 500
 /** Lo que tarda el cartel en desaparecer antes de pasar a la parada siguiente. */
 const SALIDA_CARTEL = T.salidaCartel ?? 300
+/** Lo mínimo que una pantalla tiene que quedar a la vista, aunque haya tardado en cargar. */
+const MINIMO_VISIBLE = T.minimoVisible ?? 700
+
 /** El ritmo del ingreso: lo que tarda en escribir el usuario y la clave. */
 const TIPEO = T.tipeo ?? 300
 /** La pausa después de entrar, con la pantalla ya cargada. */
@@ -536,6 +539,8 @@ let sesion = SESIONES.staff ? 'staff' : null
 let fatal = null
 /** Si lo último que se dibujó fue una lámina, la pantalla siguiente hay que volver a pedirla. */
 let laminaEnPantalla = false
+/** Pantallas que tardaron más en cargar que lo que duraban: se informan al final. */
+const lentas = []
 
 try {
   await mostrarPortada(page, GUION, pausa)
@@ -586,8 +591,27 @@ try {
       // cliente aterriza en su cuenta corriente, el administrador en Inicio— volver a
       // pedirla la cargaba DE NUEVO, y en el video se veía la misma pantalla armándose
       // dos veces seguidas antes de que apareciera el cartel.
+      //
+      // EL RELOJ DE LA PARADA ARRANCA ACÁ, ANTES DE PEDIR LA PANTALLA.
+      //
+      // Este es el punto donde se arruinaba la sincronización con el relato. Antes se
+      // esperaba a que la pantalla cargara y RECIÉN AHÍ empezaba a contar su duración, así
+      // que lo que tardaba en cargar se sumaba por fuera. Contra una base de verdad eso
+      // son dos a cuatro segundos por pantalla: ocho pantallas convirtieron un video de
+      // 46 segundos en uno de 75, con el relato terminando treinta segundos antes que la
+      // imagen. En mi máquina no se veía, porque la aplicación de prueba responde al
+      // instante — el defecto solo aparecía con datos reales.
+      //
+      // Contando desde acá, la parada dura lo mismo en cualquier máquina: lo que tarde la
+      // carga se descuenta de su tiempo en pantalla, no se agrega al video.
+      const arranque = Date.now()
+
       if (parada.ruta && (laminaEnPantalla || !yaEstamosEn(parada.ruta))) {
-        await page.goto(`${URL_BASE}${parada.ruta}`, { waitUntil: 'networkidle', timeout: 45_000 })
+        // `domcontentloaded` y no `networkidle`: la aplicación dibuja la pantalla en el
+        // servidor, así que cuando llega el documento YA se ve con sus datos. Esperar a
+        // que no quede ni un pedido en vuelo agrega segundos que no cambian lo que se ve
+        // —hay un sondeo periódico que nunca deja la red del todo quieta—.
+        await page.goto(`${URL_BASE}${parada.ruta}`, { waitUntil: 'domcontentloaded', timeout: 45_000 })
         await pausa(RESPIRAR)
       }
       laminaEnPantalla = false
@@ -604,7 +628,15 @@ try {
         await pausa(LEER)
       }
       if (parada.hacer) await parada.hacer(page)
-      await pausa(ESPERA_FIJA ?? duracionDeParada(parada, T))
+
+      // Lo que ya se consumió cargando y actuando se descuenta. El mínimo existe para que
+      // una pantalla lenta igual llegue a verse: mejor perder medio segundo de sincronía
+      // que mostrar un parpadeo.
+      const total = ESPERA_FIJA ?? duracionDeParada(parada, T)
+      const consumido = Date.now() - arranque
+      const resta = Math.max(MINIMO_VISIBLE, total - consumido)
+      if (consumido > total) lentas.push({ parada: parada.titulo, carga: consumido, previsto: total })
+      await pausa(resta)
       if (parada.texto) await ocultarCartel(page)
     } catch (e) {
       if (e instanceof Fatal) { fatal = e; break }
@@ -649,6 +681,15 @@ if (reciente !== destino) {
 // sabe cuál es cuál. Se van, porque el que vale ya tiene nombre.
 for (const f of readdirSync(SALIDA).filter(f => f.endsWith('.webm')).map(f => join(SALIDA, f))) {
   if (f !== destino) { try { unlinkSync(f) } catch {} }
+}
+
+if (lentas.length) {
+  console.log(`\n⚠️  ${lentas.length} pantalla(s) tardaron MÁS en cargar que lo que duran en el video.`)
+  console.log('   Se ven lo mínimo y el video se alarga, así que el relato se va corriendo:\n')
+  for (const l of lentas) {
+    console.log(`     ${String(l.parada).padEnd(30)} cargó en ${(l.carga / 1000).toFixed(1)} s · tenía ${(l.previsto / 1000).toFixed(1)} s`)
+  }
+  console.log('\n   Alargá esas paradas en el guion, o acortá el relato de esa frase.\n')
 }
 
 console.log(`
