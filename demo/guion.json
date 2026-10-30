@@ -14,6 +14,10 @@
     "                      pausa que viene después. `npm run revisar` muestra el reparto.",
     "  pausaDespues      — silencio EXTRA después de esa frase, para las pantallas que",
     "                      necesitan mirarse más rato. Se suma a 'pausaEntreFrases'.",
+    "  frases            — cuántas frases del audio ocupa este renglón. Lo CLAVA, para",
+    "                      cuando la voz no dice exactamente el texto de acá. Se",
+    "                      comprueba con `npm run frases`, que corta el audio en",
+    "                      frases sueltas y dice a quién le tocó cada una.",
     "",
     "PARA QUE EL VIDEO VAYA MÁS DESPACIO se sube 'pausaEntreFrases' (abajo, en",
     "'tiempos'). Estira los silencios del archivo de voz sin volver a generarlo, así",
@@ -52,7 +56,8 @@
   "portada": {
     "titulo": "El sistema de la <b>casa de cambio</b>",
     "subtitulo": "Toda la operatoria en un solo lugar",
-    "voz": "Un sistema pensado para una casa de cambio.",
+    "voz": "Un sistema pensado para la gestión integral de una casa de cambio.",
+    "frases": 1,
     "espera": 1800
   },
   "paradas": [
@@ -62,7 +67,8 @@
       "ruta": "/dashboard/inicio",
       "titulo": "La caja del día",
       "etiqueta": "La caja del día",
-      "voz": "La caja, en todas las monedas, al día.",
+      "voz": "En una pantalla, la situación de caja de cada moneda y los últimos movimientos.",
+      "frases": 1,
       "espera": 1800
     },
     {
@@ -72,6 +78,7 @@
       "titulo": "Cargar una operación",
       "etiqueta": "Cargar una operación",
       "voz": "Cada operación se carga en segundos, y se ve el impacto antes de guardar.",
+      "frases": 1,
       "espera": 1800,
       "accion": "cargar-operacion"
     },
@@ -81,7 +88,8 @@
       "ruta": "/dashboard/cuenta-corriente",
       "titulo": "Cuentas corrientes",
       "etiqueta": "Cuentas corrientes",
-      "voz": "Las cuentas corrientes, con el saldo de cada cliente.",
+      "voz": "Las cuentas corrientes, con el saldo de cada cliente,",
+      "frases": 1,
       "espera": 1800
     },
     {
@@ -90,7 +98,8 @@
       "ruta": "/dashboard/cuenta-corriente",
       "titulo": "El cliente, desde su usuario",
       "etiqueta": "El cliente, desde su usuario",
-      "voz": "Que él mismo puede consultar, desde el teléfono.",
+      "voz": "que él mismo puede consultar desde su teléfono.",
+      "frases": 1,
       "espera": 1800
     },
     {
@@ -100,6 +109,7 @@
       "titulo": "Transferencias",
       "etiqueta": "Transferencias",
       "voz": "Las transferencias, con su ganancia calculada.",
+      "frases": 1,
       "espera": 1800
     },
     {
@@ -108,7 +118,8 @@
       "ruta": "/dashboard/ganancias?p=mes",
       "titulo": "Ganancias",
       "etiqueta": "Ganancias",
-      "voz": "Cuánto se ganó, por día, por semana o por mes.",
+      "voz": "Cuánto se ganó, por día, por semana, por mes.",
+      "frases": 1,
       "espera": 1800
     },
     {
@@ -117,7 +128,8 @@
       "ruta": "/dashboard/admin/auditoria",
       "titulo": "Auditoría",
       "etiqueta": "Auditoría",
-      "voz": "Y quién hizo qué, registrado y sin poder alterarse.",
+      "voz": "Quién hizo cada operación, registrado y sin poder alterarse. Seguro.",
+      "frases": 2,
       "espera": 1800
     },
     {
@@ -129,7 +141,8 @@
         "Sin instalar nada",
         "Desde el teléfono"
       ],
-      "voz": "En la nube. En cualquier dispositivo.",
+      "voz": "Trazable. En la nube. En cualquier dispositivo.",
+      "frases": 3,
       "espera": 1800
     }
   ],
@@ -137,6 +150,7 @@
     "titulo": "Tu operación, bajo control",
     "texto": "Caja, cuentas corrientes y resultados, en un solo lugar.",
     "voz": "Tu operación, bajo control.",
+    "frases": 1,
     "espera": 2000
   },
   "tiempos": {
@@ -145,6 +159,7 @@
     "salidaCartel": 0,
     "palabrasPorMinuto": 118,
     "respiroVoz": 0,
-    "pausaEntreFrases": 2200
+    "pausaEntreFrases": 2000,
+    "corteVoz": 350
   }
 }

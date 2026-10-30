@@ -65,15 +65,15 @@ export function compasesDelGuion(GUION) {
   const compases = []
   const mudas = []
   if (GUION.portada) {
-    if (GUION.portada.voz) compases.push({ clave: 'portada', voz: GUION.portada.voz, titulo: 'PORTADA', pausaDespues: GUION.portada.pausaDespues })
+    if (GUION.portada.voz) compases.push({ clave: 'portada', voz: GUION.portada.voz, titulo: 'PORTADA', pausaDespues: GUION.portada.pausaDespues, frases: GUION.portada.frases })
     else mudas.push('la portada')
   }
   ;(GUION.paradas ?? []).forEach((p, i) => {
-    if (p.voz) compases.push({ clave: i, parada: i, voz: p.voz, titulo: p.titulo ?? `parada ${i + 1}`, pausaDespues: p.pausaDespues })
+    if (p.voz) compases.push({ clave: i, parada: i, voz: p.voz, titulo: p.titulo ?? `parada ${i + 1}`, pausaDespues: p.pausaDespues, frases: p.frases })
     else mudas.push(`la parada ${i + 1} ("${p.titulo ?? ''}")`)
   })
   if (GUION.cierre) {
-    if (GUION.cierre.voz) compases.push({ clave: 'cierre', voz: GUION.cierre.voz, titulo: 'CIERRE', pausaDespues: GUION.cierre.pausaDespues })
+    if (GUION.cierre.voz) compases.push({ clave: 'cierre', voz: GUION.cierre.voz, titulo: 'CIERRE', pausaDespues: GUION.cierre.pausaDespues, frases: GUION.cierre.frases })
     else mudas.push('el cierre')
   }
   return { compases, mudas }
@@ -148,10 +148,30 @@ export async function tramosDeVoz(archivo, { ruido = -35, detecta = 0.18, corte 
  * un renglón de catorce palabras tiene que quedarse con más segundos que uno de cuatro. Se
  * prueban todos los repartos (son pocos) y gana el de menor error total.
  */
+/** Cuántas oraciones tiene un renglón. La voz hace una pausa entera en cada punto. */
+export function contarOraciones(texto) {
+  return Math.max(1, (texto.trim().match(/[^.!?…]+[.!?…]*/g) ?? []).filter(t => t.trim()).length)
+}
+
 export function emparejar(tramos, compases) {
   const N = tramos.length
   const M = compases.length
-  if (N < M) return { error: `la voz tiene ${N} frase(s) y el guion ${M} renglón(es)` }
+
+  // Cuántas frases del audio le tocan a cada renglón. `frases` en el guion lo CLAVA; si no
+  // está, el piso son sus oraciones —la voz hace una pausa entera en cada punto, así que un
+  // renglón con dos oraciones nunca puede ocupar una sola frase— y el techo queda libre.
+  const piso = compases.map(c => Math.max(1, c.frases ?? contarOraciones(c.voz)))
+  const techo = compases.map(c => c.frases ?? N)
+  const minimo = piso.reduce((a, b) => a + b, 0)
+
+  if (N < minimo) return {
+    error: `la voz tiene ${N} frase(s) y el guion necesita al menos ${minimo}`,
+    detalle: compases.map((c, j) => ({ titulo: c.titulo, piso: piso[j], fijo: c.frases !== undefined })),
+  }
+  const maximo = techo.reduce((a, b) => a + b, 0)
+  if (N > maximo) return {
+    error: `la voz tiene ${N} frase(s) y los "frases" del guion suman ${maximo}`,
+  }
 
   const palabras = compases.map(c => c.voz.trim().split(/\s+/).filter(Boolean).length)
   const totalPalabras = palabras.reduce((a, b) => a + b, 0)
@@ -164,9 +184,11 @@ export function emparejar(tramos, compases) {
   const vieneDe = Array.from({ length: M + 1 }, () => new Array(N + 1).fill(-1))
   costo[0][0] = 0
   for (let j = 1; j <= M; j++) {
-    for (let i = j; i <= N - (M - j); i++) {
-      for (let k = j - 1; k < i; k++) {
+    for (let i = 1; i <= N; i++) {
+      for (let k = 0; k < i; k++) {
         if (costo[j - 1][k] === INF) continue
+        const cuantas = i - k
+        if (cuantas < piso[j - 1] || cuantas > techo[j - 1]) continue
         let suma = 0
         for (let x = k; x < i; x++) suma += habla[x]
         const c = costo[j - 1][k] + Math.abs(suma - esperado[j - 1])
@@ -187,7 +209,21 @@ export function emparejar(tramos, compases) {
       inicio: tramos[bordes[j]].inicio,
       fin: tramos[bordes[j + 1] - 1].fin,
       tramos: bordes[j + 1] - bordes[j],
+      oraciones: contarOraciones(c.voz),
+      palabras: palabras[j],
       esperado: esperado[j],
+      // Lo mínimo que tarda cualquiera en decir ese texto. 260 palabras por minuto es más
+      // rápido que un locutor apurado: por debajo de eso no es que quedó justo, es que el
+      // reparto le asignó una frase que no es la suya.
+      minimoHumano: palabras[j] / 260 * 60,
+      // El tiempo HABLADO, sin los silencios de adentro. Un renglón que ocupa tres frases
+      // abarca dos silencios de un segundo que no son voz: midiéndolo de punta a punta
+      // parecería que le sobra tiempo y se lo marcaría como mal repartido estando bien.
+      habla: habla.slice(bordes[j], bordes[j + 1]).reduce((a, b) => a + b, 0),
+      // Qué tan lejos quedó de lo que haría falta para decir ese texto. Es lo que delata
+      // un reparto equivocado sin tener que escuchar: una frase de diecisiete sílabas no
+      // se dice en nueve décimas, y si el reparto dice que sí, el reparto está mal.
+      holgura: habla.slice(bordes[j], bordes[j + 1]).reduce((a, b) => a + b, 0) - esperado[j],
     })),
   }
 }

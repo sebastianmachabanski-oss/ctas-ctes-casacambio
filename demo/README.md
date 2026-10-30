@@ -244,6 +244,42 @@ renglones por orden y por largo. Si el texto que se le pasó al generador no es 
 imprime `npm run revisar` —sobra una frase, falta otra, cambió el orden— el emparejamiento
 sale mal, y acá se ve en dos segundos en lugar de descubrirlo en el video.
 
+#### Cuando el reparto sale mal: `npm run frases`
+
+Pasó, y costó tres grabaciones descubrirlo: el generador de voz **reescribió el texto**.
+Unió dos renglones en una sola frase y agregó dos palabras sueltas que no estaban en el
+guion. El reparto automático no tenía manera de saberlo, así que corrió todo y una pantalla
+se quedó siete segundos mientras la voz ya hablaba de otra cosa.
+
+Deducirlo mejor no tiene arreglo: sin entender el audio no hay forma. Lo que sí tiene
+arreglo es poder comprobarlo:
+
+```powershell
+npm run frases
+```
+
+Deja en `demo/salida/frases/` cada frase del audio en su propio archivo, numerada, y
+imprime a qué renglón le tocó cada una. Se escuchan de a una —son dos segundos cada una— y
+se ve enseguida cuál no está donde debería.
+
+Marca con `← revisar` los renglones cuyo tiempo no da para decir ese texto. Ese aviso es
+fuerte: si a nueve palabras les tocaron nueve décimas de segundo, no es que quedó justo, es
+que esa frase no es la suya.
+
+Una vez visto, se clava en el guion cuántas frases ocupa cada renglón:
+
+```json
+{ "titulo": "Auditoría", "voz": "...", "frases": 2 }
+```
+
+Con `frases` puesto el reparto deja de ser una deducción y pasa a ser un dato. Los números
+tienen que sumar la cantidad de frases que detectó. Los renglones sin `frases` se reparten
+lo que sobre.
+
+Si la voz dice algo bastante distinto del guion, lo que corresponde es **poner el guion de
+acuerdo con lo que la voz dice** —es el texto que se va a escuchar— o generar la voz de
+nuevo con el texto tal cual lo imprime `npm run revisar`.
+
 Si algo no cierra, el grabador lo dice y sigue con los tiempos calculados del texto, que no
 sincronizan pero tampoco mienten. Los casos: no hay archivo de voz, no está ffmpeg, alguna
 parada no tiene `voz` (con una pantalla muda en el medio no hay forma de saber cuándo
@@ -257,6 +293,7 @@ Los números finos, en el bloque `tiempos` del guion:
 | `anticipoVoz` | cuánto antes de su frase entra una lámina o el cierre (350 ms) |
 | `colitaVoz` | el silencio de cierre después de la última palabra (900 ms) |
 | `corteVoz` | a partir de qué silencio se considera que terminó una frase (600 ms) |
+| `frases` (por parada) | cuántas frases del audio ocupa ese renglón. Lo clava. |
 
 Y en cada parada, `pausaDespues`: lo que se le suma a la pausa general después de esa.
 
