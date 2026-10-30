@@ -2,7 +2,7 @@
   "_leeme": [
     "ESTE ES EL GUION DEL VIDEO. Se edita acá, no en el programa.",
     "",
-    "El video dura 45 segundos y está RELATADO: cada parada tiene su renglón de",
+    "El video dura unos 52 segundos y está RELATADO: cada parada tiene su renglón de",
     "relato en 'voz'. `npm run revisar` imprime el texto completo, listo para",
     "copiar y pegar en el generador de voz.",
     "",
@@ -10,13 +10,19 @@
     "  voz               — lo que se dice mientras se ve esa pantalla",
     "  espera            — cuánto dura, en milésimas de segundo. OJO: si ya está el",
     "                      archivo de la voz en demo/, NO SE USA. El video sigue a la",
-    "                      voz: cada pantalla dura lo que dura su frase grabada, y eso",
-    "                      se mide del audio. `npm run revisar` muestra el reparto.",
+    "                      voz: cada pantalla dura lo que dura su frase grabada más la",
+    "                      pausa que viene después. `npm run revisar` muestra el reparto.",
+    "  pausaDespues      — silencio EXTRA después de esa frase, para las pantallas que",
+    "                      necesitan mirarse más rato. Se suma a 'pausaEntreFrases'.",
+    "",
+    "PARA QUE EL VIDEO VAYA MÁS DESPACIO se sube 'pausaEntreFrases' (abajo, en",
+    "'tiempos'). Estira los silencios del archivo de voz sin volver a generarlo, así",
+    "que cada pantalla se ve más rato y la carga tiene tiempo de terminar.",
     "  ruta              — qué pantalla mostrar. null = quedarse en la de antes",
     "  tipo: 'lamina'    — no muestra la aplicación: es una placa de texto",
     "",
-    "La regla de oro de los 45 segundos: si una parada no se puede explicar en",
-    "un renglón de relato, no entra.",
+    "La regla de oro: si una parada no se puede explicar en un renglón de relato,",
+    "no entra. El largo se gradúa con las pausas, no agregando frases.",
     "",
     "Si el archivo queda mal escrito, cualquier comando avisa en qué renglón."
   ],
@@ -138,6 +144,7 @@
     "respirar": 150,
     "salidaCartel": 0,
     "palabrasPorMinuto": 118,
-    "respiroVoz": 0
+    "respiroVoz": 0,
+    "pausaEntreFrases": 2200
   }
 }

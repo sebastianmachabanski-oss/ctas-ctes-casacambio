@@ -401,9 +401,13 @@ const avisoClave = usuario =>
   + "   Con comillas simples no pasa:  $env:DEMO_CLAVE='tu-clave'"
 
 /**
- * Lo que tarda cada pantalla en aparecer, MEDIDO, no estimado.
+ * Lo que tarda cada pantalla en aparecer, medido en el precalentado.
  *
- * Sirve para empezar a pedirla antes de que le toque. Ver PEDIR ANTES, más abajo.
+ * NO se usa para calcular el ritmo —ese intento falló, está explicado en LA PAUSA ES LA
+ * VENTANA DE CARGA—. Se usa para avisar: si la pantalla más lenta tarda más que la pausa
+ * entre frases, las pantallas van a entrar metidas en su propia frase, y lo que hay que
+ * hacer es alargar la pausa. Es un número que conviene ver, aunque sea de arriba: contra
+ * la aplicación de verdad suele ser más grande de lo que uno supone.
  */
 const CARGAS = new Map()
 
@@ -453,7 +457,16 @@ async function precalentar() {
   await ctx.close()
   if (CARGAS.size) {
     const peor = [...CARGAS.entries()].sort((a, b) => b[1] - a[1])[0]
-    console.log(`   listo · la más lenta es ${peor[0]} con ${(peor[1] / 1000).toFixed(1).replace('.', ',')} s de carga\n`)
+    const s = n => (n / 1000).toFixed(1).replace('.', ',')
+    console.log(`   listo · la más lenta es ${peor[0]} con ${s(peor[1])} s de carga`)
+    const pausa = T.pausaEntreFrases ?? 0
+    if (VOZ && peor[1] > pausa) {
+      console.log(`\n   ⚠️  La pausa entre frases es de ${s(pausa)} s y esa pantalla tarda ${s(peor[1])} s.`)
+      console.log('      Va a entrar con la voz ya hablando. Para darle aire, subí')
+      console.log(`      "pausaEntreFrases" en el bloque "tiempos" del guion a ${s(Math.ceil(peor[1] / 100) * 100 + 300)} s o más`)
+      console.log('      y volvé a correr `npm run revisar`.')
+    }
+    console.log('')
   } else {
     console.log('   listo\n')
   }
@@ -533,20 +546,28 @@ async function esperarHasta(cuando) {
   return sobra
 }
 
-// ── PEDIR ANTES ────────────────────────────────────────────────────────────
-// Sincronizar con la voz no alcanza si la pantalla tarda tres segundos en aparecer y su
-// frase dura tres y medio: se ve medio segundo y pasa como un parpadeo. Es lo que se vio en
-// el video: "las pantallas están pasando rápido".
+// ── LA PAUSA ES LA VENTANA DE CARGA ────────────────────────────────────────
+// La pantalla se pide EN CUANTO LA VOZ TERMINA DE HABLAR DE LA ANTERIOR, y mientras el
+// servidor contesta se sigue viendo la pantalla vieja. Cuando contesta, la nueva aparece —
+// durante el silencio que hay antes de su frase, que es justo cuando conviene que aparezca:
+// se la ve un momento en silencio y recién entonces la voz la explica.
 //
-// Dentro del compás no hay nada que hacer —ese tiempo ya está gastado—, así que la pantalla
-// se pide ANTES, durante el final de la anterior. Mientras el servidor contesta, el
-// navegador sigue mostrando la pantalla vieja; cuando contesta, la nueva aparece. No hay
-// parpadeo en blanco, y las dos se ven el tiempo que les toca.
+// Esa pausa entre frases es la que da el aire, y se gradúa en el guion
+// (`tiempos.pausaEntreFrases`). Si la pausa alcanza para la carga, la pantalla llega a
+// horario; si no, entra un poco metida en su propia frase, que es el error chico.
 //
-// Cuánto antes lo dice la medición del precalentado, no una estimación.
-
-/** Lo que se le suma a la carga medida, por si esta vez tarda un poco más. */
-const COJIN = T.cojinVoz ?? 250
+// ── POR QUÉ NO SE ADELANTA SEGÚN LO QUE TARDA ──────────────────────────────
+// El intento anterior calculaba el adelanto con lo que había tardado cada pantalla en el
+// precalentado. Falló feo contra la aplicación de verdad: la medición del precalentado sale
+// MUCHO más lenta que la carga durante la grabación —la primera vez se paga la conexión a
+// la base, el caché frío, todo—, así que el adelanto quedaba enorme y la pantalla aparecía
+// SOLA, hasta cinco segundos antes de que la voz la nombrara. Se veía como que el video
+// "va todo más rápido".
+//
+// Predecir cuánto va a tardar algo que varía máquina por máquina y corrida por corrida es
+// la clase de cuenta que acierta en la máquina donde se probó. No predecir nada y empezar
+// cuando corresponde no puede adelantarse nunca: la pantalla aparece apenas puede, y el
+// error es siempre del lado chico.
 
 /**
  * ¿La parada `i` va a tener que pedirle la pantalla al servidor?
@@ -564,29 +585,19 @@ function pedirAlServidor(i) {
   return anterior.ruta !== p.ruta
 }
 
-/** Lo mínimo que algo tiene que quedar a la vista antes de empezar a pedir lo que sigue. */
-const MIN_EN_PANTALLA = T.minimoEnPantalla ?? 1200
-
 /**
- * En qué segundo del video hay que EMPEZAR A PEDIR la parada `i`, para que aparezca
- * justo en `cuando` —el segundo en que la voz empieza a hablar de ella—.
+ * En qué segundo del video arrancar lo que viene después del compás `actual`.
  *
- * PEDIR UNA PANTALLA NO LA PONE EN PANTALLA. Mientras el servidor contesta se sigue viendo
- * la anterior; recién cambia cuando llega la respuesta. Así que adelantarse no le saca ni
- * un instante a lo que se está viendo, y el tope no va sobre cuándo se pide sino sobre
- * cuándo APARECE: lo de antes tiene que haberse visto su rato.
- *
- * El primer intento ponía el tope sobre el momento de pedir, que es lo que parece de
- * sentido común y es justamente al revés: la portada se guardaba 1,2 s que no le servían
- * de nada y la primera pantalla entraba medio segundo tarde, con la voz ya hablando.
+ *  · Si lo que sigue hay que PEDIRLE AL SERVIDOR, en cuanto la voz termina de hablar de lo
+ *    que se está viendo. Lo que tarde la carga transcurre durante el silencio.
+ *  · Si lo que sigue es instantáneo —una lámina, el cierre, o la misma pantalla de antes—,
+ *    recién un instante antes de su frase. Ponerlo apenas termina la frase anterior lo
+ *    dejaría un silencio entero en pantalla sin que nadie lo explique.
  */
-function momentoDePedir(i, cuando) {
-  if (!pedirAlServidor(i)) return cuando
-  const carga = ((CARGAS.get(RECORRIDO[i].ruta) ?? 1200) + COJIN) / 1000
-  const visto = enPantalla ? (enPantalla.desde - T0) / 1000 : 0
-  // Que lo de antes haya estado su mínimo A LA VISTA, descontando lo que tarda la carga.
-  const piso = visto + MIN_EN_PANTALLA / 1000 - carga
-  return Math.max(0, Math.min(Math.max(cuando - carga, piso), cuando))
+function cuandoArranca(iSiguiente, actual) {
+  const proximo = VOZ.proximo(actual)
+  if (!proximo) return VOZ.fin
+  return pedirAlServidor(iSiguiente) ? actual.fin : proximo.aparece
 }
 
 /**
@@ -704,7 +715,7 @@ try {
   await mostrarPortada(page, portada ? { ...GUION, portada: { ...GUION.portada, espera: 0 } } : GUION, pausa)
   if (portada) {
     marcar('PORTADA', portada.dura)
-    await esperarHasta(momentoDePedir(0, portada.hasta))
+    await esperarHasta(cuandoArranca(0, portada))
   }
 
   // Recorrido
@@ -753,7 +764,7 @@ try {
         laminaEnPantalla = true
         if (compas) {
           marcar(parada.titulo, compas.dura)
-          await esperarHasta(momentoDePedir(i + 1, compas.hasta))
+          await esperarHasta(cuandoArranca(i + 1, compas))
         }
         continue
       }
@@ -810,7 +821,7 @@ try {
         // volvería a correr todo lo que sigue —medio segundo por pantalla, ocho pantallas,
         // y la voz otra vez hablando sobre la imagen equivocada—. Si una pantalla no llega
         // a verse, el arreglo es alargar su frase en el guion, y para eso se avisa abajo.
-        await esperarHasta(momentoDePedir(i + 1, compas.hasta))
+        await esperarHasta(cuandoArranca(i + 1, compas))
       } else {
         // SIN RELATO: lo que ya se consumió cargando y actuando se descuenta. El mínimo
         // existe para que una pantalla lenta igual llegue a verse: mejor perder medio

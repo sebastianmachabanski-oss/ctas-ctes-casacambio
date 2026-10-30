@@ -23,6 +23,8 @@ import { join, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { prepararVoz } from './pistas-voz.mjs'
+import { leerGuion } from './leer-guion.mjs'
 
 const ejecutar = promisify(execFile)
 const AQUI = dirname(fileURLToPath(import.meta.url))
@@ -66,7 +68,13 @@ async function duracion(archivo) {
 const buscar = base => ['mp3', 'm4a', 'wav', 'ogg', 'aac']
   .map(e => join(AQUI, `${base}.${e}`)).find(existsSync)
 
-const RELATO = buscar('narracion') ?? buscar('relato') ?? buscar('voz')
+// El relato sale de la misma función que usa el grabador, y no de buscar el archivo a mano.
+// Es importante: si el guion pide pausas entre frases, lo que suena en el video es una
+// versión ESPACIADA del archivo original, y el grabador sincronizó contra esa. Mezclando
+// acá el original, el video volvería a quedar desfasado — y por una diferencia que no se ve
+// en ningún lado, porque los dos archivos dicen exactamente lo mismo.
+const relato = await prepararVoz(leerGuion(), AQUI)
+const RELATO = relato.archivo
 const MUSICA = buscar('musica')
 
 const segundos = await duracion(video)
@@ -184,7 +192,12 @@ args.push(
 )
 
 console.log(`\n🎬 Convirtiendo ${basename(video)} (${Math.round(segundos)} s)`)
-if (RELATO) console.log(`   con relato: ${basename(RELATO)}`)
+if (RELATO) {
+  console.log(`   con relato: ${basename(relato.original)}`)
+  if (relato.archivo !== relato.original) {
+    console.log(`               con las pausas del guion${relato.antes ? `: ${relato.antes.toFixed(1).replace('.', ',')} s → ${relato.ahora.toFixed(1).replace('.', ',')} s` : ''}`)
+  }
+}
 if (MUSICA) console.log(`   con música: ${basename(MUSICA)} al ${Math.round(VOL_MUSICA * 100)}% de volumen`)
 if (!RELATO && !MUSICA) {
   console.log('   sin audio. Poné en la carpeta demo:')

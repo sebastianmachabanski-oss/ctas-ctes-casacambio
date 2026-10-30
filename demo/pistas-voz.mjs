@@ -29,8 +29,8 @@
  * una, el emparejamiento sale mal — y por eso `npm run revisar` lo IMPRIME, para poder
  * controlarlo antes de grabar en lugar de descubrirlo en el video.
  */
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs'
+import { join, basename } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
@@ -65,15 +65,15 @@ export function compasesDelGuion(GUION) {
   const compases = []
   const mudas = []
   if (GUION.portada) {
-    if (GUION.portada.voz) compases.push({ clave: 'portada', voz: GUION.portada.voz, titulo: 'PORTADA' })
+    if (GUION.portada.voz) compases.push({ clave: 'portada', voz: GUION.portada.voz, titulo: 'PORTADA', pausaDespues: GUION.portada.pausaDespues })
     else mudas.push('la portada')
   }
   ;(GUION.paradas ?? []).forEach((p, i) => {
-    if (p.voz) compases.push({ clave: i, parada: i, voz: p.voz, titulo: p.titulo ?? `parada ${i + 1}` })
+    if (p.voz) compases.push({ clave: i, parada: i, voz: p.voz, titulo: p.titulo ?? `parada ${i + 1}`, pausaDespues: p.pausaDespues })
     else mudas.push(`la parada ${i + 1} ("${p.titulo ?? ''}")`)
   })
   if (GUION.cierre) {
-    if (GUION.cierre.voz) compases.push({ clave: 'cierre', voz: GUION.cierre.voz, titulo: 'CIERRE' })
+    if (GUION.cierre.voz) compases.push({ clave: 'cierre', voz: GUION.cierre.voz, titulo: 'CIERRE', pausaDespues: GUION.cierre.pausaDespues })
     else mudas.push('el cierre')
   }
   return { compases, mudas }
@@ -181,6 +181,7 @@ export function emparejar(tramos, compases) {
   for (let j = M; j >= 1; j--) bordes[j - 1] = vieneDe[j][bordes[j]]
 
   return {
+    bordes,
     renglones: compases.map((c, j) => ({
       ...c,
       inicio: tramos[bordes[j]].inicio,
@@ -192,6 +193,128 @@ export function emparejar(tramos, compases) {
 }
 
 /**
+ * Estira los silencios ENTRE FRASES del archivo de voz, sin tocar las frases.
+ *
+ * ── PARA QUÉ ───────────────────────────────────────────────────────────────
+ * El relato viene pegado: una frase atrás de la otra con un segundo de aire. En un video
+ * de pantallas eso se siente apurado por dos motivos distintos, y los dos se arreglan acá.
+ *
+ *  · La pantalla TARDA EN CARGAR. Contra una base de verdad son dos o tres segundos. Si el
+ *    aire entre frases es un segundo, la pantalla no llega a aparecer antes de que la voz
+ *    empiece a hablar de ella.
+ *  · Quien mira NO CONOCE el sistema. Una pantalla llena de números necesita un momento de
+ *    silencio para que el ojo la recorra antes de que le cuenten qué es.
+ *
+ * ── POR QUÉ ACÁ Y NO REGENERANDO LA VOZ ────────────────────────────────────
+ * Porque las pausas de un generador de voz no se pueden pedir con precisión, y cada vuelta
+ * de prueba obliga a volver al generador, bajar el archivo y copiarlo. Estirando el
+ * silencio del archivo que ya está, el ritmo se ajusta cambiando un número del guion.
+ *
+ * La voz no se altera: no se acelera, no se corta, no se vuelve a sintetizar. Se recortan
+ * los tramos hablados tal cual están y se los pega con más silencio en el medio.
+ *
+ * Los silencios de ADENTRO de una frase —una coma, un punto y seguido— no se tocan: si se
+ * estiraran, la frase sonaría dictada.
+ */
+export async function prepararVoz(GUION, dir) {
+  const original = buscarNarracion(dir)
+  if (!original) return { archivo: null }
+
+  const T = GUION.tiempos ?? {}
+  const PAUSA = (T.pausaEntreFrases ?? 0) / 1000
+  const { compases, mudas } = compasesDelGuion(GUION)
+  const extras = compases.map(c => (c.pausaDespues ?? 0) / 1000)
+
+  // Sin pausas pedidas no hay nada que hacer, y con una parada muda no se sabe a cuál de
+  // los silencios le corresponde cada número.
+  if ((PAUSA <= 0 && !extras.some(x => x > 0)) || mudas.length) return { archivo: original, original }
+
+  const deteccion = {
+    ruido: T.ruidoVoz ?? -35,
+    detecta: (T.detectaVoz ?? 180) / 1000,
+    corte: (T.corteVoz ?? 600) / 1000,
+  }
+
+  const salida = join(dir, 'salida')
+  mkdirSync(salida, { recursive: true })
+  const destino = join(salida, 'voz-con-pausas.wav')
+  const ficha = join(salida, 'voz-con-pausas.json')
+
+  // Se rehace solo si cambió algo: el archivo de voz, las pausas pedidas o la detección.
+  // Sin esta comprobación, grabar y convertir lo reconstruirían dos veces por corrida.
+  const info = statSync(original)
+  const huella = JSON.stringify({
+    origen: basename(original), mtime: Math.round(info.mtimeMs), tam: info.size,
+    PAUSA, extras, ...deteccion,
+  })
+  if (existsSync(destino) && existsSync(ficha)) {
+    try {
+      // La ficha guarda también los dos largos, para poder informarlos sin rehacer el
+      // archivo: `npm run mp4` corre después del grabador y encuentra todo hecho.
+      const previa = JSON.parse(readFileSync(ficha, 'utf8'))
+      if (previa.huella === huella) {
+        return { archivo: destino, original, hecho: false, antes: previa.antes, ahora: previa.ahora }
+      }
+    } catch {}
+  }
+
+  const { duracion, tramos } = await tramosDeVoz(original, deteccion)
+  const { bordes, error } = emparejar(tramos, compases)
+  if (error) return { archivo: original, original, aviso: error }
+
+  // Los silencios que separan FRASES son los que caen en un borde de renglón. A cada uno
+  // se le pide la pausa general más la propia de esa parada, y se respeta el que ya venía
+  // si era más largo: nunca se acorta el relato.
+  const bordeDe = new Map(bordes.slice(1, -1).map((b, j) => [b, j]))
+  const piezas = []
+  for (let i = 0; i < tramos.length; i++) {
+    piezas.push({ tipo: 'voz', desde: tramos[i].inicio, hasta: tramos[i].fin })
+    if (i + 1 >= tramos.length) break
+    const tenia = tramos[i + 1].inicio - tramos[i].fin
+    const j = bordeDe.get(i + 1)
+    const pedido = j === undefined ? tenia : PAUSA + (extras[j] ?? 0)
+    piezas.push({ tipo: 'silencio', dura: Math.max(tenia, pedido) })
+  }
+  // La colita del final se conserva tal cual: el cierre ya tiene su propio silencio.
+  const cola = duracion - tramos[tramos.length - 1].fin
+  if (cola > 0.05) piezas.push({ tipo: 'silencio', dura: cola })
+
+  // Un filtro solo: se recortan los tramos hablados del original, se generan los silencios
+  // de una fuente muda y se pega todo en orden.
+  const voces = piezas.filter(p => p.tipo === 'voz').length
+  const silencios = piezas.filter(p => p.tipo === 'silencio').length
+  const formato = 'aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo'
+  const filtros = [
+    `[0:a]${formato},asplit=${voces}${Array.from({ length: voces }, (_, i) => `[v${i}]`).join('')}`,
+    `[1:a]${formato},asplit=${silencios}${Array.from({ length: silencios }, (_, i) => `[m${i}]`).join('')}`,
+  ]
+  const orden = []
+  let nv = 0, ns = 0
+  for (const p of piezas) {
+    if (p.tipo === 'voz') {
+      filtros.push(`[v${nv}]atrim=start=${p.desde.toFixed(3)}:end=${p.hasta.toFixed(3)},asetpts=N/SR/TB[p${orden.length}]`)
+      nv++
+    } else {
+      filtros.push(`[m${ns}]atrim=duration=${p.dura.toFixed(3)},asetpts=N/SR/TB[p${orden.length}]`)
+      ns++
+    }
+    orden.push(`[p${orden.length}]`)
+  }
+  filtros.push(`${orden.join('')}concat=n=${orden.length}:v=0:a=1[fin]`)
+
+  await ejecutar('ffmpeg', ['-nostdin', '-y', '-v', 'error',
+    '-i', original,
+    '-f', 'lavfi', '-t', String(Math.ceil(duracion) + 120), '-i', 'anullsrc=r=48000:cl=stereo',
+    '-filter_complex', filtros.join(';'), '-map', '[fin]',
+    '-c:a', 'pcm_s16le', destino,
+  ], { maxBuffer: 1024 * 1024 * 64 })
+
+  const nueva = await tramosDeVoz(destino, deteccion)
+  writeFileSync(ficha, JSON.stringify({ huella, antes: duracion, ahora: nueva.duracion }))
+  return { archivo: destino, original, hecho: true, antes: duracion, ahora: nueva.duracion }
+}
+
+/**
  * El plan completo: en qué segundo del video tiene que aparecer cada pantalla y hasta
  * cuándo se queda.
  *
@@ -200,8 +323,14 @@ export function emparejar(tramos, compases) {
  * desfasado" es carísimo de diagnosticar mirando el video y baratísimo de leer acá.
  */
 export async function planDeVoz(GUION, { dir, anticipo, colita } = {}) {
-  const archivo = buscarNarracion(dir)
-  if (!archivo) return null
+  if (!buscarNarracion(dir)) return null
+
+  // Primero se le ponen las pausas pedidas; lo que se mide después es el archivo que
+  // realmente va a sonar en el video. Medir el original y mezclar el espaciado sería
+  // sincronizar contra un archivo que no es el que se escucha.
+  const preparada = await prepararVoz(GUION, dir)
+  const archivo = preparada.archivo
+  if (preparada.aviso) return { archivo, aviso: preparada.aviso }
 
   const T = GUION.tiempos ?? {}
   // Cuánto antes de su frase aparece la pantalla. Que la imagen entre un instante antes
@@ -250,12 +379,17 @@ export async function planDeVoz(GUION, { dir, anticipo, colita } = {}) {
 
   return {
     archivo,
+    original: preparada.original,
+    espaciada: archivo !== preparada.original,
     duracion: medido.duracion,
+    duracionOriginal: preparada.antes,
     tramos: medido.tramos,
     renglones: conTiempos,
     fin: medido.duracion + COLITA,
     anticipo: ANTICIPO,
     porParada: new Map(conTiempos.filter(r => r.parada !== undefined).map(r => [r.parada, r])),
     de: clave => conTiempos.find(r => r.clave === clave),
+    /** El renglón que viene después de `r`, o null si es el último. */
+    proximo: r => conTiempos[conTiempos.indexOf(r) + 1] ?? null,
   }
 }

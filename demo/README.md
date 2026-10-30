@@ -163,11 +163,65 @@ terminaba mostrando cuentas corrientes mientras la voz decía el cierre.
 Siguiendo la voz, cada pantalla tiene su segundo FIJO. Una que tarde de más se come su
 propio tiempo y nada más: el desfasaje no pasa a la siguiente.
 
-Lo mismo vale para la carga: la pantalla se **pide antes** de que le toque, durante el
-final de la anterior, usando lo que tardó en el precalentado. Mientras el servidor
-contesta se sigue viendo la pantalla vieja, así que no hay parpadeo en blanco y las dos se
-ven su rato. Sin esto, contra una base de verdad —tres segundos por pantalla— una pantalla
-de tres segundos y medio se veía medio segundo.
+#### Las pausas entre frases
+
+El relato generado viene pegado: una frase atrás de la otra con un segundo de aire. Para un
+video de pantallas eso queda apurado, por dos motivos distintos.
+
+- **La pantalla tarda en cargar.** Contra una base de verdad son dos o tres segundos. Con un
+  segundo de aire, la pantalla no llega a aparecer antes de que la voz empiece a hablar de
+  ella.
+- **Quien mira no conoce el sistema.** Una pantalla llena de números necesita un momento de
+  silencio para que el ojo la recorra antes de que le cuenten qué es.
+
+Las dos cosas se arreglan con el mismo número, en el bloque `tiempos` del guion:
+
+```json
+"pausaEntreFrases": 2200
+```
+
+El programa **estira los silencios del archivo de voz que ya está**, sin volver a
+generarlo. La voz no se altera —no se acelera, no se corta, no se vuelve a sintetizar—: se
+recortan los tramos hablados tal cual y se los pega con más silencio en el medio. Los
+silencios de ADENTRO de una frase no se tocan; estirarlos la haría sonar dictada.
+
+El archivo espaciado queda en `demo/salida/voz-con-pausas.wav` y se rehace solo cuando
+cambia algo. Es el que suena en el video y contra el que sincroniza el grabador.
+
+Para darle más aire a una pantalla en particular, se le pone su propio número — se suma a
+la pausa general y vale para el silencio que va DESPUÉS de su frase:
+
+```json
+{ "titulo": "Auditoría", "voz": "...", "pausaDespues": 800 }
+```
+
+Así es como se alarga el video: con 2,2 s de pausa, 41 s de relato se vuelven 52 s de
+video, y cada pantalla pasa de tres segundos y medio a entre cuatro y siete.
+
+#### La carga entra en la pausa
+
+La pantalla se pide **en cuanto la voz termina de hablar de la anterior**, y mientras el
+servidor contesta se sigue viendo la pantalla vieja. Cuando contesta, la nueva aparece
+durante el silencio — que es justo cuando conviene: se la ve un momento callada y recién
+entonces la voz la explica.
+
+Por eso la pausa tiene que ser **más larga que la pantalla más lenta**. El precalentado las
+mide y el grabador avisa si no alcanza:
+
+```
+   listo · la más lenta es /dashboard/cuenta-corriente con 3,0 s de carga
+
+   ⚠️  La pausa entre frases es de 2,2 s y esa pantalla tarda 3,0 s.
+      Va a entrar con la voz ya hablando.
+```
+
+**No se intenta adivinar cuánto va a tardar cada pantalla para adelantarse.** Se probó y
+salió mal: la medición del precalentado da mucho más lenta que la carga real durante la
+grabación —la primera vez se paga la conexión a la base y el caché frío—, así que el
+adelanto quedaba enorme y la pantalla aparecía **sola, hasta cinco segundos antes** de que
+la voz la nombrara. Se veía como que el video va todo apurado. Empezando cuando
+corresponde, la pantalla no puede adelantarse nunca: aparece apenas puede, y el error
+siempre es del lado chico.
 
 `npm run revisar` imprime el reparto medido ANTES de grabar:
 
@@ -199,11 +253,12 @@ Los números finos, en el bloque `tiempos` del guion:
 
 | | |
 |---|---|
-| `anticipoVoz` | cuánto antes de su frase aparece la pantalla (350 ms) |
+| `pausaEntreFrases` | el silencio entre una frase y la siguiente (2200 ms) |
+| `anticipoVoz` | cuánto antes de su frase entra una lámina o el cierre (350 ms) |
 | `colitaVoz` | el silencio de cierre después de la última palabra (900 ms) |
-| `corteVoz` | el silencio que separa una frase de otra (600 ms) |
-| `minimoEnPantalla` | lo mínimo que algo se ve antes de pedir lo que sigue (1200 ms) |
-| `cojinVoz` | lo que se le suma a la carga medida, por las dudas (250 ms) |
+| `corteVoz` | a partir de qué silencio se considera que terminó una frase (600 ms) |
+
+Y en cada parada, `pausaDespues`: lo que se le suma a la pausa general después de esa.
 
 Si hay relato y música a la vez, la música baja al 6%: acompaña, no se escucha como
 música. Una música al mismo volumen que la voz obliga a esforzarse para entender, y quien

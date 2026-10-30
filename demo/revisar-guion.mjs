@@ -217,13 +217,23 @@ if (PLAN?.aviso) {
 }
 
 // ── El límite ──────────────────────────────────────────────────────────────
-const LIMITE = Number(process.env.DEMO_LIMITE || 45)
+const LIMITE = Number(process.env.DEMO_LIMITE || 55)
 const duracionReal = PLAN && !PLAN.aviso ? PLAN.fin : (total + ingresos) / 1000
 if (duracionReal > LIMITE) {
   console.log(`  ⚠️  Se pasa del límite de ${LIMITE} s por ${(duracionReal - LIMITE).toFixed(0)} s.\n`)
 }
 
-console.log(`
+// El consejo depende de quién esté mandando el ritmo. Con la voz puesta, "espera" no hace
+// nada, y mandar a tocarla sería mandar a perder el tiempo con un número que se ignora.
+console.log(PLAN && !PLAN.aviso ? `
+  El ritmo lo manda el relato. Para que vaya más despacio, subí "pausaEntreFrases"
+  en el bloque "tiempos" del guion (hoy ${seg((guion.tiempos?.pausaEntreFrases ?? 0))} s): estira los silencios ENTRE
+  frases sin tocar la voz. Para una pantalla en particular, su "pausaDespues".
+
+  Para que dure menos, sacá una parada con su renglón de relato. Acortar los
+  silencios por debajo de lo que tarda una pantalla en cargar no sirve: la
+  pantalla entra igual de tarde, solo que encima con la voz hablando.
+` : `
   Si quedó largo, mirá primero el renglón más largo de arriba.
   "Entre pantallas" se acorta en el bloque "tiempos" del guion; los carteles,
   uno por uno, en su "espera".
