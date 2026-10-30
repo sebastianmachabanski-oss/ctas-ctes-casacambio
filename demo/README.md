@@ -121,6 +121,42 @@ hay que cerrar y volver a abrir la terminal).
 El archivo sale en WebM porque es lo único que sabe grabar el navegador. WebM se ve bien
 en cualquier navegador, pero para mandarlo por WhatsApp o por correo conviene MP4.
 
+#### El relato
+
+El video va **relatado**: una voz cuenta lo que se ve. Cada parada del guion tiene su
+renglón en `voz`, y **ese texto decide cuánto dura la parada** — lo que tarda en decirse
+más un respiro. Al revés no funciona: fijando los tiempos a mano y escribiendo el texto
+después, todas las frases terminaban hablando sobre la pantalla siguiente.
+
+`npm run revisar` imprime el relato completo y seguido, listo para copiar:
+
+```
+  ── EL RELATO ─────────────────────────────────────────────────────
+  83 palabras · unos 34 s hablados
+
+  Un sistema pensado para una casa de cambio.
+  La caja, en todas las monedas, al día.
+  ...
+  ✓ Entra, con 9 s de aire repartidos entre las frases.
+```
+
+Con ese texto se genera la voz donde se prefiera —NotebookLM, o cualquier servicio de voz
+sintética— y el archivo se guarda como **`demo/narracion.mp3`**. `npm run mp4` lo mezcla
+solo.
+
+El relato **no se repite ni se recorta**: dura lo que dura. Si sobra video al final, se ve
+la lámina de cierre en silencio, que es un final y no un error.
+
+Si hay relato y música a la vez, la música baja al 6%: acompaña, no se escucha como
+música. Una música al mismo volumen que la voz obliga a esforzarse para entender, y quien
+mira un aviso de cuarenta y cinco segundos no se esfuerza: lo cierra.
+
+```powershell
+$env:DEMO_VOLUMEN_VOZ=1.3       # la voz, más fuerte
+$env:DEMO_VOLUMEN_MUSICA=0.04   # la música, más baja
+npm run mp4
+```
+
 #### La música
 
 Poné un archivo llamado **`musica.mp3`** en la carpeta `demo` y volvé a correr

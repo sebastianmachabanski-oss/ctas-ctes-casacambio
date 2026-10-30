@@ -136,3 +136,29 @@ export function leerGuion() {
     process.exit(1)
   }
 }
+
+/**
+ * Cuánto tiene que durar una parada.
+ *
+ * LA VOZ MANDA, NO EL RELOJ
+ * Antes cada parada tenía su `espera` escrita a mano y el relato se escribía después. El
+ * resultado es el previsible y se midió: todas las frases tardaban más en decirse que lo
+ * que duraba su pantalla, así que la voz se iba corriendo y terminaba hablando sobre la
+ * pantalla siguiente. Arreglarlo a mano, parada por parada, es un trabajo que hay que
+ * rehacer entero cada vez que se cambia una palabra.
+ *
+ * Con `voz`, la duración se calcula del texto: lo que tarda en decirse más un respiro
+ * para que no se encimen las frases. `espera` queda como mínimo, para las pantallas que
+ * necesitan verse un rato aunque la frase sea corta.
+ *
+ * Las palabras por minuto son de locución tranquila, que es la que corresponde a alguien
+ * que escucha esto por primera vez. Se ajusta en el bloque `tiempos` del guion.
+ */
+export function duracionDeParada(parada, tiempos = {}) {
+  const minimo = parada.espera ?? 2500
+  if (!parada.voz) return minimo
+  const palabras = parada.voz.trim().split(/\s+/).filter(Boolean).length
+  const ppm = tiempos.palabrasPorMinuto ?? 145
+  const respiro = tiempos.respiroVoz ?? 600
+  return Math.max(minimo, Math.round(palabras / ppm * 60_000) + respiro)
+}

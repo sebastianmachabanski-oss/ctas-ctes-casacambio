@@ -25,7 +25,7 @@ import { mkdirSync, existsSync, renameSync, readdirSync, readFileSync, statSync,
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cargarCredenciales, ARCHIVO as ARCHIVO_CREDENCIALES } from './credenciales.mjs'
-import { leerGuion, ARCHIVO_GUION } from './leer-guion.mjs'
+import { leerGuion, ARCHIVO_GUION, duracionDeParada } from './leer-guion.mjs'
 import { mostrarPortada, mostrarCierre, mostrarLamina, mostrarEtiqueta } from './laminas.mjs'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
@@ -386,7 +386,10 @@ async function precalentar() {
       for (const r of destinos) {
         await p.goto(`${URL_BASE}${r}`, { waitUntil: 'networkidle', timeout: 120_000 }).catch(() => {})
       }
+      // Se guarda la sesión ya iniciada. Ver SESIONES, más abajo.
+      const guardado = await ctx.storageState()
       await ctx.clearCookies()
+      return guardado
     } catch (e) {
       // Que falle el precalentado no justifica abortar: se graba igual, más lento.
       console.warn(`   ⚠️  precalentado incompleto: ${e.message.split('\n')[0]}`)
@@ -394,16 +397,35 @@ async function precalentar() {
   }
 
   console.log('→ Precalentando las pantallas (no se graba)…')
-  await visitar(USUARIO, CLAVE, rutas)
-  if (HAY_CLIENTE) await visitar(CLIENTE_USUARIO, CLIENTE_CLAVE, ['/dashboard/cuenta-corriente'])
+  const staff = await visitar(USUARIO, CLAVE, rutas)
+  const cliente = HAY_CLIENTE
+    ? await visitar(CLIENTE_USUARIO, CLIENTE_CLAVE, ['/dashboard/cuenta-corriente'])
+    : null
   await ctx.close()
   console.log('   listo\n')
+  return { staff, cliente }
 }
 
-await precalentar()
+const SESIONES = await precalentar()
 
+/**
+ * SESIONES
+ *
+ * El contexto que graba arranca con la sesión del administrador YA iniciada, y el cambio
+ * al usuario del cliente se hace poniéndole las cookies de la otra sesión, no entrando de
+ * nuevo por la pantalla de ingreso.
+ *
+ * POR QUÉ
+ * Cada ingreso son cuatro o cinco segundos de video mirando un formulario que se llena
+ * solo. En un recorrido de dos minutos se tolera; en uno de cuarenta y cinco segundos son
+ * veinte por ciento del aviso gastados en algo que no muestra el producto.
+ *
+ * Las dos sesiones se consiguen en el precalentado, que no se graba. Si por lo que sea no
+ * se consiguieron, el recorrido entra por la pantalla de ingreso como antes.
+ */
 const contexto = await navegador.newContext({
   viewport: { width: 1600, height: 900 },
+  ...(SESIONES.staff ? { storageState: SESIONES.staff } : {}),
   recordVideo: { dir: SALIDA, size: { width: 1600, height: 900 } },
   locale: 'es-AR',
   timezoneId: 'America/Argentina/Buenos_Aires',
@@ -507,8 +529,9 @@ async function cerrarSesion() {
  * Es el MISMO de la pantalla de ingreso de la aplicación: así el video empieza y termina
  * dentro del producto y no en dos láminas que podrían ser de cualquier otro.
  */
-/** Con qué usuario estamos adentro ahora mismo. */
-let sesion = null
+/** Con qué usuario estamos adentro ahora mismo. Si el precalentado dejó la sesión del
+ *  administrador puesta, el recorrido ya empieza adentro. */
+let sesion = SESIONES.staff ? 'staff' : null
 /** Si queda cargado, el recorrido se corta y se informa al final. */
 let fatal = null
 /** Si lo último que se dibujó fue una lámina, la pantalla siguiente hay que volver a pedirla. */
@@ -529,12 +552,22 @@ try {
         continue
       }
       if (quiere !== sesion) {
-        console.log(`→ ${n}  Entrando como ${quiere}…`)
-        if (sesion !== null) await cerrarSesion()
-        await entrar(
-          quiere === 'cliente' ? CLIENTE_USUARIO : USUARIO,
-          quiere === 'cliente' ? CLIENTE_CLAVE : CLAVE,
-        )
+        const guardada = quiere === 'cliente' ? SESIONES.cliente : SESIONES.staff
+        if (guardada) {
+          // Se cambia de usuario poniendo las cookies de la otra sesión. No se ve nada:
+          // la pantalla siguiente ya aparece con el usuario nuevo.
+          console.log(`→ ${n}  Cambiando a ${quiere} (sin pasar por el ingreso)`)
+          await contexto.clearCookies()
+          await contexto.addCookies(guardada.cookies)
+          laminaEnPantalla = true   // obliga a volver a pedir la pantalla
+        } else {
+          console.log(`→ ${n}  Entrando como ${quiere}…`)
+          if (sesion !== null) await cerrarSesion()
+          await entrar(
+            quiere === 'cliente' ? CLIENTE_USUARIO : USUARIO,
+            quiere === 'cliente' ? CLIENTE_CLAVE : CLAVE,
+          )
+        }
         sesion = quiere
       }
 
@@ -544,7 +577,7 @@ try {
       // sobre la misma página, así que después hay que volver a pedir la pantalla aunque
       // el navegador crea que ya está ahí.
       if (parada.tipo === 'lamina') {
-        await mostrarLamina(page, { ...parada, espera: ESPERA_FIJA ?? parada.espera }, pausa)
+        await mostrarLamina(page, { ...parada, espera: ESPERA_FIJA ?? duracionDeParada(parada, T) }, pausa)
         laminaEnPantalla = true
         continue
       }
@@ -571,7 +604,7 @@ try {
         await pausa(LEER)
       }
       if (parada.hacer) await parada.hacer(page)
-      await pausa(ESPERA_FIJA ?? parada.espera ?? 2500)
+      await pausa(ESPERA_FIJA ?? duracionDeParada(parada, T))
       if (parada.texto) await ocultarCartel(page)
     } catch (e) {
       if (e instanceof Fatal) { fatal = e; break }

@@ -15,7 +15,7 @@
  * estén entre las disponibles. Son los errores que no rompen el archivo pero arruinan el
  * video, y se descubrirían recién al mirarlo.
  */
-import { leerGuion } from './leer-guion.mjs'
+import { leerGuion, duracionDeParada } from './leer-guion.mjs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -103,7 +103,7 @@ if (guion.portada) {
 paradas.forEach((p, i) => {
   // Una lámina se dibuja sobre la misma página: no navega ni muestra cartel, así que no
   // paga la sobrecarga de una pantalla.
-  const dura = (ESPERA_FIJA ?? p.espera ?? 2500) + (p.tipo === 'lamina' ? 0 : POR_PARADA)
+  const dura = (ESPERA_FIJA ?? duracionDeParada(p, T)) + (p.tipo === 'lamina' ? 0 : POR_PARADA)
   total += dura
   const quien = (p.como ?? 'staff') === 'cliente' ? '[cliente]' : '         '
   const marca = p.tipo === 'lamina' ? '▌' : ' '
@@ -113,7 +113,7 @@ paradas.forEach((p, i) => {
   // Se muestran los dos números por separado. Con uno solo —el total— uno busca ese
   // valor en el guion para bajarlo y no lo encuentra, porque lo que está escrito ahí es
   // el primero; el segundo le suma lo que tarda la pantalla en aparecer e irse.
-  const propio = ESPERA_FIJA ?? p.espera ?? 2500
+  const propio = ESPERA_FIJA ?? duracionDeParada(p, T)
   console.log(`      espera ${seg(propio)} s  ·  en pantalla ${seg(dura)} s  ·  ${p.ruta ?? '(sigue en la misma pantalla)'}\n`)
 })
 
@@ -128,14 +128,14 @@ if (guion.cierre) {
 // parte del tiempo se va en algo que ni se ve: la pausa entre pantalla y pantalla.
 const pantallas = paradas.filter(p => p.tipo !== 'lamina')
 const seccionesL = paradas.filter(p => p.tipo === 'lamina')
-const carteles = pantallas.reduce((n, p) => n + (ESPERA_FIJA ?? p.espera ?? 2500), 0)
-const laminasT = seccionesL.reduce((n, p) => n + (ESPERA_FIJA ?? p.espera ?? 2500), 0)
+const carteles = pantallas.reduce((n, p) => n + (ESPERA_FIJA ?? duracionDeParada(p, T)), 0)
+const laminasT = seccionesL.reduce((n, p) => n + (ESPERA_FIJA ?? duracionDeParada(p, T)), 0)
 const entre = pantallas.length * POR_PARADA
-const tapas = (guion.portada?.espera ?? 0) + (guion.cierre?.espera ?? 0)
-// Un ingreso por cada cambio de usuario, más el primero.
-const cambios = paradas.reduce((n, p, i) =>
-  n + ((p.como ?? 'staff') !== (paradas[i - 1]?.como ?? 'staff') ? 1 : 0), 1)
-const ingresos = cambios * ((T.tipeo ?? 300) * 2 + (T.trasIngresar ?? 1100) + 3000)
+const tapas = duracionDeParada(guion.portada ?? {}, T) + duracionDeParada(guion.cierre ?? {}, T)
+// Los ingresos ya no se graban: el recorrido arranca con la sesión puesta y el cambio de
+// usuario se hace por cookies. Se deja la cuenta en cero para que la duración anunciada
+// sea la del video y no la de una versión anterior.
+const ingresos = 0
 
 const reloj = ms => `${Math.floor(ms / 60000)} min ${String(Math.round((ms % 60000) / 1000)).padStart(2, '0')} s`
 const fila = (etiqueta, ms) =>
@@ -152,8 +152,42 @@ fila(`Las pantallas (${pantallas.length})`, carteles)
 fila(`Entre pantallas (${pantallas.length} × ${(POR_PARADA / 1000).toFixed(1)} s)`, entre)
 if (laminasT) fila(`Las láminas de sección (${seccionesL.length})`, laminasT)
 fila('Portada y cierre', tapas)
-fila(`Los ingresos (${cambios})`, ingresos)
 console.log(`\n     ${'TOTAL APROXIMADO'.padEnd(34)} ${reloj(total + ingresos).padStart(10)}`)
+// ── El relato ──────────────────────────────────────────────────────────────
+// Se imprime entero y seguido, para copiarlo de una sola vez al generador de voz. Línea
+// por línea no sirve: lo que importa es cómo suena de corrido.
+const conVoz = [
+  guion.portada?.voz && { voz: guion.portada.voz, ms: duracionDeParada(guion.portada, T) },
+  ...paradas.map(p => p.voz && { voz: p.voz, ms: ESPERA_FIJA ?? duracionDeParada(p, T) }),
+  guion.cierre?.voz && { voz: guion.cierre.voz, ms: duracionDeParada(guion.cierre, T) },
+].filter(Boolean)
+
+if (conVoz.length) {
+  const palabras = conVoz.reduce((n, l) => n + l.voz.trim().split(/\s+/).length, 0)
+  // 145 palabras por minuto es un ritmo de locución tranquilo, que es el que corresponde
+  // a alguien que escucha esto por primera vez.
+  const hablado = palabras / 145 * 60
+  console.log(`\n  ── EL RELATO ─────────────────────────────────────────────────────`)
+  console.log(`  ${palabras} palabras · unos ${hablado.toFixed(0)} s hablados\n`)
+  for (const l of conVoz) console.log(`  ${l.voz}`)
+  console.log('')
+  const holgura = (total + ingresos) / 1000 - hablado
+  if (holgura < 0) {
+    console.log(`  ⚠️  El relato dura más que el video (unos ${(-holgura).toFixed(0)} s de más).`)
+    console.log('      Acortá renglones o alargá las esperas.\n')
+  } else if (holgura > 16) {
+    console.log(`  ⚠️  Sobran unos ${holgura.toFixed(0)} s de imagen sin relato: se va a sentir lento.\n`)
+  } else {
+    console.log(`  ✓ Entra, con ${holgura.toFixed(0)} s de aire repartidos entre las frases.\n`)
+  }
+}
+
+// ── El límite ──────────────────────────────────────────────────────────────
+const LIMITE = Number(process.env.DEMO_LIMITE || 45)
+if ((total + ingresos) / 1000 > LIMITE) {
+  console.log(`  ⚠️  Se pasa del límite de ${LIMITE} s por ${((total + ingresos) / 1000 - LIMITE).toFixed(0)} s.\n`)
+}
+
 console.log(`
   Si quedó largo, mirá primero el renglón más largo de arriba.
   "Entre pantallas" se acorta en el bloque "tiempos" del guion; los carteles,

@@ -2,22 +2,20 @@
   "_leeme": [
     "ESTE ES EL GUION DEL VIDEO. Se edita acá, no en el programa.",
     "",
-    "Cada bloque de 'paradas' es un momento del video:",
-    "  titulo  — el renglón grande del cartel",
-    "  texto   — la explicación, abajo del título",
-    "  espera  — cuánto se queda en esa pantalla, en milésimas de segundo (1000 = 1 segundo)",
-    "  ruta    — qué pantalla mostrar. null = quedarse en la misma de antes",
-    "  como    — con qué usuario: 'staff' (el administrador) o 'cliente'",
-    "  accion  — opcional, el nombre de un movimiento guionado (bajan la pantalla, escriben",
-    "            en un campo). Los disponibles están listados en grabar-demo.mjs.",
+    "El video dura 45 segundos y está RELATADO: cada parada tiene su renglón de",
+    "relato en 'voz'. `npm run revisar` imprime el texto completo, listo para",
+    "copiar y pegar en el generador de voz.",
     "",
-    "Para sacar una parada, borrá su bloque entre llaves. Para agregar una, copiá uno",
-    "parecido y cambiale el contenido. Cuidado con las comas: todos los bloques llevan",
-    "una coma al final MENOS el último.",
+    "  titulo / etiqueta — el nombre de la pantalla, chico, en un rincón",
+    "  voz               — lo que se dice mientras se ve esa pantalla",
+    "  espera            — cuánto dura, en milésimas de segundo",
+    "  ruta              — qué pantalla mostrar. null = quedarse en la de antes",
+    "  tipo: 'lamina'    — no muestra la aplicación: es una placa de texto",
     "",
-    "Si el archivo queda mal escrito, el grabador avisa y no graba. No rompe nada.",
+    "La regla de oro de los 45 segundos: si una parada no se puede explicar en",
+    "un renglón de relato, no entra.",
     "",
-    "El color del cartel está en 'estilo', más abajo."
+    "Si el archivo queda mal escrito, cualquier comando avisa en qué renglón."
   ],
   "estilo": {
     "_comentario": [
@@ -43,132 +41,30 @@
     "fondo": "205,206,213"
   },
   "portada": {
-    "_comentario": [
-      "La pantalla de presentación, antes de que se vea la aplicación.",
-      "Para sacarla, borrá este bloque entero.",
-      "",
-      "  titulo / subtitulo  — los dos renglones grandes. En el título, lo que vaya",
-      "                        entre <b> y </b> se resalta en celeste.",
-      "  destacados          — las tres tarjetas de arriba: no son funcionalidades sino",
-      "                        condiciones del producto (dónde corre, en qué se usa).",
-      "  grupos              — las funcionalidades, en columnas con su encabezado.",
-      "                        Agregá o sacá renglones; tres columnas entran cómodas.",
-      "  espera              — cuánto dura en pantalla, en milésimas de segundo."
-    ],
-    "titulo": "Aplicación para la Gestión de <b>Casas de Cambio</b>",
-    "subtitulo": "Toda la operatoria en un solo lugar: caja, cuentas corrientes y resultados.",
-    "destacados": [
-      {
-        "icono": "☁️",
-        "titulo": "En la nube",
-        "texto": "Sin servidores ni equipos que comprar y mantener."
-      },
-      {
-        "icono": "📱",
-        "titulo": "Solución Multiplataforma",
-        "texto": "Computadora, tablet o teléfono. Nada que instalar."
-      },
-      {
-        "icono": "🔒",
-        "titulo": "Gestión de la Seguridad y Visibilidad",
-        "texto": "Roles y permisos controlados en el servidor."
-      }
-    ],
-    "grupos": [
-      {
-        "titulo": "Operación diaria",
-        "puntos": [
-          "Caja en todas las monedas, al instante",
-          "Carga de operaciones simple y segura",
-          "Transferencias entre terceros",
-          "Gastos del Negocio",
-          "Dinero en la calle, por repartidor"
-        ]
-      },
-      {
-        "titulo": "Cuentas corrientes",
-        "puntos": [
-          "Portal para que el cliente consulte su cuenta",
-          "Movimientos con saldo acumulado",
-          "Posición consolidada",
-          "Extracto para enviar al cliente"
-        ]
-      },
-      {
-        "titulo": "Control y gestión",
-        "puntos": [
-          "Ganancias por día, semana, mes o año",
-          "Usuarios con roles diferenciados",
-          "Operación trazable y auditable"
-        ]
-      }
-    ],
-    "espera": 10000
+    "titulo": "El sistema de la <b>casa de cambio</b>",
+    "subtitulo": "Toda la operatoria en un solo lugar",
+    "voz": "Un sistema pensado para una casa de cambio.",
+    "espera": 2000
   },
   "paradas": [
-    {
-      "tipo": "lamina",
-      "seccion": "01 · OPERACIÓN DIARIA",
-      "titulo": "La caja, siempre al día",
-      "puntos": [
-        "Todas las monedas",
-        "Carga en segundos",
-        "Impacto a la vista"
-      ],
-      "espera": 4200
-    },
     {
       "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/inicio",
-      "titulo": "Inicio",
-      "etiqueta": "Inicio",
-      "espera": 3000
-    },
-    {
-      "tipo": "pantalla",
-      "como": "staff",
-      "ruta": null,
-      "titulo": "Movimientos del día",
-      "etiqueta": "Movimientos del día",
-      "espera": 2600,
-      "accion": "bajar"
+      "titulo": "La caja del día",
+      "etiqueta": "La caja del día",
+      "voz": "La caja, en todas las monedas, al día.",
+      "espera": 2000
     },
     {
       "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/nueva-transaccion",
-      "titulo": "Nueva operación",
-      "etiqueta": "Nueva operación",
-      "espera": 3400,
+      "titulo": "Cargar una operación",
+      "etiqueta": "Cargar una operación",
+      "voz": "Cada operación se carga en segundos, y se ve el impacto antes de guardar.",
+      "espera": 2000,
       "accion": "cargar-operacion"
-    },
-    {
-      "tipo": "pantalla",
-      "como": "staff",
-      "ruta": "/dashboard/gastos",
-      "titulo": "Gastos",
-      "etiqueta": "Gastos",
-      "espera": 2400
-    },
-    {
-      "tipo": "pantalla",
-      "como": "staff",
-      "ruta": "/dashboard/calle",
-      "titulo": "Dinero en la calle",
-      "etiqueta": "Dinero en la calle",
-      "espera": 2400
-    },
-    {
-      "tipo": "lamina",
-      "seccion": "02 · CUENTAS CORRIENTES",
-      "titulo": "Quién debe, y cuánto",
-      "puntos": [
-        "Todas las cuentas",
-        "Saldo acumulado",
-        "Posición consolidada"
-      ],
-      "espera": 4200
     },
     {
       "tipo": "pantalla",
@@ -176,34 +72,17 @@
       "ruta": "/dashboard/cuenta-corriente",
       "titulo": "Cuentas corrientes",
       "etiqueta": "Cuentas corrientes",
-      "espera": 3000
+      "voz": "Las cuentas corrientes, con el saldo de cada cliente.",
+      "espera": 2000
     },
     {
       "tipo": "pantalla",
-      "como": "staff",
-      "ruta": "/dashboard/deudores",
-      "titulo": "Posición consolidada",
-      "etiqueta": "Posición consolidada",
-      "espera": 2600
-    },
-    {
-      "tipo": "lamina",
-      "seccion": "03 · TRANSFERENCIAS",
-      "titulo": "Entre terceros, sin cabos sueltos",
-      "puntos": [
-        "Las dos patas juntas",
-        "Ganancia calculada",
-        "Nada a medio registrar"
-      ],
-      "espera": 4200
-    },
-    {
-      "tipo": "pantalla",
-      "como": "staff",
-      "ruta": "/dashboard/nueva-transferencia",
-      "titulo": "Nueva transferencia",
-      "etiqueta": "Nueva transferencia",
-      "espera": 2800
+      "como": "cliente",
+      "ruta": "/dashboard/cuenta-corriente",
+      "titulo": "El cliente, desde su usuario",
+      "etiqueta": "El cliente, desde su usuario",
+      "voz": "Que él mismo puede consultar, desde el teléfono.",
+      "espera": 2000
     },
     {
       "tipo": "pantalla",
@@ -211,18 +90,8 @@
       "ruta": "/dashboard/transferencias",
       "titulo": "Transferencias",
       "etiqueta": "Transferencias",
-      "espera": 2400
-    },
-    {
-      "tipo": "lamina",
-      "seccion": "04 · CONTROL",
-      "titulo": "El resultado, y quién hizo qué",
-      "puntos": [
-        "Ganancias por período",
-        "Auditoría inalterable",
-        "Roles y permisos"
-      ],
-      "espera": 4200
+      "voz": "Las transferencias, con su ganancia calculada.",
+      "espera": 2000
     },
     {
       "tipo": "pantalla",
@@ -230,7 +99,8 @@
       "ruta": "/dashboard/ganancias?p=mes",
       "titulo": "Ganancias",
       "etiqueta": "Ganancias",
-      "espera": 3200
+      "voz": "Cuánto se ganó, por día, por semana o por mes.",
+      "espera": 2000
     },
     {
       "tipo": "pantalla",
@@ -238,47 +108,33 @@
       "ruta": "/dashboard/admin/auditoria",
       "titulo": "Auditoría",
       "etiqueta": "Auditoría",
-      "espera": 2800
-    },
-    {
-      "tipo": "pantalla",
-      "como": "staff",
-      "ruta": "/dashboard/admin/usuarios",
-      "titulo": "Usuarios y roles",
-      "etiqueta": "Usuarios y roles",
-      "espera": 2400
+      "voz": "Y quién hizo qué, registrado y sin poder alterarse.",
+      "espera": 2000
     },
     {
       "tipo": "lamina",
-      "seccion": "05 · EL CLIENTE",
-      "titulo": "Consulta su cuenta desde su propio usuario",
+      "seccion": "",
+      "titulo": "En la nube, en cualquier dispositivo",
       "puntos": [
-        "Sin llamar por teléfono",
-        "Desde cualquier dispositivo",
-        "Solo ve lo suyo"
+        "Sin servidores",
+        "Sin instalar nada",
+        "Desde el teléfono"
       ],
-      "espera": 4200
-    },
-    {
-      "tipo": "pantalla",
-      "como": "cliente",
-      "ruta": "/dashboard/cuenta-corriente",
-      "titulo": "Portal del cliente",
-      "etiqueta": "Portal del cliente",
-      "espera": 3600,
-      "accion": "bajar-despacio"
+      "voz": "En la nube. En cualquier dispositivo.",
+      "espera": 2000
     }
   ],
   "cierre": {
-    "titulo": "Toda la operatoria en un solo lugar",
-    "texto": "Sin planillas sueltas. Solución segura, trazable, escalable e Innovadora",
-    "espera": 6000
+    "titulo": "Tu operación, bajo control",
+    "texto": "Caja, cuentas corrientes y resultados, en un solo lugar.",
+    "voz": "Tu operación, bajo control.",
+    "espera": 2400
   },
   "tiempos": {
-    "leer": 1800,
-    "respirar": 500,
-    "salidaCartel": 300,
-    "tipeo": 250,
-    "trasIngresar": 900
+    "leer": 0,
+    "respirar": 400,
+    "salidaCartel": 0,
+    "palabrasPorMinuto": 145,
+    "respiroVoz": 500
   }
 }
