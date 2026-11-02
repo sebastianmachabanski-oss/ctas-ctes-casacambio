@@ -121,6 +121,30 @@ hay que cerrar y volver a abrir la terminal).
 El archivo sale en WebM porque es lo único que sabe grabar el navegador. WebM se ve bien
 en cualquier navegador, pero para mandarlo por WhatsApp o por correo conviene MP4.
 
+### Capturas para el material de venta
+
+```powershell
+npm run captura
+```
+
+Deja en `demo/salida/` una captura de la pantalla de Inicio con los datos de demostración,
+al doble de resolución y sin las barras del navegador ni el cartelito de errores de Next.
+
+Existe porque en un folleto **un dibujo de la pantalla no sirve**: si dice "así se ve el
+sistema" y lo que muestra no es el sistema, la primera demostración lo desmiente. Además se
+rehace sola cada vez que la pantalla cambia.
+
+Con `DEMO_RUTA` se captura otra pantalla:
+
+```powershell
+$env:DEMO_RUTA="/dashboard/cuenta-corriente"
+npm run captura
+```
+
+Misma guarda que el grabador: solo contra `localhost` y con el usuario de la base de
+demostración. Una captura con nombres y saldos de un cliente real en un folleto es un
+problema del que no se vuelve.
+
 #### El relato
 
 El video va **relatado**: una voz cuenta lo que se ve. Cada parada del guion tiene su
