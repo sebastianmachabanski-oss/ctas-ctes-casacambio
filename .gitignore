@@ -25,3 +25,9 @@ demo/musica.mp3
 demo/musica.m4a
 demo/musica.wav
 demo/musica.ogg
+
+# El relato. Tampoco se versiona: es un archivo de audio que se regenera, y puede
+# llegar a pesar varios megas.
+demo/narracion.*
+demo/relato.*
+demo/voz.*

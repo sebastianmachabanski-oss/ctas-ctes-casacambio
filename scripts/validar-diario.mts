@@ -6,7 +6,7 @@
  * No toca la base. Cubre el caso real del 5/10/2026: la cuenta EDY tenía dos ingresos de
  * U$S 5.000 el mismo día ("MATI RAFA" y "RAFA") y al borrar uno el saldo quedaba mal.
  */
-import { desempatar } from '../src/lib/diario'
+import { desempatar, sonIndistinguibles, hayColumnaVinculo, olvidarColumnaVinculo, sincronizarDiario } from '../src/lib/diario'
 
 let ok = 0
 const fallas: string[] = []
@@ -70,6 +70,103 @@ const fila = (id: string, evento: string | null, notas: string | null = null) =>
 {
   const r = desempatar([fila('a', 'RAFA'), fila('b', 'RAFA')], 'RAFA')
   asert('7 · referencias idénticas no se desempatan', r.length === 2)
+}
+
+// ── 8. EL CASO DEL 30/10/2026: dos filas IDÉNTICAS ─────────────────────────
+//     Dos ingresos de U$S 19.300 el mismo día en la misma cuenta, los dos sin
+//     referencia. La referencia no desempata (test 7) y antes se abandonaba, dejando el
+//     saldo del cliente mal. Siendo iguales en todo, son intercambiables: borrar
+//     cualquiera de las dos deja el mismo saldo, así que hay que tocar una.
+{
+  const igual = (id: string) => ({
+    id, evento: null, notas: null,
+    concepto: 'DOLARES → DOLARES', detalle: 'C', moneda: 'DOLARES', cotizacion: null,
+    origen: 'sheet', cc_pesos: 0, cc_dolares: -19300, cc_euros: 0, cc_reales: 0,
+    cc_usdt: 0, cc_libras: 0,
+  })
+  asert('8a · dos filas iguales son intercambiables', sonIndistinguibles([igual('a'), igual('b')]))
+  asert('8b · una sola siempre lo es', sonIndistinguibles([igual('a')]))
+  asert('8c · ninguna también', sonIndistinguibles([]))
+}
+
+// ── 9. Si DIFIEREN en algo, no se toca ninguna ──────────────────────────────
+//     Acá elegir mal cambia la plata de un cliente, y corresponde seguir avisando.
+{
+  const base = {
+    evento: null, notas: null, concepto: 'DOLARES → DOLARES', detalle: 'C',
+    moneda: 'DOLARES', cotizacion: null, origen: 'sheet',
+    cc_pesos: 0, cc_dolares: -19300, cc_euros: 0, cc_reales: 0, cc_usdt: 0, cc_libras: 0,
+  }
+  asert('9a · distinta pata de cuenta corriente',
+    !sonIndistinguibles([{ ...base, id: 'a' }, { ...base, id: 'b', cc_dolares: -19301 }]))
+  asert('9b · distinta moneda',
+    !sonIndistinguibles([{ ...base, id: 'a' }, { ...base, id: 'b', moneda: 'PESOS' }]))
+  asert('9c · distinta referencia',
+    !sonIndistinguibles([{ ...base, id: 'a' }, { ...base, id: 'b', evento: 'RAFA' }]))
+}
+
+// ── 10. El importe se compara POR VALOR, no por texto ───────────────────────
+//     Según el driver, un numeric llega como number o como string: "0" y "0.00" son el
+//     mismo importe, y tomarlos por distintos haría fallar justo el caso que esto arregla.
+{
+  const base = {
+    evento: null, notas: null, concepto: 'DOLARES → DOLARES', detalle: 'C',
+    moneda: 'DOLARES', cotizacion: null, origen: 'sheet',
+    cc_pesos: 0, cc_euros: 0, cc_reales: 0, cc_usdt: 0, cc_libras: 0,
+  }
+  asert('10 · numeric como texto o como número es lo mismo', sonIndistinguibles([
+    { ...base, id: 'a', cc_dolares: -19300 },
+    { ...base, id: 'b', cc_dolares: '-19300.00' as any },
+  ]))
+}
+
+// ── 11. LA BASE SIN LA COLUMNA `vinculo` ───────────────────────────────────
+//     Cada cliente corre sus migraciones a mano, así que este código va a llegar a alguna
+//     base donde todavía no se corrió. Mandar una columna inexistente no deja la fila a
+//     medias: falla el INSERT ENTERO. Si eso pasara en el alta, el operador se quedaría sin
+//     poder cargar una transacción — mucho peor que el problema que todo esto arregla.
+//
+//     Se prueba con una base de mentira que contesta como contestaría PostgREST.
+{
+  const baseFalsa = (tieneColumna: boolean) => {
+    const escrito: Record<string, unknown>[] = []
+    const api: any = {
+      escrito,
+      from: () => api,
+      select: (cols: string) => {
+        // La pregunta por la columna: sin ella, PostgREST devuelve error.
+        if (cols === 'vinculo') {
+          return { limit: () => Promise.resolve(tieneColumna ? { error: null } : { error: { message: 'column diario.vinculo does not exist' } }) }
+        }
+        return { single: () => Promise.resolve({ data: { id: 'nueva' }, error: null }) }
+      },
+      insert: (fila: Record<string, unknown>) => { escrito.push(fila); return api },
+    }
+    return api
+  }
+
+  const cambios: any = {
+    fecha: '2026-10-30', cuenta_cte: 'EDY', operacion: 'INGRESAN',
+    concepto: 'DOLARES → DOLARES', moneda: 'DOLARES', monto: 100, cotizacion: null,
+    cc_pesos: 0, cc_dolares: -100, cc_euros: 0, cc_reales: 0, cc_usdt: 0, cc_libras: 0,
+    evento: null, notas: null, vinculo: 'uuid-del-alta',
+  }
+  const original: any = { tipo: 'CAJA', cliente: 'EDY', fecha: '2026-10-30', operacion: 'INGRESAN', monto: 100 }
+
+  olvidarColumnaVinculo()
+  const sin = baseFalsa(false)
+  asert('11a · sin la columna, la base dice que no', (await hayColumnaVinculo(sin)) === false)
+  await sincronizarDiario(sin, original, 'CTA CTE', cambios, 'prueba')
+  asert('11b · y la fila se escribe SIN el campo', !('vinculo' in sin.escrito[0]),
+    `se escribió ${JSON.stringify(Object.keys(sin.escrito[0] ?? {}))}`)
+  asert('11c · pero con todo lo demás', sin.escrito[0]?.cuenta_cte === 'EDY' && sin.escrito[0]?.monto === 100)
+
+  olvidarColumnaVinculo()
+  const con = baseFalsa(true)
+  asert('11d · con la columna, la base dice que sí', (await hayColumnaVinculo(con)) === true)
+  await sincronizarDiario(con, original, 'CTA CTE', cambios, 'prueba')
+  asert('11e · y la fila se escribe CON el vínculo', con.escrito[0]?.vinculo === 'uuid-del-alta')
+  olvidarColumnaVinculo()
 }
 
 console.log(fallas.length === 0

@@ -2,22 +2,33 @@
   "_leeme": [
     "ESTE ES EL GUION DEL VIDEO. Se edita acá, no en el programa.",
     "",
-    "Cada bloque de 'paradas' es un momento del video:",
-    "  titulo  — el renglón grande del cartel",
-    "  texto   — la explicación, abajo del título",
-    "  espera  — cuánto se queda en esa pantalla, en milésimas de segundo (1000 = 1 segundo)",
-    "  ruta    — qué pantalla mostrar. null = quedarse en la misma de antes",
-    "  como    — con qué usuario: 'staff' (el administrador) o 'cliente'",
-    "  accion  — opcional, el nombre de un movimiento guionado (bajan la pantalla, escriben",
-    "            en un campo). Los disponibles están listados en grabar-demo.mjs.",
+    "El video dura unos 52 segundos y está RELATADO: cada parada tiene su renglón de",
+    "relato en 'voz'. `npm run revisar` imprime el texto completo, listo para",
+    "copiar y pegar en el generador de voz.",
     "",
-    "Para sacar una parada, borrá su bloque entre llaves. Para agregar una, copiá uno",
-    "parecido y cambiale el contenido. Cuidado con las comas: todos los bloques llevan",
-    "una coma al final MENOS el último.",
+    "  titulo / etiqueta — el nombre de la pantalla, chico, en un rincón",
+    "  voz               — lo que se dice mientras se ve esa pantalla",
+    "  espera            — cuánto dura, en milésimas de segundo. OJO: si ya está el",
+    "                      archivo de la voz en demo/, NO SE USA. El video sigue a la",
+    "                      voz: cada pantalla dura lo que dura su frase grabada más la",
+    "                      pausa que viene después. `npm run revisar` muestra el reparto.",
+    "  pausaDespues      — silencio EXTRA después de esa frase, para las pantallas que",
+    "                      necesitan mirarse más rato. Se suma a 'pausaEntreFrases'.",
+    "  frases            — cuántas frases del audio ocupa este renglón. Lo CLAVA, para",
+    "                      cuando la voz no dice exactamente el texto de acá. Se",
+    "                      comprueba con `npm run frases`, que corta el audio en",
+    "                      frases sueltas y dice a quién le tocó cada una.",
     "",
-    "Si el archivo queda mal escrito, el grabador avisa y no graba. No rompe nada.",
+    "PARA QUE EL VIDEO VAYA MÁS DESPACIO se sube 'pausaEntreFrases' (abajo, en",
+    "'tiempos'). Estira los silencios del archivo de voz sin volver a generarlo, así",
+    "que cada pantalla se ve más rato y la carga tiene tiempo de terminar.",
+    "  ruta              — qué pantalla mostrar. null = quedarse en la de antes",
+    "  tipo: 'lamina'    — no muestra la aplicación: es una placa de texto",
     "",
-    "El color del cartel está en 'estilo', más abajo."
+    "La regla de oro: si una parada no se puede explicar en un renglón de relato,",
+    "no entra. El largo se gradúa con las pausas, no agregando frases.",
+    "",
+    "Si el archivo queda mal escrito, cualquier comando avisa en qué renglón."
   ],
   "estilo": {
     "_comentario": [
@@ -25,7 +36,8 @@
       "Va SIN el '#' y separado por comas, porque el cartel lo usa opaco abajo y",
       "transparente arriba.",
       "",
-      "  228,228,233   gris claro (el que está)",
+      "  205,206,213   gris claro (el que está)",
+      "  228,228,233   un poco más claro",
       "  200,200,206   gris claro un poco más apagado",
       "  245,245,245   casi blanco",
       "  113,113,122   gris medio",
@@ -39,141 +51,115 @@
       "probar tonos sin quedarse con un cartel ilegible. Para imponerlo a mano se agrega",
       "  \"texto\": \"#18181b\""
     ],
-    "fondo": "228,228,233"
+    "fondo": "205,206,213"
+  },
+  "portada": {
+    "titulo": "El sistema de la <b>casa de cambio</b>",
+    "subtitulo": "Toda la operatoria en un solo lugar",
+    "voz": "Un sistema pensado para la gestión integral de una casa de cambio.",
+    "frases": 1,
+    "espera": 1800
   },
   "paradas": [
     {
-      "como": "staff",
-      "ruta": "/dashboard/admin/usuarios",
-      "titulo": "Posibilidad de definir usuarios con distintos roles",
-      "texto": "Superadmin, Admin, Cliente y Operador. El rol define las pantallas a mostrar y el alcance en el sistema",
-      "espera": 5200
-    },
-    {
-      "como": "cliente",
-      "ruta": "/dashboard/cuenta-corriente",
-      "titulo": "El cliente accede a su cuenta corriente",
-      "texto": "Desde cualquier dispositivo, accede a su saldo y sus movimientos. Sin llamar ni esperar a que alguien le arme un resumen.",
-      "espera": 5600,
-      "accion": "bajar-despacio"
-    },
-    {
-      "como": "cliente",
-      "ruta": null,
-      "titulo": "Seguridad",
-      "texto": "Solo tiene acceso a su información",
-      "espera": 5200
-    },
-    {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/inicio",
-      "titulo": "Ahora entra el administrador",
-      "texto": "Mismo sistema, otro alcance: ve la caja, todas las cuentas y los resultados del negocio.",
-      "espera": 5000
+      "titulo": "La caja del día",
+      "etiqueta": "La caja del día",
+      "voz": "En una pantalla, la situación de caja de cada moneda y los últimos movimientos.",
+      "frases": 1,
+      "espera": 1800
     },
     {
-      "como": "staff",
-      "ruta": null,
-      "titulo": "Visibilidad",
-      "texto": "En la misma pantalla cada movimiento con su impacto. Se filtra por fecha, cliente, tipo o monto.",
-      "espera": 5000,
-      "accion": "bajar"
-    },
-    {
-      "como": "staff",
-      "ruta": "/dashboard/cuenta-corriente",
-      "titulo": "Todas las cuentas, en un solo lugar",
-      "texto": "El administrador ve y filtra las cuentas corrientes de toda la casa de cambio, no solo una.",
-      "espera": 5600,
-      "accion": "bajar-despacio"
-    },
-    {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/nueva-transaccion",
-      "titulo": "Simplicidad",
-      "texto": "Las operaciones se cargan de forma simple y controlada, conteniendo los distintos tipos de operación y monedas",
-      "espera": 3800
-    },
-    {
-      "como": "staff",
-      "ruta": null,
-      "titulo": "Impacto",
-      "texto": "Mientras se escribe, la previsualización muestra exactamente cómo queda la caja. Sin sorpresas después.",
-      "espera": 5000,
+      "titulo": "Cargar una operación",
+      "etiqueta": "Cargar una operación",
+      "voz": "Cada operación se carga en segundos, y se ve el impacto antes de guardar.",
+      "frases": 1,
+      "espera": 1800,
       "accion": "cargar-operacion"
     },
     {
+      "tipo": "pantalla",
       "como": "staff",
-      "ruta": "/dashboard/nueva-transferencia",
-      "titulo": "Nueva transferencia",
-      "texto": "Texto a completar.",
-      "espera": 5000
+      "ruta": "/dashboard/cuenta-corriente",
+      "titulo": "Cuentas corrientes",
+      "etiqueta": "Cuentas corrientes",
+      "voz": "Las cuentas corrientes, con el saldo de cada cliente,",
+      "frases": 1,
+      "espera": 1800
     },
     {
+      "tipo": "pantalla",
+      "como": "cliente",
+      "ruta": "/dashboard/cuenta-corriente",
+      "titulo": "El cliente, desde su usuario",
+      "etiqueta": "El cliente, desde su usuario",
+      "voz": "que él mismo puede consultar desde su teléfono.",
+      "frases": 1,
+      "espera": 1800
+    },
+    {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/transferencias",
       "titulo": "Transferencias",
-      "texto": "Carga de transferencias entre terceros, identificando los movimientos y la ganancia para la oficina.",
-      "espera": 5200
+      "etiqueta": "Transferencias",
+      "voz": "Las transferencias, con su ganancia calculada.",
+      "frases": 1,
+      "espera": 1800
     },
     {
-      "como": "staff",
-      "ruta": "/dashboard/gastos",
-      "titulo": "Gastos",
-      "texto": "Alquiler, sueldos, servicios tienen impacto en la situación de caja, permite registrarlos y listarlos",
-      "espera": 4800,
-      "accion": "bajar-despacio"
-    },
-    {
-      "como": "staff",
-      "ruta": "/dashboard/calle",
-      "titulo": "Dinero en calle",
-      "texto": "Texto a completar.",
-      "espera": 5000,
-      "accion": "bajar-despacio"
-    },
-    {
-      "como": "staff",
-      "ruta": "/dashboard/deudores",
-      "titulo": "Posición Ctas Ctes",
-      "texto": "Texto a completar.",
-      "espera": 5000,
-      "accion": "bajar-despacio"
-    },
-    {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/ganancias?p=mes",
       "titulo": "Ganancias",
-      "texto": "Detalle por día, semana, mes o año. apertura paso a paso de como se arriba al resultado",
-      "espera": 5200,
-      "accion": "bajar-despacio"
+      "etiqueta": "Ganancias",
+      "voz": "Cuánto se ganó, por día, por semana, por mes.",
+      "frases": 1,
+      "espera": 1800
     },
     {
+      "tipo": "pantalla",
       "como": "staff",
       "ruta": "/dashboard/admin/auditoria",
-      "titulo": "Trazabilidad",
-      "texto": "Quién hizo qué, y cuándo. Cada alta, corrección o borrado queda registrado con su autor y su hora.",
-      "espera": 4600
+      "titulo": "Auditoría",
+      "etiqueta": "Auditoría",
+      "voz": "Quién hizo cada operación, registrado y sin poder alterarse. Seguro.",
+      "frases": 2,
+      "espera": 1800
     },
     {
-      "como": "staff",
-      "ruta": null,
-      "titulo": "Auditable",
-      "texto": "En una corrección se guardan los dos valores, el viejo y el nuevo. El registro no se puede editar ni borrar.",
-      "espera": 5000,
-      "accion": "bajar"
-    },
-    {
-      "como": "staff",
-      "ruta": "/dashboard/mi-cuenta",
-      "titulo": "Mi cuenta",
-      "texto": "Texto a completar.",
-      "espera": 5000
+      "tipo": "lamina",
+      "seccion": "",
+      "titulo": "En la nube, en cualquier dispositivo",
+      "puntos": [
+        "Sin servidores",
+        "Sin instalar nada",
+        "Desde el teléfono"
+      ],
+      "voz": "Trazable. En la nube. En cualquier dispositivo.",
+      "frases": 3,
+      "espera": 1800
     }
   ],
   "cierre": {
-    "titulo": "Toda la operatoria en un solo lugar",
-    "texto": "Sin planillas sueltas. Solución segura, trazable, escalable e Innovadora",
-    "espera": 4200
+    "titulo": "Tu operación, bajo control",
+    "texto": "Caja, cuentas corrientes y resultados, en un solo lugar.",
+    "voz": "Tu operación, bajo control.",
+    "frases": 1,
+    "espera": 2000
+  },
+  "tiempos": {
+    "leer": 0,
+    "respirar": 150,
+    "salidaCartel": 0,
+    "palabrasPorMinuto": 118,
+    "respiroVoz": 0,
+    "pausaEntreFrases": 2000,
+    "corteVoz": 350
   }
 }
