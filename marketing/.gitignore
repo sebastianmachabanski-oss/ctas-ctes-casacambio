@@ -1,0 +1,4 @@
+# Los PDF y los HTML intermedios se regeneran con `node a-pdf.mjs`: no se versionan.
+# Lo que vale es brochure.html, que es de donde salen los dos.
+Sistema-para-casas-de-cambio*.pdf
+Sistema-para-casas-de-cambio*.html
