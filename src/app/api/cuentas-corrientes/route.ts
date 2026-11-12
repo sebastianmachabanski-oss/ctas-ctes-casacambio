@@ -14,6 +14,25 @@ import { esStaff } from '@/lib/roles'
 // Usa el service role: la policy de escritura de `cuentas_corrientes` es solo para
 // administradores, pero esta pantalla también la usa el rol operador — el permiso ya se
 // valida arriba.
+/**
+ * Deja el nombre en `clientes`, que es el padrón del que sale el desplegable del filtro
+ * del listado de transacciones.
+ *
+ * POR QUÉ HACE FALTA (12/11/2026)
+ * `clientes` la llenaba SOLO la sincronización desde la planilla. Una cuenta creada desde
+ * la app quedaba en `cuentas_corrientes` pero no en el padrón, así que sus movimientos se
+ * veían en el listado y el filtro no la ofrecía: para el operador, el filtro "no
+ * encontraba" algo que estaba a la vista. Pasó en producción con dos cuentas.
+ *
+ * No corta el alta si falla: la cuenta ya quedó creada, y quedarse sin poder filtrarla es
+ * mucho menos grave que no poder crearla.
+ */
+async function anotarEnPadron(admin: ReturnType<typeof createAdminClient>, nombre: string) {
+  const { error } = await admin.from('clientes')
+    .upsert({ nombre, activo: true }, { onConflict: 'nombre', ignoreDuplicates: true })
+  if (error) console.error('No se pudo anotar en el padrón de clientes:', error.message)
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -37,11 +56,13 @@ export async function POST(request: Request) {
     if (!existente.activo) {
       await admin.from('cuentas_corrientes').update({ activo: true }).eq('nombre', existente.nombre)
     }
+    await anotarEnPadron(admin, existente.nombre)
     return NextResponse.json({ success: true, nombre: existente.nombre, ya_existia: true })
   }
 
   const { error } = await admin.from('cuentas_corrientes').insert({ nombre, activo: true })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  await anotarEnPadron(admin, nombre)
   return NextResponse.json({ success: true, nombre, ya_existia: false })
 }
