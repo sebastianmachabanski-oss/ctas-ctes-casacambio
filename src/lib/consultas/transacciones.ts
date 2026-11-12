@@ -29,6 +29,25 @@ export type ParamsTransacciones = {
  */
 export const SIN_EXTERNA = '(sin)'
 
+/**
+ * Une las dos fuentes de nombres del desplegable, sin repetidos y en orden alfabético.
+ *
+ * Compara SIN distinguir mayúsculas ni espacios de sobra, porque las dos tablas se
+ * llenaron por caminos distintos y el mismo nombre puede estar escrito de dos formas. Ante
+ * un empate gana el del padrón, que es el que coincide carácter por carácter con lo que
+ * hay guardado en los movimientos — y el filtro compara por igualdad exacta.
+ */
+export function unirPadron(padron: string[], cuentas: string[]): string[] {
+  const clave = (n: string) => n.trim().toUpperCase()
+  const porClave = new Map<string, string>()
+  for (const n of [...padron, ...cuentas]) {
+    const nombre = (n ?? '').trim()
+    if (!nombre) continue
+    if (!porClave.has(clave(nombre))) porClave.set(clave(nombre), nombre)
+  }
+  return Array.from(porClave.values()).sort((a, b) => a.localeCompare(b, 'es'))
+}
+
 export async function traerTransacciones(
   supabase: SupabaseClient<any, any, any>,
   sp: ParamsTransacciones,
@@ -97,14 +116,28 @@ export async function traerTransacciones(
 
   // Padrón para el desplegable del filtro. Paginado: Postgrest corta en 1.000 y hay más
   // clientes que eso, así que sin esto faltarían los del final del abecedario.
-  const clientes: string[] = []
+  const delPadron: string[] = []
   for (let from = 0; ; from += 1000) {
     const { data } = await supabase.from('clientes')
       .select('nombre').eq('activo', true).order('nombre').range(from, from + 999)
     const filas = (data ?? []) as any[]
-    clientes.push(...filas.map(c => c.nombre))
+    delPadron.push(...filas.map(c => c.nombre))
     if (filas.length < 1000) break
   }
+
+  // Y TAMBIÉN las cuentas corrientes (12/11/2026).
+  //
+  // El desplegable salía solo de `clientes`, que llena la sincronización desde la
+  // planilla. Una cuenta creada DESDE LA APP no pasa por ahí, así que no aparecía en la
+  // lista y no había forma de filtrar por ella: el movimiento se veía en el listado y el
+  // filtro juraba que no existía. Pasó en producción con dos cuentas.
+  //
+  // Las dos listas se unen en vez de elegir una: `clientes` tiene los clientes eventuales
+  // de las filas de CAJA, que no son cuentas, y `cuentas_corrientes` tiene las cuentas
+  // nuevas. Ninguna de las dos sola alcanza.
+  const { data: ctas } = await supabase
+    .from('cuentas_corrientes').select('nombre').eq('activo', true)
+  const clientes = unirPadron(delPadron, ((ctas ?? []) as any[]).map(c => c.nombre))
 
   let query = conFiltros('*', { count: 'exact' })
     // MISMA SECUENCIA QUE LA PLANILLA, dada vuelta: lo más nuevo arriba (25/8/2026).

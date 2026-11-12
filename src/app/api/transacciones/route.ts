@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 import { registrarAuditoria, calcularHuella, describirMovimiento } from '@/lib/auditoria'
 import { esStaff } from '@/lib/roles'
@@ -251,6 +251,30 @@ export async function POST(request: Request) {
     notas: notas || null,
     cuenta: impacto.cuenta,
   }
+  // EL NOMBRE QUEDA EN EL PADRÓN DEL FILTRO (12/11/2026).
+  //
+  // `clientes` es de donde sale el desplegable con el que se filtra el listado, y hasta
+  // ahora la llenaba SOLO la sincronización desde la planilla. Todo lo cargado desde la
+  // app con un nombre que la planilla no tenía quedaba invisible para el filtro: el
+  // movimiento se veía en el listado y el filtro no ofrecía ese nombre. Pasó en
+  // producción con dos cuentas corrientes.
+  //
+  // Va con el service role porque escribir en `clientes` es de administradores y esta
+  // pantalla la usa también el operador; el permiso ya se validó arriba. Y va envuelto:
+  // el movimiento ya está guardado, así que un fallo acá no puede tumbar el alta — como
+  // mucho deja ese nombre fuera del filtro hasta la próxima vez que se cargue.
+  const nombrePadron = String(cuenta_cte ?? '').trim()
+  if (nombrePadron) {
+    try {
+      const admin = createAdminClient()
+      const { error } = await admin.from('clientes')
+        .upsert({ nombre: nombrePadron, activo: true }, { onConflict: 'nombre', ignoreDuplicates: true })
+      if (error) console.error('No se pudo anotar en el padrón de clientes:', error.message)
+    } catch (e: any) {
+      console.error('No se pudo anotar en el padrón de clientes:', e?.message ?? e)
+    }
+  }
+
   await registrarAuditoria(supabase, {
     accion: 'alta',
     usuarioId: user.id,
