@@ -105,12 +105,13 @@ exige que volumen e importe en pesos estén en la misma pata.
 Cómo se calcula:
 
 1. Se agrupan las filas con `op = 'T'` por **NOTAS**, que es donde el cliente anota los
-   participantes, y dentro de cada nota las patas se **parean por orden cronológico**: el
-   ingreso más viejo sin pareja se cancela con el egreso más viejo sin pareja.
-2. Un par **realizado** —ingreso + egreso— cuenta **entero**, en la fecha de la pata que lo
-   completó. Se suman sus **columnas de caja**, que ya traen el signo puesto (INGRESAN
-   suma, EGRESAN resta), así que la suma **es** la diferencia. Lo que no tiene pareja no
-   entra: todavía no se realizó.
+   participantes, y dentro de cada nota las patas se agrupan por **orden cronológico y por
+   importe**: cada pata abre una transferencia que queda esperando que la cubran del otro
+   lado, y las del lado contrario le van descontando su importe hasta cubrirla.
+2. Una transferencia **realizada** cuenta **entera**, en la fecha de la pata que terminó de
+   cubrirla. Se suman sus **columnas de caja**, que ya traen el signo puesto (INGRESAN
+   suma, EGRESAN resta), así que la suma **es** la diferencia. Lo que no tiene
+   contrapartida no entra: todavía no se realizó.
 3. Ese neto nace en la moneda de la operación. Para sumarlo al total en pesos se convierte
    con la **cotización implícita del par en el período**, la misma que usa el panel de
    dólares. Las transferencias que ya son en pesos entran directo, sin convertir.
@@ -131,11 +132,13 @@ Entra al resultado apenas se carga la punta que falta.
 
 Definiciones del negocio, confirmadas por el cliente:
 
-1. Una transferencia tiene **dos patas**: lo que ingresa y lo que egresa.
-2. El ingreso **siempre** es mayor o igual al egreso. Si no, no hay negocio — un par que da
-   negativo es un **error de carga**, no una pérdida, y la pantalla lo avisa aparte.
-3. **Hasta que no está la segunda pata, no se computa nada.** Cuando llega, el par **entero**
-   cuenta en esa fecha.
+1. Una transferencia tiene lo que **ingresa** y lo que **egresa**. Lo habitual es una pata
+   de cada lado, pero lo que entra de una vez puede salir repartido en varios pagos.
+2. El ingreso **siempre** es mayor o igual al egreso. Si no, no hay negocio — una
+   transferencia que da negativa es un **error de carga**, no una pérdida, y la pantalla lo
+   avisa aparte.
+3. **Hasta que lo que entró no queda cubierto por lo que salió, no se computa nada.**
+   Cuando se cubre, la transferencia **entera** cuenta en esa fecha.
 
 **Qué cambió.** Antes cada pata se imputaba a su propia fecha y lo único que decidía el
 grupo era si contaba o no. Con eso, una transferencia con el ingreso en agosto y el egreso
@@ -143,10 +146,37 @@ en septiembre dejaba el ingreso entero en agosto y el egreso entero —negativo�
 septiembre: los meses quedaban partidos al medio y uno de los dos daba pérdida.
 
 **Cómo se parea.** Las notas son contrapartes que se REPITEN: "MATI - EDY" tiene 164 patas
-en 19 meses. La nota sola no identifica una transferencia, así que dentro de cada nota las
-patas se parean por **orden cronológico** (FIFO). Es lo que haría una persona mirando la
-planilla, y sobre los datos reales cierra: todos los grupos tienen la misma cantidad de
-ingresos que de egresos.
+en 19 meses. La nota sola no identifica una transferencia, así que dentro de cada nota se
+agrupa por orden cronológico y por importe:
+
+- Una pata abre una transferencia y queda esperando que la cubran del otro lado.
+- Cada pata del lado contrario va contra la transferencia abierta **más vieja** y le
+  descuenta su importe. Pueden hacer falta varias.
+- La transferencia **se cierra** cuando lo que falta cubrir cae por debajo de
+  `TOLERANCIA_CIERRE` (5%), porque eso que sobra ya no es una salida pendiente: es el
+  **spread**, o sea la ganancia.
+- Una pata del **mismo lado** nunca se suma a una transferencia abierta: abre la suya y se
+  pone en la cola detrás. Dos ingresos seguidos son dos transferencias esperando su salida,
+  no un ingreso en dos veces.
+- Si llega una pata que ya no entra en lo que falta cubrir, la de adelante se da por
+  terminada con lo que tiene y la nueva pasa a la siguiente de la cola.
+
+### Una transferencia repartida en varias salidas (16/11/2026)
+
+Hasta esta fecha el emparejamiento era **una pata contra una pata**. Con eso, una
+transferencia repartida en dos salidas dejaba el grupo **corrido un lugar para siempre**:
+desde ahí cada par mezclaba patas de transferencias distintas. El total seguía cerrando,
+pero caía en fechas equivocadas y la última pata quedaba sin pareja y se informaba como "en
+curso" sin estarlo.
+
+Pasó en tres referencias. Se vio en **"CAR - EDY"**: el 30/1/2026 entraron 52.330 y
+salieron 34.780 + 16.830, con 720 de spread. La consecuencia recién apareció en noviembre,
+con **US$ (14.198) en curso** de una transferencia que había cerrado el mismo día, mayo
+inflado en 22.245 y el 13/11 hundido en 24.095.
+
+Para encontrar estos casos está `scripts/transferencias-sin-pareja.sql`: lista las
+referencias con distinta cantidad de ingresos que de egresos, las patas que quedan sueltas
+y las transferencias cuyo egreso superó al ingreso.
 
 Para saber si un grupo está cerrado hay que mirar su historia completa, no solo el período:
 una punta puede haberse cargado meses antes. Por eso la consulta de transferencias trae
