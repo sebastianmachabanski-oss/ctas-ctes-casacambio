@@ -154,6 +154,7 @@ export default async function InicioPage({
             pref="t"
             filtros={tx.filtros}
             totales={tx.totales}
+            hayFiltro={tx.hayFiltro}
             clientes={tx.clientes}
             clientesSel={tx.clientesSel}
             movimientos={tx.movimientos}

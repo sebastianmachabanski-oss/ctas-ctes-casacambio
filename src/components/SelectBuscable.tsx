@@ -50,6 +50,25 @@ export default function SelectBuscable({
 
   function elegir(v: string) { onChange(v); setAbierto(false) }
 
+  /**
+   * La ayuda sale de las opciones REALES del campo (18/11/2026).
+   *
+   * Era un texto fijo con el ejemplo de Operación —"V = VENTA"—, pero este desplegable lo
+   * usan también Moneda propia, Moneda externa y Tipo: al pararse sobre las monedas, la
+   * ayuda explicaba cómo elegir una opción que ni siquiera está en esa lista.
+   *
+   * Se prefiere una opción cuya inicial no comparta con ninguna otra, para que el ejemplo
+   * sea de los que se eligen con UNA tecla. Si todas comparten inicial, igual sirve: la
+   * tecla repetida cicla entre ellas.
+   */
+  const inicialDe = (s: string) => s.trim().charAt(0).toUpperCase()
+  const conInicialUnica = opciones.find(o =>
+    o.trim() && opciones.filter(q => inicialDe(q) === inicialDe(o)).length === 1)
+  const ejemplo = (conInicialUnica ?? opciones.find(o => o.trim()))?.trim()
+  const ayuda = ejemplo
+    ? `Tocá la primera letra para elegir (${inicialDe(ejemplo)} = ${ejemplo}). Las flechas recorren la lista.`
+    : 'Tocá la primera letra para elegir. Las flechas recorren la lista.'
+
   function mover(paso: 1 | -1) {
     if (!opciones.length) return
     const i = opciones.indexOf(value)
@@ -93,7 +112,7 @@ export default function SelectBuscable({
         role="combobox"
         aria-expanded={abierto}
         aria-controls={id ? `${id}-lista` : undefined}
-        title="Tocá la primera letra para elegir (V = VENTA). Las flechas recorren la lista."
+        title={ayuda}
         style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
       />
       <span aria-hidden className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">▾</span>
