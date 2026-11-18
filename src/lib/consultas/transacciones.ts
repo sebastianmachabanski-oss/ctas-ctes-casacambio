@@ -158,20 +158,33 @@ export async function traerTransacciones(
     .order('creado_at', { ascending: false, nullsFirst: false })
   query = query.range((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA - 1)
 
+  // ¿Hay filtro POR COLUMNA? El rango de fechas no cuenta: la pantalla siempre tiene un
+  // período puesto (Día/Semana/Mes/Año/Todo), así que contarlo sería decir que siempre
+  // hay filtro. Decide si se muestran —y si se calculan— los totales de abajo.
+  const hayFiltro = Boolean(
+    fCli || fTipo || fOp || fNotas || fAutor || fMonto || fPropio || fExterno)
+
   // Totales del resultado filtrado COMPLETO. Sumar solo la página respondería otra
   // pregunta: filtrando un cliente, lo que interesa es su total, no el de las 100 filas
-  // que entraron en pantalla. Se traen tres columnas y se suman acá; Postgrest no agrega.
+  // que entraron en pantalla. Se traen dos columnas y se suman acá; Postgrest no agrega.
+  //
+  // SOLO CON FILTRO (18/11/2026). Sin filtrar, estos totales son los mismos que ya muestran
+  // las tarjetas de arriba, y calcularlos cuesta recorrer TODAS las filas que coinciden, de
+  // a mil por vez. Con el período en "Todo" eso es leer la tabla entera en cada carga de la
+  // pantalla para repetir un número que ya está a la vista. Filtrando un cliente, en cambio,
+  // es justo el dato que no está en ningún otro lado.
   const PAGINA_TOT = 1000
-  const totales = { monto: 0, pesos: 0, dolares: 0 }
-  for (let from = 0; ; from += PAGINA_TOT) {
-    const { data: pg } = await conFiltros('monto, pesos, dolares').range(from, from + PAGINA_TOT - 1)
-    const filas = (pg ?? []) as any[]
-    for (const f of filas) {
-      totales.monto   += Math.abs(Number(f.monto) || 0)
-      totales.pesos   += Number(f.pesos) || 0
-      totales.dolares += Number(f.dolares) || 0
+  const totales = { pesos: 0, dolares: 0 }
+  if (hayFiltro) {
+    for (let from = 0; ; from += PAGINA_TOT) {
+      const { data: pg } = await conFiltros('pesos, dolares').range(from, from + PAGINA_TOT - 1)
+      const filas = (pg ?? []) as any[]
+      for (const f of filas) {
+        totales.pesos   += Number(f.pesos) || 0
+        totales.dolares += Number(f.dolares) || 0
+      }
+      if (filas.length < PAGINA_TOT) break
     }
-    if (filas.length < PAGINA_TOT) break
   }
 
   const { data, count, error } = await query
@@ -185,6 +198,7 @@ export async function traerTransacciones(
     clientes,
     clientesSel,
     totales,
+    hayFiltro,
     total,
     pagina,
     totalPaginas,

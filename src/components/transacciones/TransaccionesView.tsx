@@ -77,14 +77,24 @@ function badge(op: string) {
 }
 
 type Filtros = { cli: string; tipo: string; op: string; notas: string; autor: string; monto: string; propio: string; externo: string }
-type Totales = { monto: number; pesos: number; dolares: number }
+// Sin "monto": sumaba la columna MONTO de todas las filas SIN MIRAR LA MONEDA, así que
+// juntaba pesos con dólares, euros y reales como si fueran la misma unidad. Con el período
+// en "Todo" daba 72.169.274.373, un número que no se puede usar para nada (18/11/2026).
+type Totales = { pesos: number; dolares: number }
 
 /** Los parámetros que este listado maneja en la URL. Lo demás no se toca al navegar. */
 const MIOS = ['desde', 'hasta', 'pagina', 'cli', 'tipo', 'op', 'notas', 'autor', 'monto', 'propio', 'externo'] as const
 
-export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas, filtros, totales, clientes, clientesSel, ruta = '/dashboard/inicio', pref = 't' }: {
+export default function TransaccionesView({ movimientos, puedeEditar, desde, hasta, total, pagina, totalPaginas, filtros, totales, hayFiltro, clientes, clientesSel, ruta = '/dashboard/inicio', pref = 't' }: {
   movimientos: Mov[]; puedeEditar: boolean; desde: string; hasta: string
   total: number; pagina: number; totalPaginas: number; filtros: Filtros; totales: Totales
+  /**
+   * Si hay algún filtro POR COLUMNA aplicado (lo calcula el servidor, en
+   * src/lib/consultas/transacciones.ts). El rango de fechas no cuenta: siempre hay uno.
+   * Lo manda el servidor y no se recalcula acá para que describa lo que está EN PANTALLA
+   * y no lo que se acaba de tipear, que viaja 400ms después.
+   */
+  hayFiltro: boolean
   clientes: string[]; clientesSel: string[]
   /** Pantalla que contiene el listado. Desde el 10/9/2026 es Inicio. */
   ruta?: string
@@ -218,7 +228,6 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
   // Fecha, Op, Tipo, Cliente, Operación, Cot., Monto, (2 fijas más) y Notas, más una
   // columna de importe por moneda con saldo y la de acciones si puede editar.
   const ncols = 11 + cols.length + (puedeEditar ? 1 : 0)
-  const hayFiltro = Boolean(cliSel.length || fTipo || fOp || fNotas || fAutor || fMin)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10 }}>
@@ -265,17 +274,17 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
             </span>
           </div>
 
-          {/* Totales de TODO lo que coincide con los filtros, no solo de esta página. */}
+          {/* Totales de TODO lo que coincide con el filtro, no solo de esta página.
+              SOLO CUANDO HAY FILTRO (18/11/2026): sin filtrar repetían lo que ya dicen las
+              tarjetas de Situación de caja, y costaban recorrer la tabla entera para eso. */}
+          {hayFiltro && (
           <div
-            title={hayFiltro
-              ? `Totales de los ${total.toLocaleString('es-AR')} movimientos que coinciden con el filtro, no solo de esta página.`
-              : 'Totales de todos los movimientos del rango, no solo de esta página.'}
+            title={`Totales de los ${total.toLocaleString('es-AR')} movimientos que coinciden con el filtro, no solo de esta página.`}
             className="tx-totales">
-            {/* La palabra "Total" va aparte porque en el teléfono se oculta: repetida tres
-                veces son ~120px, justo lo que falta para que los tres entren en un renglón.
-                El rótulo de la tarjeta ya dice que son totales. */}
+            {/* La palabra "Total" va aparte porque en el teléfono se oculta: repetida
+                son los píxeles que faltan para que entren en un renglón. El rótulo de la
+                tarjeta ya dice que son totales. */}
             {([
-              ['monto', nf0.format(totales.monto), 'var(--ink)'],
               ['imp. $', ars(Math.round(totales.pesos)), totales.pesos >= 0 ? 'var(--pos-ink)' : 'var(--neg-ink)'],
               ['imp. U$S', usdTot(Math.round(totales.dolares)), totales.dolares >= 0 ? 'var(--pos-ink)' : 'var(--neg-ink)'],
             ] as [string, string, string][]).map(([lbl, val, col]) => (
@@ -287,6 +296,7 @@ export default function TransaccionesView({ movimientos, puedeEditar, desde, has
               </div>
             ))}
           </div>
+          )}
         </div>
       </div>
 
