@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -10,6 +10,15 @@ import { aUsuario } from '@/lib/usuarios'
 import type { Profile } from '@/lib/supabase/types'
 
 type Item = { href?: string; label: string; icon: string; off?: boolean; section?: string }
+
+/**
+ * El mismo corte que usa el CSS. Arriba de esto la barra se ANCLA y corre el contenido;
+ * abajo es un PANEL que se abre encima, con fondo oscuro y se cierra tocando afuera.
+ * Si se cambia acá hay que cambiarlo también en globals.css.
+ */
+const COMO_PANEL = '(max-width: 860px)'
+const esPanel = () =>
+  typeof window !== 'undefined' && window.matchMedia(COMO_PANEL).matches
 
 // Menú por rol (ver src/lib/roles.ts para el modelo completo).
 // Todas las opciones están habilitadas (16/7/2026, pedido del cliente).
@@ -85,11 +94,18 @@ export default function Sidebar({ profile }: { profile: Profile }) {
     // rebota desde el layout — esconder la opción no alcanza, con la URL se entra igual.
     .filter(it => !it.href || rutaActiva(it.href))
 
+  /** Ancla o desancla, y lo recuerda para la próxima visita. */
+  const anclar = useCallback((v: boolean) => {
+    setPinned(v)
+    setNavOpen(false)
+    try { localStorage.setItem('cc-nav-pinned', v ? '1' : '0') } catch {}
+  }, [])
+
   // Estado de anclado: recordado entre visitas; en pantallas chicas arranca como panel.
   useEffect(() => {
     let ini = true
     try { const s = localStorage.getItem('cc-nav-pinned'); if (s !== null) ini = s === '1' } catch {}
-    if (typeof window !== 'undefined' && window.matchMedia('(max-width:860px)').matches) ini = false
+    if (esPanel()) ini = false
     setPinned(ini)
   }, [])
 
@@ -104,20 +120,34 @@ export default function Sidebar({ profile }: { profile: Profile }) {
   }, [])
 
   // El botón hamburguesa lo pinta la topbar del layout (server); acá lo cableamos.
+  //
+  // HACE DOS COSAS DISTINTAS SEGÚN EL TAMAÑO DE PANTALLA (18/11/2026).
+  // En el teléfono abre y cierra el panel, que es lo que se espera de una hamburguesa.
+  // En pantalla grande vuelve a ANCLAR la barra, que es lo único que corre el contenido.
+  // Antes abría el panel también acá, así que la barra aparecía flotando por encima, la
+  // pantalla no se ajustaba, y había que tocar el pin aparte para acomodarla — con el
+  // agravante de que arriba de 861px el fondo oscuro está apagado y no se podía cerrar
+  // tocando al costado. El modo panel no aporta nada en pantalla grande: se usa el ancho,
+  // no se tapa el contenido.
   useEffect(() => {
     const btn = document.getElementById('cc-hamb')
     if (!btn) return
-    const h = () => setNavOpen(v => !v)
+    const h = () => { if (esPanel()) setNavOpen(v => !v); else anclar(true) }
     btn.addEventListener('click', h)
     return () => btn.removeEventListener('click', h)
+  }, [anclar])
+
+  // Al pasar de teléfono a pantalla grande (girar el aparato, agrandar la ventana), el
+  // panel que hubiera quedado abierto se cierra: ahí arriba no tiene fondo oscuro con el
+  // que cerrarse y quedaría clavado encima del contenido.
+  useEffect(() => {
+    const mq = window.matchMedia(COMO_PANEL)
+    const alCambiar = (e: MediaQueryListEvent) => { if (!e.matches) setNavOpen(false) }
+    mq.addEventListener('change', alCambiar)
+    return () => mq.removeEventListener('change', alCambiar)
   }, [])
 
-  function togglePin() {
-    const next = !pinned
-    setPinned(next)
-    setNavOpen(false)
-    try { localStorage.setItem('cc-nav-pinned', next ? '1' : '0') } catch {}
-  }
+  function togglePin() { anclar(!pinned) }
 
   async function handleLogout() {
     const supabase = createClient()
