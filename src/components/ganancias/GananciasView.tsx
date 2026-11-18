@@ -218,7 +218,7 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
         {puntasAbiertas > 0 && (
           <div className="card gn-card" style={{ borderLeft: '3px solid var(--warn-ink)' }}>
             <div className="gn-lbl">
-              Transferencias en curso · {puntasAbiertas} sin su segunda pata
+              Transferencias en curso · {puntasAbiertas} sin su contrapartida
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}>
               {monedasConSaldo(abiertas).map(([k, v]) => (
@@ -229,8 +229,8 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
             </div>
             <div className="gn-pie">
               <b>No suman al resultado</b>: la ganancia se computa cuando la transferencia
-              se realiza, y para eso falta cargar la otra pata. Es una posición acumulada al
-              cierre del período, no un resultado del período.
+              se realiza, y para eso falta cargar el movimiento que la cubre. Es una
+              posición acumulada al cierre del período, no un resultado del período.
             </div>
           </div>
         )}
@@ -316,13 +316,14 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
             </p>
             <p style={{ margin: '0 0 8px' }}>
               <b>La ganancia se computa cuando la transferencia se realiza.</b> Una
-              transferencia tiene resultado recién cuando están cargadas <b>sus dos patas</b>:
-              el ingreso y el egreso. Hasta entonces lo cargado no es ganancia sino plata en
-              tránsito, y se muestra aparte como <b>transferencias en curso</b>. Cuando llega
-              la pata que falta, el par <b>entero</b> cuenta en esa fecha — no se reparte entre
-              las fechas de cada pata, porque entonces un mes se quedaría con el ingreso y el
-              siguiente con el egreso, y ese daría pérdida. El ingreso siempre tiene que ser
-              mayor o igual al egreso: si no, no hay negocio.
+              transferencia tiene resultado recién cuando <b>lo que entró quedó cubierto por
+              lo que salió</b>, sea en una salida o en varias: lo que entra de una vez puede
+              salir repartido en dos o tres pagos. Hasta entonces lo cargado no es ganancia
+              sino plata en tránsito, y se muestra aparte como <b>transferencias en
+              curso</b>. Cuando se cubre, la transferencia <b>entera</b> cuenta en esa
+              fecha — no se reparte entre las fechas de cada pata, porque entonces un mes se
+              quedaría con el ingreso y el siguiente con el egreso, y ese daría pérdida. El
+              ingreso siempre tiene que ser mayor o igual al egreso: si no, no hay negocio.
             </p>
             <p style={{ margin: '0 0 8px' }}>
               <b>En dólares.</b> Es el mismo resultado, convertido con la cotización promedio

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "base": "node scripts/elegir-base.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

@@ -196,6 +196,129 @@ const egr = (fecha: string, notas: string | null, dolares: number, id: string): 
   asert('13c · no queda nada abierto', r.puntasAbiertas === 0)
 }
 
+// ── 14. EL CASO REAL: "CAR - EDY" entera, tal como está en producción ───────
+//      Es la referencia que destapó el problema el 16/11/2026. Trece transferencias en
+//      catorce meses, y una sola de ellas repartida en dos salidas: el 30/1/2026 entraron
+//      52.330 y salieron 34.780 (EDY) + 16.830 (CHAMI), con 720 de spread.
+//
+//      Con el emparejamiento de a una pata, esa transferencia dejaba al grupo corrido para
+//      siempre: el 30/1 contaba +17.550, mayo +22.245, el 13/11 −24.095 y sobraba un
+//      egreso de 14.198 que se informaba "en curso" aunque hubiera cerrado el mismo día.
+{
+  const filas = [
+    ing('2025-09-09', 'CAR - EDY', 5_050, 'a1'),  egr('2025-09-09', 'CAR - EDY', -5_000, 'a2'),
+    ing('2025-09-15', 'CAR - EDY', 5_830, 'b1'),  egr('2025-09-15', 'CAR - EDY', -5_772, 'b2'),
+    ing('2025-10-13', 'CAR - EDY', 6_290, 'c1'),  egr('2025-10-13', 'CAR - EDY', -6_228, 'c2'),
+    ing('2025-10-23', 'CAR - EDY', 7_223, 'd1'),  egr('2025-10-23', 'CAR - EDY', -7_187, 'd2'),
+    ing('2025-10-30', 'CAR - EDY', 5_277, 'e1'),  egr('2025-10-30', 'CAR - EDY', -5_225, 'e2'),
+    ing('2026-01-29', 'CAR - EDY', 52_330, '24567'),
+    egr('2026-01-30', 'CAR - EDY', -34_780, '24596'),  // RETIRA DOLARES
+    egr('2026-01-30', 'CAR - EDY', -16_830, '24636'),  // la segunda salida, a otro destinatario
+    ing('2026-05-21', 'CAR - EDY', 39_075, '30875'), egr('2026-05-21', 'CAR - EDY', -38_695, '30876'),
+    egr('2026-11-13', 'CAR - EDY', -14_198, 'z1'), ing('2026-11-13', 'CAR - EDY', 14_600, 'z2'),
+  ]
+  const r = repartirTT(filas, '1900-01-01')
+  igual('14a · la transferencia repartida cierra el día de su última salida',
+    r.porFecha.get('2026-01-30')?.usd ?? 0, 720)
+  asert('14b · y no deja nada en la fecha del ingreso', !r.porFecha.has('2026-01-29'))
+  igual('14c · mayo deja de estar inflado (daba 22.245)', r.porFecha.get('2026-05-21')?.usd ?? 0, 380)
+  igual('14d · el 13/11 deja de dar pérdida (daba -24.095)', r.porFecha.get('2026-11-13')?.usd ?? 0, 402)
+  igual('14e · el spread total del grupo', usdDelPeriodo(r), 1_760)
+  igual('14f · ya no hay US$ (14.198) en curso', r.abiertas.usd, 0)
+  asert('14g · ninguna punta abierta', r.puntasAbiertas === 0, `quedaron ${r.puntasAbiertas}`)
+  asert('14h · ninguna transferencia negativa', r.paresNegativos.length === 0,
+    JSON.stringify(r.paresNegativos))
+  // Las cinco de 2025 tienen que haber quedado donde estaban: el cambio no las toca.
+  igual('14i · las de a dos patas no se movieron', r.porFecha.get('2025-09-09')?.usd ?? 0, 50)
+}
+
+// ── 15. Un ingreso repartido en TRES salidas ────────────────────────────────
+{
+  const filas = [
+    ing('2026-09-10', 'UNO - TRES', 30_000, 'i'),
+    egr('2026-09-10', 'UNO - TRES', -12_000, 'e1'),
+    egr('2026-09-11', 'UNO - TRES', -10_000, 'e2'),
+    egr('2026-09-12', 'UNO - TRES', -7_700, 'e3'),   // quedan 300: es el spread
+  ]
+  const r = repartirTT(filas, '2026-09-01')
+  igual('15a · cierra con la última salida', r.porFecha.get('2026-09-12')?.usd ?? 0, 300)
+  asert('15b · no cuenta nada antes de estar cubierta',
+    !r.porFecha.has('2026-09-10') && !r.porFecha.has('2026-09-11'))
+  asert('15c · nada queda abierto', r.puntasAbiertas === 0)
+}
+
+// ── 16. Dos ingresos seguidos NO se funden en uno ───────────────────────────
+//      Es la otra mitad de la regla: si cualquier pata del mismo lado se sumara a la
+//      transferencia abierta, dos transferencias que esperan su salida se leerían como
+//      una sola de importe doble y los dos egresos siguientes cerrarían cualquier cosa.
+{
+  const filas = [
+    ing('2026-09-01', 'DOS - UNO', 10_000, 'i1'),
+    ing('2026-09-02', 'DOS - UNO', 20_000, 'i2'),
+    egr('2026-09-03', 'DOS - UNO', -9_900, 'e1'),   // cierra la primera → +100
+    egr('2026-09-04', 'DOS - UNO', -19_800, 'e2'),  // cierra la segunda → +200
+  ]
+  const r = repartirTT(filas, '2026-09-01')
+  igual('16a · la primera cierra sola', r.porFecha.get('2026-09-03')?.usd ?? 0, 100)
+  igual('16b · la segunda también', r.porFecha.get('2026-09-04')?.usd ?? 0, 200)
+  asert('16c · nada abierto', r.puntasAbiertas === 0)
+}
+
+// ── 17. La segunda salida llega en otro mes ─────────────────────────────────
+//      Mientras falte cubrir, la transferencia no cuenta: se realiza entera el día en que
+//      la última salida la cubre, igual que una de dos patas que cruza el borde del mes.
+//
+//      Con una salvedad heredada que conviene tener escrita. La pantalla trae las filas
+//      HASTA el fin del período, así que mirando septiembre la salida de octubre no
+//      existe: la transferencia se cierra con lo que hay y septiembre cuenta 4.000 (ver
+//      18). Mirado el año entero, en cambio, cuenta 100 en octubre. Las dos lecturas no
+//      suman lo mismo, y es el precio de dar por cerrada una transferencia a la que le
+//      falta cubrir — pasaba igual antes de este cambio. Solo ocurre cuando las salidas
+//      de una misma transferencia caen a los dos lados del corte del período.
+{
+  const filas = [
+    ing('2026-09-28', 'CRUZA - PARTIDA', 10_000, 'i'),
+    egr('2026-09-29', 'CRUZA - PARTIDA', -6_000, 'e1'),
+    egr('2026-10-05', 'CRUZA - PARTIDA', -3_900, 'e2'),
+  ]
+  // Septiembre: la pantalla solo trae hasta el 30/9, así que la salida de octubre no está.
+  const rSep = repartirTT(filas.slice(0, 2), '2026-09-01')
+  igual('17a · septiembre cuenta lo que hay, como antes del cambio', usdDelPeriodo(rSep), 4_000)
+  asert('17b · y no lo informa en curso', rSep.puntasAbiertas === 0)
+  // Octubre: ya están las tres filas, y la transferencia se cubre el 5/10.
+  const rOct = repartirTT(filas, '2026-10-01')
+  igual('17c · cuenta entera en octubre, cuando se cubre', rOct.porFecha.get('2026-10-05')?.usd ?? 0, 100)
+  igual('17d · y es lo único que octubre se lleva', usdDelPeriodo(rOct), 100)
+  asert('17e · septiembre no dejó nada en curso tampoco acá', rOct.puntasAbiertas === 0)
+  asert('17f · la salida del 29/9 no se imputa sola', !rOct.porFecha.has('2026-09-29'))
+}
+
+// ── 18. Si el grupo termina con algo sin cubrir, se realiza con lo que tiene ─
+//      Criterio heredado del emparejamiento de a dos patas, que hacía exactamente esto.
+//      Una transferencia con patas de los dos lados es un negocio hecho: lo que falte
+//      cubrir es spread, aunque sea grande. Lo que NO tiene contrapartida es otra cosa.
+{
+  const filas = [ing('2026-09-05', 'FALTA - ALGO', 10_000, 'i'), egr('2026-09-06', 'FALTA - ALGO', -6_000, 'e')]
+  const r = repartirTT(filas, '2026-09-01')
+  igual('18a · se realiza con lo que tiene', usdDelPeriodo(r), 4_000)
+  asert('18b · no queda en curso', r.puntasAbiertas === 0)
+}
+
+// ── 19. Una salida posterior no se pega a una transferencia ya cubierta ─────
+//      Es para lo que existe la tolerancia: cubierta la primera, lo que queda es spread,
+//      así que la salida siguiente empieza una transferencia nueva en vez de comérselo.
+{
+  const filas = [
+    ing('2026-09-01', 'YA - CERRADA', 1_000, 'i'),
+    egr('2026-09-02', 'YA - CERRADA', -990, 'e1'),   // quedan 10: cubierta
+    egr('2026-09-20', 'YA - CERRADA', -500, 'e2'),   // transferencia nueva, sin su ingreso
+  ]
+  const r = repartirTT(filas, '2026-09-01')
+  igual('19a · la primera cerró con su spread', usdDelPeriodo(r), 10)
+  igual('19b · la segunda salida queda en curso, no se come el spread', r.abiertas.usd, -500)
+  asert('19c · una punta abierta', r.puntasAbiertas === 1)
+}
+
 console.log(fallas.length === 0
   ? `✅ ${ok} verificaciones OK`
   : `❌ ${fallas.length} falla(s) sobre ${ok + fallas.length}:\n  - ${fallas.join('\n  - ')}`)
