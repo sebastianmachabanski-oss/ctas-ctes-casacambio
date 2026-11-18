@@ -169,6 +169,47 @@ configurables, con reporte exportable.
 > requisito o una buena práctica. En cualquier caso, tener el dato ordenado ante un
 > pedido de información es muy superior a reconstruirlo del Excel.
 
+### 5.3. Cerrar y reabrir cuentas corrientes — **6 a 8 h**
+Hoy **no hay forma de dar de baja una cuenta corriente desde la app**: la tabla tiene un
+campo `activo` que todas las pantallas respetan, pero el único lugar del código que lo
+escribe lo pone en `true`. Una cuenta creada por error, un cliente que se fue o la
+perdedora de una unificación se quedan para siempre en todos los desplegables.
+
+**Se puede cerrar aunque no esté saldada.** Cerrar acá es sacarla de los desplegables, no
+borrarla ni esconder la plata: Posición y Saldos Pendientes leen la vista de saldos **sin
+mirar `activo`**, así que una cuenta cerrada con deuda sigue figurando en "nos deben".
+Exigir saldo cero sería contraproducente — las que nunca se van a saldar (incobrables,
+clientes que se fueron) son justamente las que más conviene retirar de circulación.
+
+**Lo único que bloquea el cierre:** que haya un usuario con rol cliente atado a la cuenta
+(`profiles.cuenta_cte`). Si no, esa persona entra y se queda mirando una cuenta que nadie
+puede operar. Ahí el mensaje es "desvinculá primero a Fulano", no una advertencia salteable.
+
+**Lo que advierte sin bloquear:**
+- Saldo distinto de cero, mostrando los importes por moneda y las dos consecuencias:
+  sigue apareciendo en Saldos Pendientes, y para registrar el cobro hay que reabrirla.
+- Movimientos en los últimos 60 días, que es la mejor señal de un error de dedo.
+
+**Requisitos del cierre:** motivo obligatorio cuando hay saldo ("unificada con X",
+"incobrable"), registrado en auditoría con quién y cuándo; y una vista de cerradas con
+botón para reabrir, porque sin eso cerrar es un pozo.
+
+**Dos arreglos que entran en el mismo trabajo:**
+- La pantalla de Cuenta Corriente arma su selector con `activo = true`, así que una cuenta
+  cerrada **queda sin forma de consultar su extracto**. Hace falta un "incluir cerradas".
+- El alta dice *"la cuenta no existe, ¿crearla?"* cuando el nombre corresponde a una cuenta
+  cerrada, y al confirmar **la reactiva**. El candado ya es blando; lo que está mal es el
+  mensaje, que debería decir *"la cuenta X está cerrada, ¿reabrirla?"*.
+
+> **Regla que no se toca:** el cierre NO saca el saldo de Posición ni de Saldos Pendientes.
+> Si lo hiciera, cerrar una cuenta sería la forma de hacer desaparecer un incobrable sin
+> dejar rastro. Hoy funciona así y parece un descuido: es correcto, queda anotado para que
+> nadie lo "arregle".
+
+> **Gancho comercial:** es el cierre natural de 5.1 — se unifica, y después hay que poder
+> retirar la cuenta que sobró. Vendido solo es flojo; junto con la deduplicación se explica
+> en una frase.
+
 ---
 
 ## 6. Productividad diaria (quick wins)
@@ -203,7 +244,7 @@ mostrador.
 | **1º** | 6.1 Exportación + 2.1 Comprobante | 9 a 13 h | Impacto visible inmediato y bajo costo; genera confianza para seguir comprando. |
 | **2º** | 1.1 Auditoría + 1.2 Cierre de caja | 14 a 18 h | El salto real de control; es lo que justifica haber dejado el Excel. |
 | **3º** | 3.1 + 3.2 Logística de efectivo | 16 a 20 h | Protege plata en la calle; ROI argumentable con un solo incidente evitado. |
-| **4º** | 5.1 Ficha unificada → 4.1 Rentabilidad | 14 a 20 h | Ordenar clientes primero, después explotar la analítica. |
+| **4º** | 5.1 Ficha unificada + 5.3 Cerrar cuentas → 4.1 Rentabilidad | 20 a 28 h | Ordenar clientes primero —unificar y poder retirar la que sobró—, después explotar la analítica. |
 | **5º** | 2.3 Portal del cliente + 2.4 Pizarra | 16 a 22 h | Diferencial competitivo, una vez que el interno está sólido. |
 
 **Paquete "arranque" sugerido:** 6.1 + 2.1 + 1.1 + 1.4 ≈ **18 a 25 h** — cubre
