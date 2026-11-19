@@ -25,16 +25,16 @@
  */
 import { createClient } from '@supabase/supabase-js'
 import { tomarCotizaciones, type Cotizacion } from '../src/lib/cotizaciones/index'
-import { guardarToma } from '../src/lib/cotizaciones/guardar'
+import { guardarToma, credencialesSupabase } from '../src/lib/cotizaciones/guardar'
 
 const VISTA_PREVIA = process.argv.includes('--vista-previa')
-const URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
-const KEY = process.env.SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
+// De a pares y nunca mezclando juegos de nombres: ver credencialesSupabase().
+const CRED = credencialesSupabase()
 
 function salir(msg: string): never { console.error(`❌ ${msg}`); process.exit(1) }
 
-if (!VISTA_PREVIA && (!URL || !KEY)) salir(
-  'Faltan SUPABASE_URL y SERVICE_ROLE_KEY.\n'
+if (!VISTA_PREVIA && !CRED) salir(
+  'Faltan las credenciales de Supabase: SUPABASE_URL y SERVICE_ROLE_KEY.\n'
   + '   Para ver qué devuelven las fuentes sin guardar nada: --vista-previa')
 
 const n = (v: number | null) =>
@@ -95,7 +95,8 @@ if (VISTA_PREVIA) {
 // ── Guardado ────────────────────────────────────────────────────────────────
 // La lógica vive en src/lib/cotizaciones/guardar.ts: la comparte con la función programada
 // que hace esto mismo cada quince minutos.
-const db = createClient(URL!, KEY!, { auth: { persistSession: false } })
+console.log(`   credenciales de ${CRED!.origen} · proyecto ${CRED!.proyecto}`)
+const db = createClient(CRED!.url, CRED!.key, { auth: { persistSession: false } })
 const g = await guardarToma(db, toma)
 
 if (g.errores.length) {

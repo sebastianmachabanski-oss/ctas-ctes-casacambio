@@ -18,6 +18,7 @@ import { leerPagina, fechaDolarhoy } from '../src/lib/cotizaciones/dolarhoy'
 import { leerRespuestas } from '../src/lib/cotizaciones/dolarapi'
 import { leerEstado } from '../src/lib/cotizaciones/monitorargy'
 import { problemaDe, aNumero, type Cotizacion } from '../src/lib/cotizaciones/tipos'
+import { credencialesSupabase } from '../src/lib/cotizaciones/guardar'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 
@@ -136,6 +137,57 @@ const cot = (p: Partial<Cotizacion>): Cotizacion => ({
     !cs.some(c => (c.clave as string) === 'ipc_mensual'))
   asert('7f · aguanta un estado vacío', leerEstado({}).length === 0)
   asert('7g · aguanta basura', leerEstado(null).length === 0)
+}
+
+// ── 8. Las credenciales van DE A PARES ─────────────────────────────────────
+//     El 19/11/2026 la función leyó las once cotizaciones sin un error y no pudo guardar
+//     ninguna: `Invalid API key`. Elegía la URL y la clave por separado, y en Netlify
+//     convivían dos juegos de nombres —los del sitio y los que usaba el sync—, así que
+//     terminó con la dirección de un proyecto y la clave de otro. Supabase no da ninguna
+//     pista de que el problema sea la URL.
+{
+  const guardadas = { ...process.env }
+  const limpiar = () => {
+    for (const k of ['SUPABASE_URL', 'SERVICE_ROLE_KEY',
+      'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) delete process.env[k]
+  }
+
+  limpiar()
+  process.env.SUPABASE_URL = 'https://viejo.supabase.co'
+  process.env.SERVICE_ROLE_KEY = 'clave-vieja'
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://actual.supabase.co/'
+  process.env.SUPABASE_SERVICE_ROLE_KEY = '  clave-actual \n'
+  let c = credencialesSupabase()
+  asert('8a · con los dos juegos, gana el del sitio',
+    c?.origen === 'NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY', String(c?.origen))
+  asert('8b · y NO mezcla la URL de uno con la clave del otro',
+    c?.url === 'https://actual.supabase.co' && c?.key === 'clave-actual',
+    `${c?.url} / ${JSON.stringify(c?.key)}`)
+  asert('8c · saca la barra final de la URL', !c?.url.endsWith('/'))
+  // Una clave pegada con un salto de línea da el mismo `Invalid API key` y no se ve.
+  asert('8d · limpia espacios y saltos de línea de la clave', c?.key === 'clave-actual')
+  asert('8e · informa qué proyecto', c?.proyecto === 'actual', String(c?.proyecto))
+
+  limpiar()
+  process.env.SUPABASE_URL = 'https://viejo.supabase.co'
+  process.env.SERVICE_ROLE_KEY = 'clave-vieja'
+  c = credencialesSupabase()
+  asert('8f · sin las del sitio, usa las del sync COMPLETAS',
+    c?.origen === 'SUPABASE_URL + SERVICE_ROLE_KEY' && c?.url === 'https://viejo.supabase.co',
+    String(c?.origen))
+
+  // Medio juego no sirve: es exactamente la situación que producía el error.
+  limpiar()
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://actual.supabase.co'
+  asert('8g · una URL sin su clave no alcanza', credencialesSupabase() === null)
+  limpiar()
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'clave-suelta'
+  asert('8h · una clave sin su URL tampoco', credencialesSupabase() === null)
+  limpiar()
+  asert('8i · sin nada, null', credencialesSupabase() === null)
+
+  for (const k of Object.keys(process.env)) if (!(k in guardadas)) delete process.env[k]
+  Object.assign(process.env, guardadas)
 }
 
 console.log(fallas.length === 0
