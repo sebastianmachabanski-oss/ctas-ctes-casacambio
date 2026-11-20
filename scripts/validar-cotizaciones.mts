@@ -168,23 +168,42 @@ const cot = (p: Partial<Cotizacion>): Cotizacion => ({
   asert('8d · limpia espacios y saltos de línea de la clave', c?.key === 'clave-actual')
   asert('8e · informa qué proyecto', c?.proyecto === 'actual', String(c?.proyecto))
 
+  // EL CASO REAL DE PRODUCCIÓN: las dos claves cargadas, la vieja ya sin valor útil.
+  // `createAdminClient` prefiere SUPABASE_SERVICE_ROLE_KEY; esta función hacía lo inverso,
+  // así que la app escribía bien y la función programada fallaba las once escrituras.
+  limpiar()
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://actual.supabase.co'
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'clave-buena'
+  process.env.SERVICE_ROLE_KEY = 'clave-vieja-que-ya-no-sirve'
+  c = credencialesSupabase()
+  asert('8f · con las dos claves, gana la misma que usa la app',
+    c?.key === 'clave-buena', String(c?.key))
+
+  // Si solo está el nombre viejo, se usa igual: mejor eso que no guardar nada.
+  limpiar()
+  process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://actual.supabase.co'
+  process.env.SERVICE_ROLE_KEY = 'clave-vieja'
+  c = credencialesSupabase()
+  asert('8g · con solo el nombre viejo, lo usa',
+    c?.origen === 'NEXT_PUBLIC_SUPABASE_URL + SERVICE_ROLE_KEY', String(c?.origen))
+
   limpiar()
   process.env.SUPABASE_URL = 'https://viejo.supabase.co'
   process.env.SERVICE_ROLE_KEY = 'clave-vieja'
   c = credencialesSupabase()
-  asert('8f · sin las del sitio, usa las del sync COMPLETAS',
+  asert('8h · sin las del sitio, usa las de línea de comandos',
     c?.origen === 'SUPABASE_URL + SERVICE_ROLE_KEY' && c?.url === 'https://viejo.supabase.co',
     String(c?.origen))
 
-  // Medio juego no sirve: es exactamente la situación que producía el error.
+  // Medio juego no sirve.
   limpiar()
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://actual.supabase.co'
-  asert('8g · una URL sin su clave no alcanza', credencialesSupabase() === null)
+  asert('8i · una URL sin ninguna clave no alcanza', credencialesSupabase() === null)
   limpiar()
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'clave-suelta'
-  asert('8h · una clave sin su URL tampoco', credencialesSupabase() === null)
+  asert('8j · una clave sin URL tampoco', credencialesSupabase() === null)
   limpiar()
-  asert('8i · sin nada, null', credencialesSupabase() === null)
+  asert('8k · sin nada, null', credencialesSupabase() === null)
 
   for (const k of Object.keys(process.env)) if (!(k in guardadas)) delete process.env[k]
   Object.assign(process.env, guardadas)

@@ -13,23 +13,30 @@
 import type { Cotizacion, Toma } from './index'
 
 /**
- * De dónde salen las credenciales de Supabase, y por qué van DE A PARES.
+ * De dónde salen las credenciales de Supabase.
  *
- * Hay dos juegos de nombres dando vueltas: los que documenta docs/NUEVO-CLIENTE.md y usa
- * el sitio, y los que usaba el sync de la planilla. Eligiendo cada variable por separado
- * —la URL del primer nombre que aparezca, la clave del primero que aparezca— se puede
- * terminar con la dirección de un proyecto y la clave de otro. Supabase contesta
- * `Invalid API key`, que no sugiere en absoluto que el problema sea la URL.
+ * ── EL MISMO ORDEN QUE LA APP, Y NO OTRO (19/11/2026) ──────────────────────
+ * Hay dos nombres posibles para la clave de servicio, y `createAdminClient` —que escribe
+ * en producción todos los días y funciona— elige así:
  *
- * Pasó el 19/11/2026: la función leyó las once cotizaciones sin un error y no pudo
- * guardar ninguna. Por eso acá se toman los dos nombres del MISMO juego o ninguno, y se
- * informa cuál se usó.
+ *     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY
+ *
+ * Esta función hacía lo inverso: prefería `SERVICE_ROLE_KEY`. Con las dos variables
+ * cargadas y la vieja ya sin valor útil, el resultado fue que la app andaba y la función
+ * programada no: leyó las once cotizaciones sin un error y falló las once escrituras con
+ * `Invalid API key`, apuntando al mismo proyecto que la app.
+ *
+ * La regla, entonces, es copiar la de la app en vez de inventar una. Y los nombres se
+ * toman DE A PARES para no combinar nunca la dirección de un proyecto con la clave de
+ * otro: ese error contesta "clave inválida", que no sugiere mirar la URL.
  */
 export function credencialesSupabase(): { url: string; key: string; origen: string; proyecto: string } | null {
   const JUEGOS: [string, string][] = [
-    // Las del sitio. Son las que docs/NUEVO-CLIENTE.md manda cargar en todo despliegue.
+    // Las del sitio, en el MISMO orden que createAdminClient.
     ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
-    // Las del sync y los scripts de línea de comandos.
+    ['NEXT_PUBLIC_SUPABASE_URL', 'SERVICE_ROLE_KEY'],
+    // Las de los scripts de línea de comandos, donde no hay NEXT_PUBLIC_* cargadas.
+    ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'],
     ['SUPABASE_URL', 'SERVICE_ROLE_KEY'],
   ]
   for (const [nombreUrl, nombreKey] of JUEGOS) {
