@@ -121,6 +121,50 @@ en el momento (con hora y, opcionalmente, ubicación).
 
 ## 4. Inteligencia de negocio (decisiones, no registro)
 
+### 4.0. Ganancias: resultado consolidado y cierre automático — **10 a 14 h**
+Dos arreglos del propio cálculo, antes que cualquier gráfico. No son presentación: hoy
+el número que se muestra no es el del negocio.
+
+**4.0.a · El total consolidado — 6 a 8 h.** Ganancias calcula **una moneda por vez**, y
+viene en dólares por defecto. Las operaciones en euros, reales y USDT se registran y se
+calculan, pero se ven cambiando el par en ⚙ Configuración, de a una. No hay ningún
+número que sume todo, y **no se puede obtener sumando los pares a mano**: los gastos y
+las transferencias en pesos se descuentan enteros en cada par, así que sumarlos los
+contaría varias veces.
+
+El arreglo es un total que sume el margen de cada moneda —cada uno ya nace en pesos— y
+cuente **una sola vez** los gastos y las transferencias en pesos, con el desglose por
+moneda a la vista. El selector de par se queda, para mirar una sola cuando interesa.
+Incluye validar que cada moneda por separado siga dando exactamente lo que da hoy, que
+es la forma de comprobar que no se rompió un cálculo validado contra la planilla.
+
+Hay una maqueta de cómo quedaría expuesto, armada el 20/11/2026 para mostrársela al
+cliente, con las columnas Volumen operado · Volumen calzado · Spread por unidad ·
+Valuación del stock · Aporta, y abajo los gastos y transferencias contados una vez.
+
+**4.0.b · La cotización de cierre, automática — 4 a 6 h.** Cuando el stock se valúa con
+el criterio "cotización de cierre", esa cotización **se tipea a mano** y arranca en
+`1500`, escrito en el código. Con el blue en 1.640 eso valúa el stock un 9% abajo del
+mercado, y nada en la pantalla avisa que el número quedó viejo. Peor: un valor tipeado
+**no sigue al período** — cargado pensando en noviembre, octubre se valúa con la
+cotización de hoy.
+
+Pasa a salir de `cotizaciones_mercado`: la del **último día del período que se está
+mirando**, de la fuente que el cliente confía, mostrando en pantalla cuál se usó y de
+cuándo. El campo manual se conserva para cuando quieran otro criterio, pero indicando
+cuál de los dos está en uso. Para períodos anteriores al 19/11/2026 la historia sale de
+monitorargy, que publica el blue diario desde 2011.
+
+> **Falta una definición del cliente:** con qué cotización valuar lo que tiene en el
+> cajón — la **compra** del mercado (prudente: lo que le pagarían), la **venta**
+> (optimista) o el promedio. Entre compra y venta hay unos 20 pesos por dólar: sobre
+> 15.800 dólares de stock son 316.000 pesos de resultado. No se puede arrancar 4.0.b
+> sin esa respuesta.
+
+> **Lo que no cambia:** automatizar la cotización la vuelve reproducible, no la vuelve
+> un hecho. La valuación del stock sigue siendo el único número de la pantalla sin una
+> operación detrás.
+
 ### 4.1. Rentabilidad por cliente y por moneda — **6 a 8 h**
 Hoy Ganancias es un total global. Este módulo abre el margen por cliente, por moneda y
 por tipo de operación, con ranking de los que más y menos aportan.
@@ -148,6 +192,31 @@ ganancias, en el formato que el contador ya usa.
 
 > **Gancho comercial:** ahorra horas de armado manual todos los meses. Valor fácilmente
 > cuantificable frente al costo del módulo.
+
+### 4.5. Tablero de Ganancias: tendencia y composición — **13 a 18 h**
+Una vez que el número sea el correcto (4.0), que la pantalla deje de ser un número con
+su explicación y pase a ser algo que se mira todos los meses. Tres piezas:
+
+- **Separar ganancia por spread de ganancia por tenencia — 4 a 6 h.** Los componentes ya
+  se calculan; hoy viven escondidos en el desplegable "¿cómo se calcula?". Con el margen
+  fijo de 0,05 que está puesto, la tenencia aporta centavos, así que esto no va a revelar
+  nada escondido: hace explícito algo que está mezclado, y recién pesa de verdad si se
+  pasa a valuar a cotización de cierre.
+- **Evolución de la ganancia — 6 a 8 h.** Doce a veinticuatro meses, con el período
+  elegido resaltado. Es el agujero más grande: hoy se ve un número sin contexto. Cuesta
+  más de lo que parece porque la pantalla trae solo los días del período y hay que
+  ampliar la consulta.
+- **Comparación contra el período anterior — 3 a 4 h.** Y contra el mismo del año
+  pasado, con la variación en porcentaje. Es lo primero que mira cualquiera.
+
+Y la contracara: los **reportes de caja** que hoy cuelgan abajo de Ganancias —listado de
+clientes, saldo en dólares, barras mensuales— no se usan y no son análisis de resultado
+sino de posición. Salen de ahí. Son, eso sí, las únicas vistas de evolución que existen
+hoy, así que conviene sacarlas recién cuando estén las nuevas.
+
+> **Gancho comercial:** es lo que convierte "el sistema registra" en "el sistema me dice
+> cómo viene el negocio". Se vende después de 4.0, nunca antes: un tablero lindo sobre un
+> número que deja afuera dos monedas es peor que no tenerlo.
 
 ---
 
