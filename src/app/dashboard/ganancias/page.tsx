@@ -56,7 +56,12 @@ export default async function GananciasPage({
   const filas: any[] = []
   for (let from = 0; ; from += PAGE) {
     const { data: pg } = await supabase.from('movimientos_caja')
-      .select('fecha,operacion,pesos,cheques,dolares,euros,reales,usdt,libras,cc_pesos,cc_dolares,cc_euros,cc_reales,cc_libras')
+      // `cc_usdt` va en la lista desde el 20/11/2026. Faltaba, y como la pata se lee por
+      // nombre de columna, su ausencia no daba error: devolvía `undefined`, que se
+      // redondea a 0. Las compras y ventas de USDT por CUENTA CORRIENTE —que existen
+      // desde el 25/8/2026— no contaban en Ganancias y no había nada en pantalla que lo
+      // dijera. `cc_cheques` sí está bien ausente: esa columna no existe en la tabla.
+      .select('fecha,operacion,pesos,cheques,dolares,euros,reales,usdt,libras,cc_pesos,cc_dolares,cc_euros,cc_reales,cc_usdt,cc_libras')
       .in('operacion', ['COMPRA', 'VENTA', 'GASTOS'])
       // Las transferencias se miden con su propia regla (más abajo), no con el calce de
       // compras y ventas. Si alguna vez una COMPRA se marcara con T, contarla en los dos
@@ -72,9 +77,10 @@ export default async function GananciasPage({
     if (rows.length < PAGE) break
   }
 
-  // USDT y CHEQUES solo tienen columna de caja (no hay cc_usdt ni cc_cheques): la pata CC
-  // queda siempre en 0. En cuenta corriente el cheque igual se registra en la columna
-  // CHEQUES y la contrapartida en CC PESOS, así que el margen se mide igual.
+  // CHEQUES es el único que solo tiene columna de caja (no existe `cc_cheques`): su pata
+  // CC queda siempre en 0, y no es una pérdida, porque en cuenta corriente el cheque se
+  // registra igual en la columna CHEQUES con la contrapartida en CC PESOS, así que el
+  // margen se mide lo mismo. USDT sí tiene `cc_usdt` desde el 25/8/2026.
   const PARES: ['usd' | 'eur' | 'brl' | 'usdt' | 'gbp' | 'chq', string, string][] = [
     ['usd', 'dolares', 'cc_dolares'], ['eur', 'euros', 'cc_euros'], ['brl', 'reales', 'cc_reales'],
     ['usdt', 'usdt', 'cc_usdt'], ['gbp', 'libras', 'cc_libras'], ['chq', 'cheques', 'cc_cheques'],

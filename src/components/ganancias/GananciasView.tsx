@@ -308,6 +308,23 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
               gastos.
             </p>
             <p style={{ margin: '0 0 8px' }}>
+              <b>La valuación del {esChq ? 'la cartera' : 'stock'}.</b> El período corta el negocio
+              por la mitad: al cerrarlo quedan {esChq ? 'documentos tomados y todavía no cobrados'
+                : 'divisas compradas y todavía no vendidas'}. Si no se contaran, el mes en que
+              comprás mucho y vendés poco se vería pobre y el siguiente espléndido, aunque hayas
+              trabajado igual en los dos: el resultado dependería de <b>qué día cortás el período</b>
+              más que de cómo operaste. Por eso se les asigna un valor y ese valor entra al resultado.
+            </p>
+            <p style={{ margin: '0 0 8px' }}>
+              <b>Es el único número de acá que no tiene una operación detrás</b> — los demás salen de
+              cosas que pasaron; este, de un supuesto sobre algo que todavía no pasó. Por eso se elige
+              en ⚙ Configuración. Con <b>margen fijo</b> se asume que cada unidad va a dejar ese margen
+              cuando se venda: es prudente y pesa poco. Con <b>cotización de cierre</b> se valúa lo que
+              quedó contra esa cotización, así que el resultado pasa a incluir cuánto vale hoy más —o
+              menos— de lo que costó: eso ya no es ganancia por operar sino <b>por tener</b>, y se
+              mueve con el dólar aunque no hayas hecho una sola operación.
+            </p>
+            <p style={{ margin: '0 0 8px' }}>
               <b>Transferencias.</b> Las operaciones marcadas con <b>Op = T</b> no pasan por ese
               calce: no tienen pata en pesos, así que no hay tasa de compra ni de venta de la que
               sacar un spread. Su ganancia es lo que <b>entra menos lo que sale</b> de cada par de
@@ -338,7 +355,10 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
             <p style={{ margin: 0, color: 'var(--muted)', fontSize: 12.5 }}>
               Al ser un cálculo de período, el mismo conjunto de operaciones da un número distinto
               según mires el día, la semana o el mes: las tasas promedio se recalculan sobre el
-              conjunto elegido. Por eso la suma de los días no da el total del mes.
+              conjunto elegido. Por eso la suma de los días no da el total del mes. Y cuanto más
+              corto el período, más pesa la valuación de arriba: en un solo día las compras y las
+              ventas rara vez se equilibran, así que buena parte del número sale del supuesto y no
+              de lo que pasó.
             </p>
           </div>
           {sinDatos ? (

@@ -19,6 +19,7 @@ import { leerRespuestas } from '../src/lib/cotizaciones/dolarapi'
 import { leerEstado } from '../src/lib/cotizaciones/monitorargy'
 import { problemaDe, aNumero, type Cotizacion } from '../src/lib/cotizaciones/tipos'
 import { credencialesSupabase } from '../src/lib/cotizaciones/guardar'
+import { compararFuentes, diaArgentino, type FilaGuardada } from '../src/lib/cotizaciones/comparar'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 
@@ -207,6 +208,121 @@ const cot = (p: Partial<Cotizacion>): Cotizacion => ({
 
   for (const k of Object.keys(process.env)) if (!(k in guardadas)) delete process.env[k]
   Object.assign(process.env, guardadas)
+}
+
+// ── 9. La comparación entre fuentes, que es la que decide ──────────────────
+{
+  const f = (tomada_en: string, fuente: any, clave: string, venta: number | null): FilaGuardada =>
+    ({ tomada_en, fuente, clave, venta })
+  // Una toma: las dos fuentes con LA MISMA marca de tiempo, como en producción. Las tres
+  // se leen en la misma corrida de la función y se guardan con el mismo `tomada_en`.
+  const toma = (d: string, hv: number, av: number, hora = 0): FilaGuardada[] => {
+    const t = `2026-11-${d}T${String(10 + hora).padStart(2, '0')}:00:00Z`
+    return [f(t, 'dolarhoy', 'blue', hv), f(t, 'dolarapi', 'blue', av)]
+  }
+
+  // Las marcas de tiempo NO coinciden: solo se guarda lo que cambia. Para cada lectura de
+  // dolarhoy hay que tomar el valor de dolarapi vigente en ese momento, no el más cercano.
+  {
+    const filas = [
+      f('2026-11-20T10:00:00Z', 'dolarapi', 'blue', 1640),
+      f('2026-11-20T10:02:00Z', 'dolarhoy', 'blue', 1640),
+      f('2026-11-20T14:00:00Z', 'dolarapi', 'blue', 1655),
+      f('2026-11-20T14:05:00Z', 'dolarhoy', 'blue', 1650),
+    ]
+    const v = compararFuentes(filas)
+    const blue = v.comparaciones.find(c => c.clave === 'blue')
+    asert('9a · compara contra el valor VIGENTE, no contra el más cercano',
+      blue?.mediciones === 2, `midió ${blue?.mediciones}`)
+    // |1650 − 1655| / 1650 = 0,303%
+    asert('9b · calcula bien la peor diferencia',
+      Math.abs((blue?.peor ?? 0) - 0.303) < 0.01, String(blue?.peor))
+    asert('9c · 0,303% pasa la raya de 0,30 y marca REVISAR', blue?.sirve === false)
+  }
+
+  // Una lectura de dolarhoy ANTERIOR a cualquiera de dolarapi no se puede comparar.
+  {
+    const filas = [
+      f('2026-11-20T09:00:00Z', 'dolarhoy', 'blue', 1640),
+      f('2026-11-20T10:00:00Z', 'dolarapi', 'blue', 1640),
+      f('2026-11-20T11:00:00Z', 'dolarhoy', 'blue', 1640),
+    ]
+    const v = compararFuentes(filas)
+    asert('9d · descarta la lectura sin contraparte previa',
+      v.comparaciones.find(c => c.clave === 'blue')?.mediciones === 1,
+      String(v.comparaciones.find(c => c.clave === 'blue')?.mediciones))
+  }
+
+  // EL CONTROL QUE EVITA DECIDIR SOBRE RUIDO: días quietos no prueban nada.
+  {
+    const filas: FilaGuardada[] = []
+    for (let d = 10; d < 20; d++) {
+      for (let h = 0; h < 12; h++) filas.push(...toma(String(d), 1640, 1640, h))
+    }
+    const v = compararFuentes(filas)
+    asert('9e · con días suficientes y mediciones suficientes…', v.dias >= 7 && v.mediciones >= 100,
+      `${v.dias} días, ${v.mediciones} mediciones`)
+    asert('9f · …pero sin un día movido, NO alcanza', !v.alcanza)
+    asert('9g · y dice por qué', v.faltan.some(x => x.includes('movimiento fuerte')),
+      JSON.stringify(v.faltan))
+  }
+
+  // Con un día movido entre medio, ya hay evidencia. Las dos fuentes se mueven en la
+  // misma toma, que es lo que pasa cuando las dos publican el cambio a tiempo.
+  {
+    const filas: FilaGuardada[] = []
+    for (let d = 10; d < 20; d++) {
+      for (let h = 0; h < 12; h++) {
+        // El 15 el blue arranca en 1640 y termina en 1660: 1,2% dentro del día.
+        const v = (d === 15 && h >= 6) ? 1660 : 1640
+        filas.push(...toma(String(d), v, v, h))
+      }
+    }
+    const v = compararFuentes(filas)
+    asert('9h · un día movido alcanza', v.diasMovidos === 1 && v.alcanza,
+      `movidos ${v.diasMovidos}, alcanza ${v.alcanza}, faltan ${JSON.stringify(v.faltan)}`)
+    asert('9i · y el veredicto es que dolarapi sirve',
+      v.comparaciones.every(c => c.sirve))
+  }
+
+  // UNA FUENTE QUE REACCIONA TARDE SE VE COMO DIFERENCIA, Y ESTÁ BIEN.
+  // Si dolarhoy ya marca el precio nuevo y dolarapi todavía el viejo, en ese momento las
+  // dos pantallas mostraban cosas distintas. Eso es exactamente lo que se quiere medir:
+  // no interesa solo que coincidan en reposo, sino que no se separen cuando el mercado
+  // se mueve, que es cuando el referencial importa.
+  {
+    const filas = [
+      ...toma('20', 1640, 1640, 0),
+      // dolarhoy sube; dolarapi no publicó todavía, así que no aparece en esta toma.
+      f('2026-11-20T13:00:00Z', 'dolarhoy', 'blue', 1660),
+    ]
+    const v = compararFuentes(filas)
+    const blue = v.comparaciones.find(c => c.clave === 'blue')
+    asert('9j · el atraso de una fuente se refleja como diferencia',
+      Math.abs((blue?.peor ?? 0) - 1.2) < 0.05, String(blue?.peor))
+  }
+
+  // Pocas mediciones: tampoco alcanza, aunque coincidan.
+  {
+    const v = compararFuentes(toma('20', 1640, 1640))
+    asert('9k · con una sola toma no se decide nada', !v.alcanza)
+    asert('9l · y lo explica', v.faltan.length >= 2, JSON.stringify(v.faltan))
+  }
+
+  // El día se agrupa en hora de Argentina: el servidor corre en UTC y a la noche se corre.
+  {
+    asert('9m · las 23:30 de Argentina siguen siendo el mismo día',
+      diaArgentino('2026-11-21T02:30:00Z') === '2026-11-20',
+      diaArgentino('2026-11-21T02:30:00Z'))
+  }
+
+  // Sin datos de una de las dos fuentes no hay nada que comparar.
+  {
+    const v = compararFuentes([f('2026-11-20T10:00:00Z', 'dolarhoy', 'blue', 1640)])
+    asert('9n · una sola fuente no da comparación', v.comparaciones.length === 0)
+    asert('9o · y no alcanza', !v.alcanza)
+    asert('9p · aguanta la lista vacía', compararFuentes([]).comparaciones.length === 0)
+  }
 }
 
 console.log(fallas.length === 0
