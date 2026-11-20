@@ -116,8 +116,10 @@ const db = createClient(CRED.url, CRED.key, { auth: { persistSession: false } })
 
 // Mismas columnas, mismos filtros y misma paginación que `src/app/dashboard/ganancias/page.tsx`.
 // El `or` y no un `neq` porque `op` es NULL en casi todo el histórico.
+// Con `cc_usdt`, que la pantalla no pedía hasta el 20/11/2026: ver el comentario en
+// `src/app/dashboard/ganancias/page.tsx`. Sin ella, USDT por cuenta corriente da 0.
 const COLUMNAS = 'fecha,operacion,pesos,cheques,dolares,euros,reales,usdt,libras,'
-  + 'cc_pesos,cc_dolares,cc_euros,cc_reales,cc_libras'
+  + 'cc_pesos,cc_dolares,cc_euros,cc_reales,cc_usdt,cc_libras'
 const PAGE = 1000
 const filas: any[] = []
 for (let from = 0; ; from += PAGE) {
@@ -139,7 +141,7 @@ if (!filas.length) salir('No hay movimientos en ese rango: revisá --desde / --h
 // ── Agregar por mes y por par ──────────────────────────────────────────────
 // Réplica exacta de la agregación de la pantalla: una fila aporta a un par solo si tiene
 // volumen de esa moneda Y contrapartida en pesos, y con el signo que corresponde a la
-// operación. `cc_usdt` y `cc_cheques` no existen, así que esa pata queda siempre en cero.
+// operación. `cc_cheques` no existe, así que esa pata de cheques queda siempre en cero.
 type Agg = { vC: number; aC: number; vV: number; aV: number }
 const vacio = (): Agg => ({ vC: 0, aC: 0, vV: 0, aV: 0 })
 /** mes 'YYYY-MM' → par → agregado */
