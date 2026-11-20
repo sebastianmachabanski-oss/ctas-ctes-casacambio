@@ -194,7 +194,10 @@ for (const [mes, pares] of [...porMes.entries()].sort(([a], [b]) => a.localeComp
       mes, par, nombre, sym, vC: a.vC, vV: a.vV, t1, t2, spread, calzado, stock,
       realizado: calzado * spread,
       vFijo: stock * MARGEN_FIJO,
-      vSpread: stock * spread,
+      // DOS RAMAS, igual que la pantalla. Con el stock valuado a la venta del período,
+      // el mes que USÓ tenencia da cero: el margen de esas unidades ya entró por el
+      // calce. Aplicar la rama de "quedó stock" a los dos lados sobreestima.
+      vSpread: a.vC >= a.vV ? stock * spread : 0,
     })
   }
 }

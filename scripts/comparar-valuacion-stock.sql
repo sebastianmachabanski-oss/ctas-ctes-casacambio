@@ -46,7 +46,16 @@ filas as (
     least(vc, vv) as calzado, abs(vc - vv) as stock,
     least(vc, vv) * (case when vc > 0 and vv > 0 then av / vv - ac / vc else 0 end) as realizado,
     abs(vc - vv) * 0.05 as v_fijo,
-    abs(vc - vv) * (case when vc > 0 and vv > 0 then av / vv - ac / vc else 0 end) as v_spread
+    -- DOS RAMAS, como la pantalla, y no una sola (corregido el 20/11/2026).
+    -- Si en el mes quedó stock (compró más que vendió), ese stock vale el spread.
+    -- Si el mes USÓ tenencia (vendió más que compró), la pantalla calcula
+    -- stock * (t2 - cierre), y con cierre = la venta del período eso da CERO: el
+    -- margen de esas unidades ya está en el calce. Aplicar la primera rama a los dos
+    -- lados sobreestima, y bastante.
+    case when vc >= vv
+         then abs(vc - vv) * (case when vc > 0 and vv > 0 then av / vv - ac / vc else 0 end)
+         else 0
+    end as v_spread
   from agg where vc > 0 or vv > 0
 )
 select moneda, mes, comprado, vendido, spread_por_unidad, stock,
