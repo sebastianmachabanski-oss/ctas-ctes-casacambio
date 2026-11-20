@@ -121,9 +121,16 @@ en el momento (con hora y, opcionalmente, ubicación).
 
 ## 4. Inteligencia de negocio (decisiones, no registro)
 
-### 4.0. Ganancias: resultado consolidado y cierre automático — **10 a 14 h**
-Dos arreglos del propio cálculo, antes que cualquier gráfico. No son presentación: hoy
-el número que se muestra no es el del negocio.
+### 4.0. Ganancias: arreglar el cálculo antes de presentarlo — **24 a 34 h**
+Tres arreglos del propio cálculo, antes que cualquier gráfico. No son presentación: hoy
+el número que se muestra no es el del negocio. El tercero (4.0.c) es el más grande de
+los tres y se descubrió último, el 20/11/2026.
+
+> **Ya arreglado el 20/11/2026:** la consulta de la pantalla no pedía la columna
+> `cc_usdt`. Como la pata se lee por nombre de columna, la ausencia no daba error:
+> devolvía `undefined`, que termina en 0. Las compras y ventas de USDT por **cuenta
+> corriente** —que existen desde el 25/8/2026— no entraban en el resultado y nada en
+> pantalla lo decía.
 
 **4.0.a · El total consolidado — 6 a 8 h.** Ganancias calcula **una moneda por vez**, y
 viene en dólares por defecto. Las operaciones en euros, reales y USDT se registran y se
@@ -155,15 +162,97 @@ cuándo. El campo manual se conserva para cuando quieran otro criterio, pero ind
 cuál de los dos está en uso. Para períodos anteriores al 19/11/2026 la historia sale de
 monitorargy, que publica el blue diario desde 2011.
 
+La referencia quedó definida: **blue**, para todas las monedas, USDT incluido.
+
 > **Falta una definición del cliente:** con qué cotización valuar lo que tiene en el
-> cajón — la **compra** del mercado (prudente: lo que le pagarían), la **venta**
-> (optimista) o el promedio. Entre compra y venta hay unos 20 pesos por dólar: sobre
-> 15.800 dólares de stock son 316.000 pesos de resultado. No se puede arrancar 4.0.b
-> sin esa respuesta.
+> cajón — la **compra** del mercado, la **venta** o el promedio. Las dos ramas de la
+> fórmula son consistentes entre sí, así que la elección no cambia cuánto se gana en
+> total: cambia **en qué período se reconoce**. Con *venta* el margen aparece cuando
+> compra; con *compra*, cuando vende. Para un negocio que rota el stock en días,
+> **venta es la opción a recomendar** y hace el resultado menos dependiente de qué día
+> cae el corte; en contra, anota margen sobre mercadería no vendida.
+
+> **Al implementarlo, cuidado con el valor de arrastre (20/11/2026).** La cotización
+> de cierre es el valor al que el stock **entra y sale** del cálculo: una rama hace
+> `stock × (cierre − t1)` y la otra `stock × (t2 − cierre)`. Tiene que ser **la misma
+> de los dos lados**. Hoy lo es de casualidad, porque es un único número tipeado.
+> Automatizarla por período lo rompe: si noviembre guarda el stock a 1.643 y diciembre
+> lo saca medido contra 1.700, aparecen 57 pesos por dólar que nadie ganó. La rama de
+> salida tiene que usar la cotización del período **anterior**.
 
 > **Lo que no cambia:** automatizar la cotización la vuelve reproducible, no la vuelve
 > un hecho. La valuación del stock sigue siendo el único número de la pantalla sin una
-> operación detrás.
+> operación detrás. Medido sobre producción el 20/11/2026, además, pesa poco donde más
+> volumen hay: en dólares el criterio mueve el resultado un 2 %, porque el "stock" de
+> cada mes es casi todo corte de calendario (los desbalances mensuales suman 1.388.939
+> dólares, 36 veces el desbalance real de los trece meses, que es de 38.049). En euros
+> —volumen chico y grumoso— mueve un 32 %.
+
+> **El margen fijo no significa lo que dice la pantalla.** El texto afirma que con
+> *margen fijo* "se asume que cada unidad va a dejar ese margen cuando se venda", pero
+> el valor es `0,05` y el margen real es de **$ 17,24 por dólar** y **$ 87,26 por euro**
+> (promedios ponderados de trece meses): 403 y 1.745 veces más. No está documentado de
+> dónde salió el 0,05. Hay que redactar el texto por lo que el número hace —valuar el
+> stock en casi cero— o cambiar el número; lo que no puede quedar es la contradicción.
+
+**4.0.c · Las operaciones moneda contra moneda — 14 a 20 h.** El hallazgo más grande, y
+el que explica el reclamo del cliente de que "euros y reales no se toman en cuenta".
+Tenía razón, y la causa no era la que se suponía.
+
+Ganancias mide el margen de una moneda **siempre contra pesos**: toma la tasa promedio
+de compra, la de venta, y la diferencia es la ganancia. Una fila entra al cálculo solo
+si tiene volumen de esa moneda **y** contrapartida en pesos. Pero el cliente opera sus
+otras monedas **contra dólares**, no contra pesos, y esas filas no tienen pata en pesos:
+no hay tasa de la que sacar un spread, así que **no existen** para el cálculo.
+
+Medido sobre producción el 20/11/2026, ventana 1/11/2025 → 20/11/2026:
+
+| | Comprados | contra dólares | contra pesos | ve Ganancias |
+|---|---|---|---|---|
+| Euros | 654.295 | 507.214 | 147.081 | **22 %** |
+| Reales | 140.258 | 137.718 | 2.540 | **2 %** |
+
+| | Vendidos | contra dólares | contra pesos | ve Ganancias |
+|---|---|---|---|---|
+| Euros | 639.390 | 467.480 | 171.910 | **27 %** |
+| Reales | 129.992 | 88.075 | 41.917 | **32 %** |
+
+El libro euro-dólar es **tres veces y media** más grande que el euro-peso. Compró euros
+a US$ 1,1872 y los vendió a US$ 1,1982: 0,93 % de margen sobre 467.480 euros calzados,
+unos **US$ 5.166** (≈ $ 7,4 millones al dólar a 1.440). La pantalla informa $ 8,7
+millones de euros, así que el negocio real sería **casi el doble**.
+
+En reales la proporción es peor. Compró 137.718 a 5,12 reales por dólar y vendió 88.075
+a 4,96: unos **US$ 546**. La pantalla informa **$ 41.000**; el real está entre
+$ 910.000 y $ 1.630.000 según a qué dólar se valúe la pata en dólares — **20 a 37 veces
+más**.
+
+Sumando las dos monedas quedan afuera unos **US$ 5.712 ≈ $ 8,2 millones**, que sobre
+los $ 550 millones que informa el sistema es **1,5 %**. Parece poco porque el negocio de
+dólares contra pesos es enorme y domina el total, pero hay **US$ 1.206.946 de volumen
+que no aparece en ninguna pantalla**.
+
+> **Los dos márgenes de arriba tienen un asterisco.** Están medidos sobre los trece
+> meses enteros, así que mezclan margen de operación con la deriva del euro contra el
+> dólar en ese período. Para un número defendible hay que calcular el libro
+> moneda-dólar **mes por mes**, como hace la pantalla con el de pesos: son 2 o 3 h de
+> análisis y conviene hacerlas **antes** de llevarle cifras al cliente.
+
+> **No es un error de código.** El motor está diseñado para medir moneda contra pesos y
+> lo hace bien. Contar las operaciones moneda contra moneda es una decisión del cliente
+> y un desarrollo de verdad: hay que leer la columna `externo`, armar el libro de cada
+> par, calcular el margen en la moneda de la contrapartida y recién ahí pasarlo a pesos
+> con la cotización del período, sin contar dos veces la pata en dólares, que también
+> es volumen propio.
+
+> **Lo que NO hay que tocar:** las filas `INGRESAN` / `EGRESAN` sin contrapartida
+> (14.950 y 24.330 euros, 7.000 y 2.233 reales) son entregas y retiros de cuenta
+> corriente, no operaciones de cambio. No tienen margen y no deben entrar al cálculo.
+> Y `op = 'C'` es "operación común", no transferencia: no hay que filtrarlo.
+
+Las consultas para reproducir todo esto están en `scripts/reales-de-donde-salen.sql`
+(la consulta 3 sirve para cualquier moneda cambiando el nombre de la columna) y en
+`scripts/comparar-valuacion-stock.sql`. Las dos solo leen.
 
 ### 4.1. Rentabilidad por cliente y por moneda — **6 a 8 h**
 Hoy Ganancias es un total global. Este módulo abre el margen por cliente, por moneda y
@@ -310,6 +399,7 @@ mostrador.
 
 | Orden | Módulos | Esfuerzo | Por qué en este orden |
 |---|---|---|---|
+| **0º** | 4.0 Arreglar el cálculo de Ganancias | 24 a 34 h | No se vende, se corrige. El número que la pantalla muestra hoy no es el del negocio: le falta el 78 % de los euros y el 98 % de las compras de reales (ver 4.0.c). Vender analítica sobre un cálculo incompleto es construir arriba del error. |
 | **1º** | 6.1 Exportación + 2.1 Comprobante | 9 a 13 h | Impacto visible inmediato y bajo costo; genera confianza para seguir comprando. |
 | **2º** | 1.1 Auditoría + 1.2 Cierre de caja | 14 a 18 h | El salto real de control; es lo que justifica haber dejado el Excel. |
 | **3º** | 3.1 + 3.2 Logística de efectivo | 16 a 20 h | Protege plata en la calle; ROI argumentable con un solo incidente evitado. |
