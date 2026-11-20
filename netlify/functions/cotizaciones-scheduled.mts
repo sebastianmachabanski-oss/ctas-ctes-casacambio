@@ -24,17 +24,21 @@
  */
 import { createClient } from '@supabase/supabase-js'
 import { tomarCotizaciones } from '../../src/lib/cotizaciones/index'
-import { guardarToma } from '../../src/lib/cotizaciones/guardar'
+import { guardarToma, credencialesSupabase } from '../../src/lib/cotizaciones/guardar'
 
 export const config = { schedule: '*/15 * * * *' }
 
 export default async function handler() {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) {
-    console.error('[cotizaciones] faltan SUPABASE_URL y SERVICE_ROLE_KEY')
+  const cred = credencialesSupabase()
+  if (!cred) {
+    console.error('[cotizaciones] faltan las credenciales de Supabase: hace falta '
+      + 'NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (o SUPABASE_URL + SERVICE_ROLE_KEY)')
     return new Response('sin credenciales', { status: 500 })
   }
+  // Qué variables se usaron y a qué proyecto apuntan. Sin esto, un `Invalid API key` no
+  // dice si la clave está mal o si la dirección es la de otro proyecto.
+  console.log(`[cotizaciones] credenciales de ${cred.origen} · proyecto ${cred.proyecto}`)
+  const { url, key } = cred
 
   const toma = await tomarCotizaciones()
   for (const p of toma.problemas) console.warn(`[cotizaciones] ${p}`)
