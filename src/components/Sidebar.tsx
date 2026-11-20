@@ -39,18 +39,21 @@ const NAV: Record<string, Item[]> = {
   //   Reportes       lo que solo CONSULTA. Ninguna de estas escribe nada.
   //   Gestión        la administración del sistema.
   //
-  // "Cuentas Corrientes" pasó a "Movimientos cuentas corrientes": al lado de "Posición
-  // cuentas corrientes" el nombre viejo no decía en qué se diferencian, y son las dos
-  // preguntas distintas que el cliente hace todos los días —el detalle de una cuenta y
-  // el saldo de todas—.
+  // "Cuentas Corrientes" pasó a "Movimientos cta cte": al lado de "Posición cta cte" el
+  // nombre viejo no decía en qué se diferencian, y son las dos preguntas distintas que el
+  // cliente hace todos los días —el detalle de una cuenta y el saldo de todas—.
+  //
+  // Se abrevia "cta cte" porque escrito entero no entra en los 238px de la barra y parte
+  // el renglón en dos, justo en el bloque más largo del menú. La abreviatura ya se usa en
+  // la aplicación, así que no es una palabra nueva que haya que aprender.
   superadmin: [
     { href: '/dashboard/inicio',            label: 'Inicio',            icon: '📊' },
     { section: 'Transacciones', label: '', icon: '' },
     { href: '/dashboard/nueva-transaccion', label: 'Nueva operación', icon: '➕' },
     { href: '/dashboard/nueva-transferencia', label: 'Nueva transferencia', icon: '🔀' },
     { section: 'Reportes', label: '', icon: '' },
-    { href: '/dashboard/cuenta-corriente',  label: 'Movimientos cuentas corrientes', icon: '📋' },
-    { href: '/dashboard/deudores',          label: 'Posición cuentas corrientes', icon: '📈' },
+    { href: '/dashboard/cuenta-corriente',  label: 'Movimientos cta cte', icon: '📋' },
+    { href: '/dashboard/deudores',          label: 'Posición cta cte', icon: '📈' },
     { href: '/dashboard/transferencias',    label: 'Transferencias',  icon: '🔁' },
     { href: '/dashboard/calle',             label: 'Dinero en calle', icon: '🚚' },
     { href: '/dashboard/gastos',            label: 'Gastos',          icon: '🧾' },
@@ -67,8 +70,8 @@ const NAV: Record<string, Item[]> = {
     { href: '/dashboard/nueva-transaccion', label: 'Nueva operación', icon: '➕' },
     { href: '/dashboard/nueva-transferencia', label: 'Nueva transferencia', icon: '🔀' },
     { section: 'Reportes', label: '', icon: '' },
-    { href: '/dashboard/cuenta-corriente',  label: 'Movimientos cuentas corrientes', icon: '📋' },
-    { href: '/dashboard/deudores',          label: 'Posición cuentas corrientes', icon: '📈' },
+    { href: '/dashboard/cuenta-corriente',  label: 'Movimientos cta cte', icon: '📋' },
+    { href: '/dashboard/deudores',          label: 'Posición cta cte', icon: '📈' },
     { href: '/dashboard/transferencias',    label: 'Transferencias',  icon: '🔁' },
     { href: '/dashboard/calle',             label: 'Dinero en calle', icon: '🚚' },
     { href: '/dashboard/gastos',            label: 'Gastos',          icon: '🧾' },
@@ -84,8 +87,8 @@ const NAV: Record<string, Item[]> = {
     { href: '/dashboard/nueva-transaccion', label: 'Nueva operación', icon: '➕' },
     { href: '/dashboard/nueva-transferencia', label: 'Nueva transferencia', icon: '🔀' },
     { section: 'Reportes', label: '', icon: '' },
-    { href: '/dashboard/cuenta-corriente',  label: 'Movimientos cuentas corrientes', icon: '📋' },
-    { href: '/dashboard/deudores',          label: 'Posición cuentas corrientes', icon: '📈' },
+    { href: '/dashboard/cuenta-corriente',  label: 'Movimientos cta cte', icon: '📋' },
+    { href: '/dashboard/deudores',          label: 'Posición cta cte', icon: '📈' },
     { href: '/dashboard/transferencias',    label: 'Transferencias',  icon: '🔁' },
     { href: '/dashboard/calle',             label: 'Dinero en calle', icon: '🚚' },
     { href: '/dashboard/gastos',            label: 'Gastos',          icon: '🧾' },
