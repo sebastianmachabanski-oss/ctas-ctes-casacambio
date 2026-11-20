@@ -46,3 +46,33 @@ order by operacion, op, tipo;
 --   and fecha >= date '2025-11-01'
 -- order by fecha
 -- limit 50;
+
+
+-- ═══ CONSULTA 3 — Contra QUÉ se compran y venden los reales ════════════════
+-- (correr sola)
+--
+-- La consulta 1 mostró que la mayoría de las filas con reales NO tienen
+-- contrapartida en pesos. Ganancias mide el margen de una moneda SIEMPRE
+-- contra pesos: si la fila no tiene pata en pesos, no hay tasa de la que
+-- sacar spread y la operación no entra en el cálculo.
+--
+-- Esta consulta muestra cuál es la otra pata: la columna `externo` dice la
+-- moneda contra la que se operó.
+select
+  operacion,
+  coalesce(nullif(btrim(externo), ''), '— (contra pesos)') as moneda_externa,
+  coalesce(nullif(btrim(operacion_externa), ''), '—')      as operacion_externa,
+  count(*)                                        as filas,
+  round(sum(abs(coalesce(reales, 0))))            as reales,
+  round(sum(coalesce(pesos, 0)))                  as pesos,
+  round(sum(coalesce(dolares, 0)))                as dolares,
+  round(sum(coalesce(euros, 0)))                  as euros,
+  round(sum(coalesce(usdt, 0)))                   as usdt,
+  round(sum(coalesce(cheques, 0)))                as cheques
+from public.movimientos_caja
+where coalesce(reales, 0) <> 0
+  and fecha >= date '2025-11-01'
+group by operacion,
+         coalesce(nullif(btrim(externo), ''), '— (contra pesos)'),
+         coalesce(nullif(btrim(operacion_externa), ''), '—')
+order by operacion, moneda_externa;
