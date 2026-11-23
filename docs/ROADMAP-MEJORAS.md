@@ -393,6 +393,34 @@ mostrador.
 > **Gancho comercial:** percepción de "app de verdad" por muy poco desarrollo, ya que
 > la base web actual es aprovechable.
 
+### 6.5. Lectura automática del cheque (OCR) — **10 a 14 h**
+La cartera de cheques (`docs/CHEQUES.md`) quedó construida el 23/11/2026 **salvo esto**,
+y no por falta de tiempo: tiene adentro una decisión que es del cliente.
+
+La foto de un cheque muestra **CUIT, número de cuenta y la firma del librador**, que no
+es el cliente de la casa de cambio sino un tercero que nunca aceptó nada. Mandar esa
+imagen a un proveedor externo para que la lea se decide, no se implementa. Es la misma
+razón por la que el bucket es privado y la imagen se sirve con un enlace firmado: cuidado
+eso, no tendría sentido que lo primero que haga la app con la imagen sea mandarla afuera
+sin que nadie lo resuelva.
+
+Las tres opciones y lo que cada una cuesta de verdad están en `docs/CHEQUES.md`. En
+resumen: **Claude (visión)** es el único que lee bien una foto de teléfono con partes
+manuscritas; **Google Vision / Textract** es muy bueno con texto impreso y flojo con
+manuscritos, que es justo donde van el importe y la fecha; **en el navegador** no sale
+nada del dispositivo pero, sobre una foto real, acierta poco.
+
+> **Al evaluarlo, el ahorro es menor de lo que parece.** En el alta ya se heredan
+> librador, CUIT y banco de la fila anterior, así que de los siete campos de un cheque
+> tres vienen puestos. El OCR ahorraría el número y el importe: no se compara contra
+> cargar todo a mano, sino contra cargar dos campos.
+
+> **La regla no cambia según el motor:** el OCR precarga, la persona confirma. Un importe
+> mal leído no se descubre hasta el día del rechazo, cuando ya se pagó por el cheque. Y
+> un formulario mayormente lleno y equivocado es peor que uno vacío, porque la gente
+> acepta lo que ya está puesto. De las 10 a 14 h, unas 5 o 6 son esa pantalla de
+> confirmación, que hay que hacer con cualquiera de los tres motores.
+
 ---
 
 ## Secuencia de venta recomendada

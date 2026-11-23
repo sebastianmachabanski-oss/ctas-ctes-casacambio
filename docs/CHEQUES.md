@@ -3,9 +3,10 @@
 Cómo la app trata los cheques como **instrumentos** y no como una moneda más.
 Definido el 22/11/2026. La estructura está en `migrations/2026-11-22_cheques.sql`.
 
-> **Estado: diseñado, no construido.** Las tablas existen en la migración; las
-> pantallas de este documento todavía no. Esto es el acuerdo de cómo se va a hacer,
-> escrito antes de escribir el código para que no se decida sobre la marcha.
+> **Estado al 23/11/2026: construido, menos el OCR.** Andan el alta de N cheques dentro
+> de Nueva operación, la cartera, la ficha con el curso, los cambios de estado, la imagen
+> del cheque y la siembra para la demostración. Lo único que falta de lo que se había
+> planeado es la lectura automática: ver *El OCR*, al final.
 
 ---
 
@@ -218,7 +219,54 @@ archivo de miles de imágenes y no antes de que alguien lo pregunte.
 
 | | Por qué |
 |---|---|
-| **OCR** | El alta tiene que andar completa a mano primero. Cuando llegue: precarga y la persona confirma. Un importe mal leído se descubre el día del rechazo. |
+| **OCR** | Parado por decisión del 23/11/2026. Ver *El OCR*, abajo. |
 | **Lectura de archivos de echeq** | El modelo ya lo contempla (`tipo`, `id_echeq`); el parser es trabajo aparte y depende de si los clientes los usan. |
 | **Retención de imágenes** | Ver arriba. |
 | **Convivencia con el sync** | Estas filas nacen en la app y el Sheet no las tiene, igual que USDT. Si alguna vez se activa en una instancia con sync, hay que decidir qué pasa cuando el sync reescribe el movimiento al que un cheque está atado. Hoy ese caso no existe. |
+
+---
+
+## El OCR
+
+**Parado a propósito el 23/11/2026**, no por falta de tiempo. Tiene adentro una decisión
+que no es técnica y la toma el cliente.
+
+### Por qué no es una decisión de implementación
+
+La foto de un cheque muestra **CUIT, número de cuenta y la firma del librador**. El
+librador no es el cliente de la casa de cambio: es un tercero que nunca aceptó nada.
+Mandar esa imagen a un proveedor externo para que la lea es una decisión del negocio.
+
+Es la misma razón por la que el bucket es privado y la imagen se sirve con un enlace
+firmado y de vida corta. Habiendo cuidado eso, no tendría sentido que la primera cosa que
+hace la app con la imagen sea mandarla afuera sin que nadie lo haya decidido.
+
+### Las tres opciones, con lo que cada una cuesta de verdad
+
+| | Qué lee | Qué pide | Dónde va la imagen |
+|---|---|---|---|
+| **Claude (visión)** | Es el único que lee bien una foto de teléfono, torcida y con partes manuscritas | Clave de API y habilitar el host en Netlify. Costo bajo por imagen | A Anthropic |
+| **Google Vision / AWS Textract** | Muy bueno con texto impreso, flojo con manuscritos — y el importe y la fecha suelen ir a mano, que es justo lo que importa | Cuenta en el proveedor, clave y habilitar el host | A Google o Amazon |
+| **En el navegador (tesseract.js)** | Sobre una foto de cheque real, poco | Nada: no sale del dispositivo. Descarga unos 15 MB la primera vez | A ningún lado |
+
+Esfuerzo, en cualquiera de las tres: **10 a 14 h**, de las cuales unas 5 o 6 son la
+pantalla de confirmación, que es común y hay que hacer igual.
+
+### La regla que no cambia según el motor
+
+**El OCR precarga; la persona confirma.** Nunca se registra solo.
+
+No es prudencia genérica: un importe mal leído **no se descubre hasta el día del
+rechazo**, cuando ya se pagó por el cheque. Y hay algo peor que un formulario vacío, que
+es un formulario mayormente lleno y equivocado: la gente acepta lo que ya está puesto.
+Por eso, el día que se haga, la pantalla tiene que mostrar lo leído como **sugerencia por
+campo** y no como valor cargado.
+
+### Lo que ya hace que el OCR valga menos de lo que parece
+
+En el alta, al agregar una fila **se heredan librador, CUIT y banco de la anterior**. Una
+tanda suele venir de uno o dos libradores, así que de los siete campos de un cheque, tres
+ya vienen puestos. Lo que el OCR ahorraría de verdad es el número y el importe.
+
+Conviene tenerlo presente al evaluar el costo: no se está comparando contra cargar todo a
+mano, sino contra cargar dos campos.
