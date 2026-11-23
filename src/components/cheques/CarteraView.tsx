@@ -246,9 +246,6 @@ export default function CarteraView({
         <div className="card">
           <div className="card-h">
             <div className="card-t">Concentración por librador</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-              Cuánto de la cartera depende de que pague una sola firma
-            </div>
           </div>
           <div style={{ padding: '4px 16px 16px' }}>
             {concentracion.slice(0, 6).map(g => (

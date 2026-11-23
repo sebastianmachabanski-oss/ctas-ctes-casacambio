@@ -82,8 +82,7 @@ export default function SubirImagen({ valor, onChange, deshabilitado, compacto }
 
       {!compacto && !valor && !error && (
         <div style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.45 }}>
-          Foto o PDF, hasta 10 MB. No reemplaza al papel: sirve para verificar un dato
-          antes de depositar y para la gestión de cobro si rebota.
+          Foto o PDF, hasta 10 MB.
         </div>
       )}
 

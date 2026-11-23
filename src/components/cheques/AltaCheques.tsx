@@ -47,9 +47,6 @@ export default function AltaCheques({ cheques, onChange, fechaOperacion, deshabi
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 13.5, fontWeight: 700 }}>Cheques de la operación</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-            El nominal sale de esta lista; no se escribe aparte.
-          </div>
         </div>
         <div className="num" style={{ fontSize: 15, fontWeight: 700 }}>
           {cheques.length} · {pesosExacto(total)}

@@ -54,6 +54,10 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
   const router = useRouter()
   const [enviando, setEnviando] = useState<Estado | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  /** El destino que está esperando confirmación, cuando es un estado final. */
+  const [confirmando, setConfirmando] = useState<Estado | null>(null)
+  /** Qué pasó en el último cambio, para que la pantalla no quede muda. */
+  const [hecho, setHecho] = useState<string | null>(null)
 
   // Los botones SON la máquina de estados: no hay una lista de acciones escrita aparte
   // que pueda quedar desincronizada y ofrecer algo imposible.
@@ -61,7 +65,7 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
 
   async function mover(destino: Estado) {
     if (enviando) return
-    setEnviando(destino); setAviso(null)
+    setEnviando(destino); setAviso(null); setHecho(null)
     try {
       const r = await fetch('/api/cheques/estado', {
         method: 'POST',
@@ -70,6 +74,7 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { setAviso(j.error || 'No se pudo registrar el cambio'); return }
+      setHecho(`Ahora está ${ESTADO_LABEL[destino].toLowerCase()}. Quedó anotado en el curso del cheque.`)
       router.refresh()
     } catch {
       setAviso('No se pudo conectar. Probá de nuevo.')
@@ -102,10 +107,12 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
       {/* Encabezado */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 12 }}>
-            <Link href="/dashboard/cheques">Cartera de cheques</Link>
-            <span style={{ color: 'var(--muted)' }}> · ficha</span>
-          </div>
+          {/* Volver, como botón y no como miga de pan: la miga se lee como un rótulo
+              y no se reconoce como la salida de la pantalla. */}
+          <Link href="/dashboard/cheques" className="chip"
+            style={{ display: 'inline-block', textDecoration: 'none', marginBottom: 6 }}>
+            ← Volver a la cartera
+          </Link>
           <h1 className="num" style={{ fontSize: 22, fontWeight: 700, margin: '2px 0 0' }}>
             Cheque {cheque.numero}
           </h1>
@@ -125,6 +132,7 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
       </div>
 
       {aviso && <div className="banner banner-warn">{aviso}</div>}
+      {hecho && <div className="banner banner-info">{hecho}</div>}
 
       {/* Datos del instrumento, con la imagen al lado */}
       <div className="card" style={{ padding: 16, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
@@ -208,17 +216,6 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
           {cheque.notas && (
             <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 8 }}>{cheque.notas}</div>
           )}
-
-          {origen?.cliente && cheque.librador && (
-            <div style={{
-              borderTop: '1px solid var(--ring)', marginTop: 8, paddingTop: 9,
-              fontSize: 12, color: 'var(--muted)', lineHeight: 1.5,
-            }}>
-              <b style={{ color: 'var(--ink-2)' }}>El librador no es el cliente.</b>{' '}
-              {cheque.librador} firmó el cheque; {origen.cliente} lo trajo. Por eso el riesgo
-              se mide por librador y la cuenta corriente, por cliente.
-            </div>
-          )}
         </div>
       </div>
 
@@ -226,9 +223,6 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
       <div className="card">
         <div className="card-h">
           <div className="card-t">Curso del cheque</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-            Cada cambio de estado, con su fecha y lo que movió
-          </div>
         </div>
 
         <div style={{ padding: '12px 16px 4px' }}>
@@ -277,15 +271,35 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
         </div>
 
         {/* Las acciones son EXACTAMENTE las transiciones que la máquina permite desde el
-            estado actual. Un estado terminal no ofrece ninguna, y lo dice. */}
+            estado actual. Un estado terminal no ofrece ninguna.
+
+            SE CONFIRMA LO QUE NO SE PUEDE DESHACER, y solo eso. Acreditado, endosado y
+            devuelto son estados finales: desde ahí la pantalla no ofrece salida, así que
+            un clic de más deja el cheque fuera de la cartera sin vuelta atrás. Depositar
+            o registrar un rechazo sí se corrigen siguiendo la máquina, y pedir
+            confirmación en cada paso convierte el aviso en algo que se tilda sin leer. */}
         <div style={{
           borderTop: '1px solid var(--ring)', padding: '12px 16px',
           display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
         }}>
           {esTerminal(cheque.estado) ? (
             <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
-              {ESTADO_LABEL[cheque.estado]} es un estado final: este cheque no se mueve más.
+              {ESTADO_LABEL[cheque.estado]}: sin acciones disponibles.
             </span>
+          ) : confirmando ? (
+            <>
+              <span style={{ fontSize: 12.5, color: 'var(--ink-1)' }}>
+                <b>{ACCION[confirmando]}.</b> Sale de la cartera y no se puede deshacer
+                desde la pantalla.
+              </span>
+              <button className="btn-primary" disabled={!!enviando}
+                onClick={() => { const d = confirmando; setConfirmando(null); mover(d) }}>
+                {enviando ? 'Registrando…' : 'Confirmar'}
+              </button>
+              <button className="chip" disabled={!!enviando} onClick={() => setConfirmando(null)}>
+                Cancelar
+              </button>
+            </>
           ) : (
             <>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>
@@ -293,7 +307,7 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
               </span>
               {posibles.map(destino => (
                 <button key={destino} className="chip" disabled={!!enviando}
-                  onClick={() => mover(destino)}>
+                  onClick={() => (esTerminal(destino) ? setConfirmando(destino) : mover(destino))}>
                   {enviando === destino ? 'Registrando…' : ACCION[destino]}
                 </button>
               ))}
