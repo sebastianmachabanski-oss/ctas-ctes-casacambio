@@ -200,6 +200,80 @@ export function concentracionPorLibrador(cheques: Cheque[]): Concentracion[] {
   return lista.sort((a, b) => b.importe - a.importe)
 }
 
+// ── El alta: un cheque tal como lo carga el formulario ───────────────────
+
+export type ChequeNuevo = {
+  numero: string
+  importe: number
+  /** YYYY-MM-DD */
+  fecha_pago: string
+  fecha_emision: string | null
+  librador: string
+  cuit_librador: string | null
+  banco: string | null
+  sucursal: string | null
+  cuenta: string | null
+  tipo: 'papel' | 'echeq'
+}
+
+export const chequeNuevoVacio = (): ChequeNuevo => ({
+  numero: '', importe: 0, fecha_pago: '', fecha_emision: null,
+  librador: '', cuit_librador: null, banco: null, sucursal: null, cuenta: null,
+  tipo: 'papel',
+})
+
+const ES_FECHA = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * ¿La lista de cheques se puede guardar contra este nominal?
+ *
+ * Devuelve el motivo del rechazo o `null` si está bien. La usan el FORMULARIO —para
+ * avisar mientras se carga— y el SERVIDOR —para no confiar en el navegador—, y es una
+ * sola definición justamente para que no se puedan separar.
+ *
+ * La regla que no se puede aflojar es la última: la suma tiene que dar el nominal de la
+ * operación. Es la misma que verifica `cheques_descuadrados()` en la base, y dejarla
+ * pasar acá sería sembrar el descuadre que esa función existe para encontrar.
+ */
+export function validarChequesDelAlta(cheques: ChequeNuevo[], nominal: number): string | null {
+  if (!cheques.length) return 'Cargá al menos un cheque'
+
+  for (let i = 0; i < cheques.length; i++) {
+    const c = cheques[i]
+    const donde = `Cheque ${i + 1}`
+    if (!c.numero.trim()) return `${donde}: falta el número`
+    if (!(c.importe > 0)) return `${donde}: el importe tiene que ser mayor a cero`
+    if (!ES_FECHA.test(c.fecha_pago)) return `${donde}: falta la fecha de pago`
+    if (c.fecha_emision && !ES_FECHA.test(c.fecha_emision))
+      return `${donde}: la fecha de emisión no es válida`
+    if (c.fecha_emision && c.fecha_emision > c.fecha_pago)
+      return `${donde}: la fecha de pago no puede ser anterior a la de emisión`
+    if (c.tipo !== 'papel' && c.tipo !== 'echeq') return `${donde}: tipo desconocido`
+  }
+
+  // Dos veces el mismo número y banco DENTRO DE LA MISMA OPERACIÓN es, casi seguro, la
+  // fila duplicada por error. Entre operaciones distintas sí puede pasar de verdad —el
+  // mismo número se repite entre bancos, y un rechazado puede volver a entrar—, y por eso
+  // la base no lo impide: ahí la pantalla avisa en vez de bloquear.
+  const vistos = new Set<string>()
+  for (const c of cheques) {
+    const clave = `${(c.banco ?? '').trim().toUpperCase()}|${c.numero.trim().toUpperCase()}`
+    if (vistos.has(clave))
+      return `El cheque ${c.numero.trim()} está cargado dos veces en esta misma operación`
+    vistos.add(clave)
+  }
+
+  const suma = cheques.reduce((a, c) => a + c.importe, 0)
+  if (Math.abs(suma - nominal) > 0.005)
+    return `Los cheques suman ${pesosExacto(suma)} y la operación dice ${pesosExacto(nominal)}`
+
+  return null
+}
+
+/** El nominal de la operación: lo que suman los cheques, no un número que se tipea. */
+export const sumaDeCheques = (cheques: ChequeNuevo[]): number =>
+  cheques.reduce((a, c) => a + (Number(c.importe) || 0), 0)
+
 // ── Formato ───────────────────────────────────────────────────────────────
 
 const nf0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })

@@ -22,7 +22,8 @@ import {
   TRANSICIONES, puedeIr, esTerminal, esActivo, ESTADOS,
   resumenCartera, concentracionPorLibrador, UMBRAL_CONCENTRACION,
   diasHasta, textoVencimiento, sumarDias, vencidoSinDepositar,
-  type Cheque, type Estado,
+  validarChequesDelAlta, sumaDeCheques, chequeNuevoVacio,
+  type Cheque, type Estado, type ChequeNuevo,
 } from '../src/lib/cheques'
 
 let ok = 0, fail = 0
@@ -180,6 +181,51 @@ igual([anonimo.length, anonimo[0].librador], [1, 'Sin librador'],
   'un cheque sin librador aparece como "Sin librador"')
 
 igual(concentracionPorLibrador([]).length, 0, 'una cartera vacía no tiene concentración')
+
+// ── 5. La validación del alta ─────────────────────────────────────────────
+// Es la que corren el formulario Y el servidor, con la misma definición. La regla que no
+// se puede aflojar es la suma: dejarla pasar sería sembrar el descuadre que
+// `cheques_descuadrados()` existe para encontrar.
+console.log('\n── Alta de cheques ──')
+
+const nuevo = (p: Partial<ChequeNuevo> = {}): ChequeNuevo => ({
+  ...chequeNuevoVacio(),
+  numero: '00012345', importe: 1000, fecha_pago: '2027-01-15',
+  fecha_emision: '2026-11-20', librador: 'ACME SA', banco: 'Galicia',
+  ...p,
+})
+
+igual(validarChequesDelAlta([nuevo()], 1000), null, 'un cheque que cierra pasa')
+igual(validarChequesDelAlta([nuevo({ importe: 600 }), nuevo({ numero: 'B', importe: 400 })], 1000),
+  null, 'dos cheques que suman el nominal pasan')
+
+assert(validarChequesDelAlta([], 1000) !== null, 'sin cheques no pasa')
+assert(validarChequesDelAlta([nuevo({ numero: '  ' })], 1000) !== null, 'sin número no pasa')
+assert(validarChequesDelAlta([nuevo({ importe: 0 })], 0) !== null, 'importe cero no pasa')
+assert(validarChequesDelAlta([nuevo({ importe: -5 })], -5) !== null, 'importe negativo no pasa')
+assert(validarChequesDelAlta([nuevo({ fecha_pago: '' })], 1000) !== null, 'sin fecha de pago no pasa')
+assert(validarChequesDelAlta([nuevo({ fecha_pago: '15/01/2027' })], 1000) !== null,
+  'una fecha con otro formato no pasa')
+assert(validarChequesDelAlta([nuevo({ fecha_emision: '2027-02-01' })], 1000) !== null,
+  'emisión posterior al pago no pasa')
+
+// El descuadre, que es el motivo de todo esto.
+const descuadre = validarChequesDelAlta([nuevo({ importe: 999 })], 1000)
+assert(descuadre !== null && descuadre.includes('999'),
+  'si la suma no da el nominal, lo dice con los dos números')
+igual(validarChequesDelAlta([nuevo({ importe: 1000.004 })], 1000), null,
+  'medio centavo de punto flotante no se considera descuadre')
+
+// Duplicado DENTRO de la misma operación: casi seguro una fila repetida por error.
+assert(validarChequesDelAlta([nuevo({ importe: 500 }), nuevo({ importe: 500 })], 1000) !== null,
+  'el mismo número y banco dos veces en la misma operación no pasa')
+igual(validarChequesDelAlta(
+  [nuevo({ importe: 500 }), nuevo({ importe: 500, banco: 'Nación' })], 1000), null,
+  'el mismo número en bancos distintos sí pasa: pasa de verdad')
+
+igual(sumaDeCheques([nuevo({ importe: 600 }), nuevo({ importe: 400 })]), 1000,
+  'la suma de la lista es el nominal de la operación')
+igual(sumaDeCheques([]), 0, 'una lista vacía suma cero')
 
 // ── Final ─────────────────────────────────────────────────────────────────
 console.log(`\n${ok} OK, ${fail} fallidas`)
