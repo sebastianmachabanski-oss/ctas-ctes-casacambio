@@ -156,9 +156,14 @@ estado → rechazado
    └─ se asume la pérdida                              → movimiento
 ```
 
-En los tres casos hay un movimiento, y **su id queda guardado en el evento**
+En los tres casos hay un movimiento, y **su id va guardado en el evento**
 (`cheques_eventos.movimiento_id`). Para eso existe esa columna: para poder
 reconstruir, meses después, qué se hizo con cada rechazo y cuánto costó.
+
+> **Esto todavía no está conectado a la pantalla (23/11/2026).** El botón de rechazo
+> cambia el estado y deja el evento, pero no ofrece las tres salidas ni arma el
+> movimiento: hoy hay que cargarlo por separado en Nueva operación, y el enlace entre el
+> evento y ese movimiento queda sin hacer. Es la entrada **6.6** del roadmap.
 
 Desde `rechazado` el cheque puede ir a `devuelto` (se le devolvió el papel al cliente) o
 quedarse en gestión de cobro.

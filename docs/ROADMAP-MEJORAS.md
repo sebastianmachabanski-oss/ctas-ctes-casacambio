@@ -421,6 +421,33 @@ nada del dispositivo pero, sobre una foto real, acierta poco.
 > acepta lo que ya está puesto. De las 10 a 14 h, unas 5 o 6 son esa pantalla de
 > confirmación, que hay que hacer con cualquiera de los tres motores.
 
+### 6.6. Rechazo de cheque: resolver la plata desde la ficha — **4 a 6 h**
+El rechazo es el único evento de un cheque que cuesta dinero: la casa ya pagó por un
+documento que no se cobró. Hoy el botón cambia el estado y deja el evento, pero **ahí se
+corta**: la decisión de qué pasa con la plata hay que cargarla aparte en Nueva operación,
+y el enlace entre el rechazo y ese movimiento queda sin hacer.
+
+El trabajo es que el rechazo ofrezca las tres salidas y arme el movimiento:
+
+| | |
+|---|---|
+| Se le debita al cliente en su cuenta corriente | lo normal cuando el cliente tiene cuenta |
+| El cliente lo repone en efectivo | movimiento de caja |
+| Se asume la pérdida | queda en el resultado |
+
+`cheques_eventos.movimiento_id` ya existe para guardar el enlace: no hay nada que migrar.
+
+> **Las reglas del dominio que tiene que respetar.** Las patas `cc_*` las calcula SIEMPRE
+> el motor, nunca a mano — hacerlo a mano ya produjo un signo invertido (1/9/2026). Y si
+> la salida elegida es la cuenta corriente, el movimiento tiene que escribirse en
+> `movimientos_caja` **y** en `diario`: son dos tablas que van a la par, y escribir una
+> sola deja el saldo del cliente mal sin ninguna señal en pantalla.
+
+> **Por qué no se hizo junto con el resto.** Sin esto la cartera igual sirve: el rechazo
+> queda registrado con su fecha y el cheque sale del circuito. Lo que falta es la
+> comodidad de no cargar la contrapartida a mano, y el riesgo de que alguien se olvide de
+> cargarla. Vale la pena cuando haya un cliente descontando cheques de verdad.
+
 ---
 
 ## Secuencia de venta recomendada
