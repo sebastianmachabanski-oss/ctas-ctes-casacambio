@@ -6,6 +6,7 @@ import { registrarAuditoria, calcularHuella, describirMovimiento } from '@/lib/a
 import { esStaff } from '@/lib/roles'
 import { pareceCuentaCorriente, avisoCajaVsCtaCte } from '@/lib/caja-vs-ctacte'
 import { hayColumnaVinculo } from '@/lib/diario'
+import { validarChequesDelAlta, type ChequeNuevo } from '@/lib/cheques'
 
 export const maxDuration = 30
 
@@ -33,6 +34,19 @@ export async function POST(request: Request) {
 
   const body = await request.json()
   const { fecha, tipo, col_f, cuenta_cte, operacion, propio, externo, monto, cotizacion, costo_porcentaje, debe, notas, confirmo_caja_cta_cte } = body
+
+  // Cheques que vienen con el alta (23/11/2026). Solo en una COMPRA de CHEQUES: es la
+  // operación que los trae. Vender cheques es endosarlos, y eso se hace desde la ficha.
+  const cheques: ChequeNuevo[] = Array.isArray(body.cheques) ? body.cheques : []
+  if (cheques.length) {
+    if (operacion !== 'COMPRA' || mapMoneda(String(propio ?? '')) !== 'CHEQUES')
+      return NextResponse.json(
+        { error: 'Los cheques solo se cargan en una COMPRA de CHEQUES.' }, { status: 400 })
+    // La MISMA validación que corrió el formulario. Va también acá porque el navegador
+    // no es donde se defiende una regla: con la URL en la mano se manda cualquier cosa.
+    const problema = validarChequesDelAlta(cheques, Number(monto))
+    if (problema) return NextResponse.json({ error: problema }, { status: 400 })
+  }
 
   if (!fecha || !tipo || !col_f || !cuenta_cte || !operacion || !propio || !externo || monto == null)
     return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
@@ -202,7 +216,7 @@ export async function POST(request: Request) {
   // impacto las calcula el motor (validado 100% contra la planilla). Mientras dure la
   // convivencia, el próximo sync full reemplaza esta fila por la copia que venga de la
   // planilla (idéntica si la escritura al Sheet salió bien) — sin duplicados.
-  const { error: cajaError } = await supabase.from('movimientos_caja').insert({
+  const { data: filaCaja, error: cajaError } = await supabase.from('movimientos_caja').insert({
     ...conVinculo,
     fila_sheet: null,
     origen: involucraUsdt ? 'app' : 'sheet',
@@ -233,10 +247,69 @@ export async function POST(request: Request) {
     ...Object.fromEntries(
       Object.entries(impacto.valores).map(([k, v]) => [k.toLowerCase().replace(/\s+/g, '_'), v])
     ),
-  })
+  }).select('id').single()
   // Tolerante: diario ya quedó guardado y la planilla se escribe aparte; si esta pata
   // falla (p. ej. falta la policy de INSERT), el movimiento aparece con el próximo sync.
   if (cajaError) console.error('No se pudo escribir movimientos_caja directo:', cajaError.message)
+
+  // ── Los cheques de la operación ─────────────────────────────────────────
+  // ACÁ LA TOLERANCIA DE ARRIBA NO APLICA. Un cheque cuelga de su movimiento, así que si
+  // la fila de `movimientos_caja` no se escribió no hay de dónde colgarlo, y esperar al
+  // sync tampoco sirve: el sync trae la fila de la planilla con OTRO uuid. Se avisa.
+  if (cheques.length) {
+    if (cajaError || !filaCaja) {
+      return NextResponse.json({
+        error: 'La operación se guardó pero los cheques no: no se pudo escribir el '
+          + 'movimiento del que cuelgan. Cargalos desde la ficha de la operación.',
+      }, { status: 500 })
+    }
+
+    const movimientoId = (filaCaja as { id: string }).id
+    const limpio = (v: string | null | undefined) => {
+      const s = String(v ?? '').trim()
+      return s ? s : null
+    }
+
+    const { data: insertados, error: errorCheques } = await (supabase as any)
+      .from('cheques')
+      .insert(cheques.map(c => ({
+        movimiento_id: movimientoId,
+        numero: c.numero.trim(),
+        importe: Number(c.importe),
+        fecha_pago: c.fecha_pago,
+        fecha_emision: c.fecha_emision || null,
+        estado: 'en_cartera',
+        tipo: c.tipo,
+        librador: limpio(c.librador),
+        cuit_librador: limpio(c.cuit_librador),
+        banco: limpio(c.banco),
+        sucursal: limpio(c.sucursal),
+        cuenta: limpio(c.cuenta),
+        // La RUTA dentro del bucket privado, no una URL: una firmada vence.
+        archivo_url: limpio(c.archivo_url),
+        origen_datos: 'manual',
+        creado_por: user.id,
+      })))
+      .select('id')
+    if (errorCheques)
+      return NextResponse.json({
+        error: `La operación se guardó pero los cheques no: ${errorCheques.message}`,
+      }, { status: 500 })
+
+    // El primer evento del curso. Estado e historial se escriben siempre juntos: una
+    // ficha con estado y sin historia miente sin ninguna señal en pantalla.
+    const ids = ((insertados ?? []) as { id: string }[]).map(r => r.id)
+    const { error: errorEventos } = await (supabase as any).from('cheques_eventos').insert(
+      ids.map(id => ({
+        cheque_id: id, fecha, estado: 'en_cartera',
+        movimiento_id: movimientoId, notas: 'Recibido al descontar', creado_por: user.id,
+      })))
+    if (errorEventos)
+      return NextResponse.json({
+        error: 'Los cheques se guardaron pero sin su primer evento: '
+          + `${errorEventos.message}. La ficha va a mostrar la cartera sin historia.`,
+      }, { status: 500 })
+  }
 
   // Auditoría del alta. Se ancla por huella (no por uuid): el sync full regenera los
   // uuid, y es esta huella la que después permite volver a asociar el evento a la fila.

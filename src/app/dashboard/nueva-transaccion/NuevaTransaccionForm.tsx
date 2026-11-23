@@ -1,5 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import AltaCheques from '@/components/cheques/AltaCheques'
+import { validarChequesDelAlta, sumaDeCheques, type ChequeNuevo } from '@/lib/cheques'
 import { useRouter } from 'next/navigation'
 import SelectBuscable from '@/components/SelectBuscable'
 import { useAvisoSinGuardar } from '@/lib/useAvisoSinGuardar'
@@ -118,6 +120,9 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
   const [error, setError] = useState<string | null>(null)
 
   const [form, setForm] = useState(formPorDefecto)
+  // Los cheques de un descuento (23/11/2026). Una operación trae N: el cliente llega
+  // con cinco y se lleva un solo pago.
+  const [cheques, setCheques] = useState<ChequeNuevo[]>([])
 
   // Selector de cliente según el Tipo:
   //  - CTA CTE: buscador sobre las cuentas reales. Si el nombre no existe, se ofrece
@@ -332,7 +337,39 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
     setConfirmoCaja(false)
   }, [form.tipo, form.operacion, form.col_f, form.cuenta_cte])
 
+  /** Una COMPRA de CHEQUES trae instrumentos; el resto de las operaciones, no. */
+  const esAltaCheques = form.operacion === 'COMPRA' && form.propio === 'CHEQUES'
+
+  // El nominal NO se tipea cuando hay cheques: lo da la suma. Un importe escrito
+  // aparte es el descuadre que `cheques_descuadrados()` existe para encontrar.
+  useEffect(() => {
+    if (!esAltaCheques) return
+    const suma = sumaDeCheques(cheques)
+    const texto = suma > 0 ? fmtMonto(suma.toFixed(2).replace('.', ',')) : ''
+    setForm(f => (f.monto === texto ? f : { ...f, monto: texto }))
+  }, [cheques, esAltaCheques])
+
+  // Al dejar de ser una compra de cheques, la lista se vacía: si no, quedaría
+  // colgada e iría en el envío de una operación que no los lleva.
+  useEffect(() => {
+    if (!esAltaCheques && cheques.length) setCheques([])
+  }, [esAltaCheques, cheques.length])
+
   function set(field: string, value: string) {
+    // UN CHEQUE SE DESCUENTA CONTRA PESOS (23/11/2026).
+    //
+    // Al elegir CHEQUES como moneda propia, la externa quedaba en el default (DOLARES) y
+    // eso arrastraba dos cosas mal sin decir nada: el motor clasificaba la operación como
+    // CAMBIO DIVISAS en vez de CAMBIO CHEQUES, y la alerta de monto grande leía el
+    // nominal como si fueran dólares (un millón de pesos en cheques "equivalía a
+    // US$ 1.000.000").
+    //
+    // Es un DEFAULT, no una regla: se puede cambiar a mano si alguna vez se cambian
+    // cheques por otra cosa.
+    if (field === 'propio' && value === 'CHEQUES') {
+      setForm(f => ({ ...f, propio: value, externo: 'PESOS' }))
+      return
+    }
     setForm(f => ({ ...f, [field]: value }))
   }
 
@@ -365,6 +402,10 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
     if (!form.externo)     return 'El campo Externo es obligatorio'
     if (!form.monto || isNaN(montoNumero(form.monto)) || montoNumero(form.monto) <= 0)
       return 'El monto debe ser un número mayor a 0'
+    if (esAltaCheques) {
+      const problema = validarChequesDelAlta(cheques, montoNumero(form.monto))
+      if (problema) return problema
+    }
     if (cotizacionRequerida && (!form.cotizacion || isNaN(Number(form.cotizacion)) || Number(form.cotizacion) <= 0))
       return 'La cotización es obligatoria para operaciones de Compra/Venta'
     return null
@@ -394,6 +435,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
       // El servidor vuelve a detectar la sospecha por su cuenta y exige esta confirmación
       // explícita. El navegador no es donde se defiende una regla.
       confirmo_caja_cta_cte: confirmoCaja,
+      ...(esAltaCheques ? { cheques } : {}),
     }
 
     setStep('supabase')
@@ -472,6 +514,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
     setWarning(null)
     setError(null)
     setForm(formPorDefecto())
+    setCheques([])
     // El buscador de cliente guarda su texto aparte: sin esto el campo seguía mostrando
     // el nombre anterior con la cuenta ya vacía.
     setClienteQuery('')
@@ -692,6 +735,11 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
             onChange={e => set('monto', fmtMonto(e.target.value))}
             placeholder="0"
             required
+            // Con cheques cargados el nominal es la SUMA de la lista, no un número
+            // aparte: se muestra pero no se escribe.
+            readOnly={esAltaCheques}
+            title={esAltaCheques ? 'Lo calcula la lista de cheques de abajo' : undefined}
+            style={esAltaCheques ? { background: 'var(--bg-2, #f8fafc)', cursor: 'not-allowed' } : undefined}
           />
         </div>
         <div>
@@ -745,6 +793,18 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
           />
         </div>
       </div>
+
+      {/* Los cheques de un descuento. Aparece solo en una COMPRA de CHEQUES, que es la
+          operación que los trae: vender cheques es endosarlos, y eso se hace desde la
+          ficha del cheque. */}
+      {esAltaCheques && (
+        <AltaCheques
+          cheques={cheques}
+          onChange={setCheques}
+          fechaOperacion={form.fecha}
+          deshabilitado={loading}
+        />
+      )}
 
       {/* Posible movimiento de cuenta corriente cargado como CAJA (13/10/2026).
           Lo primero que ofrece es ARREGLARLO —un botón que cambia el tipo y se lleva el

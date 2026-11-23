@@ -39,7 +39,7 @@ function conEntorno(env: Record<string, string>, expr: string): string {
 const RUTAS_DE_MODULO = [
   '/dashboard/nueva-transferencia', '/dashboard/transferencias', '/dashboard/gastos',
   '/dashboard/calle', '/dashboard/deudores', '/dashboard/ganancias',
-  '/dashboard/admin/auditoria',
+  '/dashboard/admin/auditoria', '/dashboard/cheques',
 ]
 const RUTAS_NUCLEO = [
   '/dashboard/inicio', '/dashboard/cuenta-corriente', '/dashboard/nueva-transaccion',

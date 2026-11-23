@@ -26,6 +26,23 @@ export const EVENTUALES = [
   'C. DOMINGUEZ', 'A. FERRARI', 'S. NAVARRO', 'T. ORTEGA', 'V. QUIROGA',
 ]
 
+/**
+ * Libradores de cheques ficticios (23/11/2026).
+ *
+ * NO son los clientes: el librador es quien FIRMA el cheque, y el cliente es quien lo
+ * trae a descontar. Son dos listas distintas a propósito, porque esa distinción es la
+ * razón de que el riesgo se mida por librador y la cuenta corriente por cliente.
+ */
+export const LIBRADORES = [
+  { nombre: 'METALURGICA PARANA SA',   cuit: '30-71045812-3', banco: 'Santander', sucursal: '117' },
+  { nombre: 'DISTRIBUIDORA DEL SUR SRL', cuit: '30-70998214-6', banco: 'Galicia', sucursal: '042' },
+  { nombre: 'TEXTIL ROSARIO SA',       cuit: '30-71233907-1', banco: 'Nación',    sucursal: '208' },
+  { nombre: 'LOGISTICA ANDINA SRL',    cuit: '30-71556093-8', banco: 'Galicia',   sucursal: '091' },
+  { nombre: 'AGRO INSUMOS LITORAL SA', cuit: '30-70884551-4', banco: 'BBVA',      sucursal: '330' },
+  { nombre: 'FRIGORIFICO OESTE SA',    cuit: '30-71702336-9', banco: 'Macro',     sucursal: '015' },
+  { nombre: 'COMERCIAL NORTE SRL',     cuit: '30-71119478-2', banco: 'ICBC',      sucursal: '042' },
+]
+
 export const REPARTIDORES = ['RUTA 1', 'RUTA 2', 'MOTO CENTRO']
 export const CONTRAPARTES_TT = ['ACME - BOREAL', 'CITRUS - DELTA', 'FARO - HORIZONTE']
 export const CONCEPTOS_GASTO = ['ALQUILER', 'SUELDOS', 'SERVICIOS', 'LIMPIEZA', 'SEGURIDAD']

@@ -34,6 +34,10 @@ export const MODULOS = [
   'posicion',        // posición consolidada de cuentas corrientes
   'ganancias',
   'auditoria',
+  // Cartera de cheques (23/11/2026). Llega PRENDIDO, como todo lo nuevo. La casa que
+  // solo recibe cheques al día no tiene nada que mirar acá: se apaga con
+  // NEXT_PUBLIC_MODULOS_OFF=cheques en esa instalación.
+  'cheques',
 ] as const
 
 export type Modulo = typeof MODULOS[number]
@@ -88,6 +92,8 @@ const RUTAS: [string, Modulo][] = [
   ['/dashboard/deudores',            'posicion'],
   ['/dashboard/ganancias',           'ganancias'],
   ['/dashboard/admin/auditoria',     'auditoria'],
+  // Cubre también la ficha, /dashboard/cheques/<id>: se busca por prefijo.
+  ['/dashboard/cheques',             'cheques'],
 ]
 
 /** El módulo al que pertenece una ruta, o `null` si es parte del núcleo. */
