@@ -134,7 +134,10 @@ export default function CarteraView({
           cuánto hay en cartera. Por eso el total va acá arriba y no al pie de la tabla,
           donde se leía como el total de las filas visibles. */}
       {resumen && (
-        <div className="saldos">
+        // Son CINCO tarjetas y `.saldos` acomoda de a cuatro con su mínimo de 240px: la
+        // quinta caía sola a un segundo renglón y quedaba huérfana. Con 190px entran las
+        // cinco en pantalla ancha y siguen apilándose solas en el teléfono.
+        <div className="saldos" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
           <Tarjeta rotulo="Total en cartera" importe={resumen.enCartera.importe} cuenta={resumen.enCartera.cheques} />
           <Tarjeta rotulo="Vencen hoy" importe={resumen.vencenHoy.importe} cuenta={resumen.vencenHoy.cheques} />
           <Tarjeta rotulo="Esta semana" importe={resumen.vencenSemana.importe} cuenta={resumen.vencenSemana.cheques} />
@@ -155,7 +158,7 @@ export default function CarteraView({
                 : 'Ordenados por fecha de pago'}
             </div>
           </div>
-          <button className="btn-buscar" style={{ marginLeft: 'auto' }}
+          <button className="btn-primary" style={{ marginLeft: 'auto' }}
             disabled={!seleccionados.length || enviando} onClick={depositar}>
             {enviando ? 'Registrando…'
               : seleccionados.length ? `Depositar ${seleccionados.length} seleccionados`
@@ -200,7 +203,7 @@ export default function CarteraView({
                             ? `Seleccionar cheque ${c.numero}`
                             : `El cheque ${c.numero} no se puede depositar: está ${ESTADO_LABEL[c.estado].toLowerCase()}`} />
                       </td>
-                      <td style={{ whiteSpace: 'nowrap', fontWeight: 400 }}>
+                      <td style={{ textAlign: 'left', whiteSpace: 'nowrap', fontWeight: 400 }}>
                         <span className="num">{fechaCorta(c.fecha_pago)}</span>{' '}
                         <span style={{ color: 'var(--muted)', fontSize: 11 }}>
                           {textoVencimiento(c.fecha_pago, hoy)}

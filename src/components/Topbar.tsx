@@ -13,6 +13,8 @@ const TITLES: [string, string][] = [
   ['/dashboard/nueva-transferencia', 'Nueva transferencia'],
   ['/dashboard/transferencias', 'Transferencias'],
   ['/dashboard/gastos', 'Gastos'],
+  // Cubre también la ficha, /dashboard/cheques/<id>: el match es por prefijo.
+  ['/dashboard/cheques', 'Cartera de cheques'],
   ['/dashboard/calle', 'Dinero en calle'],
   ['/dashboard/deudores', 'Posición Ctas Ctes'],
   ['/dashboard/ganancias', 'Ganancias'],
