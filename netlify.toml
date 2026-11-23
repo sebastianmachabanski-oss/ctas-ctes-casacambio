@@ -10,3 +10,46 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Encabezados de seguridad (23/11/2026)
+#
+# Son instrucciones que el servidor le da al navegador sobre cómo tratar al
+# sitio. No reemplazan a nada de lo que ya está (RLS, el chequeo de sesión en
+# cada pantalla): tapan agujeros que viven del lado del visitante y que desde
+# el código de la app no se pueden cerrar.
+#
+# Van acá y no en `next.config.js` porque Netlify los aplica a TODA respuesta,
+# incluidos los archivos estáticos y los errores, que no pasan por Next.
+# ──────────────────────────────────────────────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Obliga al navegador a usar HTTPS por un año, incluso si alguien escribe
+    # la dirección a mano con http://. Sin esto, ese primer pedido viaja en
+    # claro y es donde se intercepta una sesión en una red abierta: el
+    # navegador se lo guarda y a partir de la segunda visita ya no hay
+    # oportunidad. `preload` lo deja pedir el alta en la lista que traen los
+    # navegadores de fábrica, para cubrir también la PRIMERA visita.
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+
+    # Nadie puede meter la app dentro de un marco en otro sitio. Es lo que
+    # frena el clickjacking: una página ajena que superpone la app y le hace
+    # apretar al operador un botón que él no ve.
+    X-Frame-Options = "DENY"
+
+    # El navegador respeta el tipo de archivo que declaramos y no lo adivina
+    # mirando el contenido. Evita que algo subido como imagen termine
+    # ejecutándose como si fuera código.
+    X-Content-Type-Options = "nosniff"
+
+    # Al salir del sitio no se filtra la dirección completa de la pantalla en
+    # la que estaba: solo el dominio. Las URLs de la app llevan identificadores
+    # (la ficha de un cheque, por ejemplo) y no tienen por qué viajar a un
+    # tercero.
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # La app no usa cámara, micrófono ni ubicación. Declararlo apagado no la
+    # cambia, pero si mañana se cuela código ajeno en una pantalla, ese código
+    # tampoco los puede pedir.
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
