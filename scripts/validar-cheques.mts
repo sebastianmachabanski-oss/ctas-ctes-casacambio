@@ -25,6 +25,9 @@ import {
   validarChequesDelAlta, sumaDeCheques, chequeNuevoVacio,
   type Cheque, type Estado, type ChequeNuevo,
 } from '../src/lib/cheques'
+import {
+  problemaDelArchivo, rutaDeArchivo, esPdf, TAMANO_MAXIMO,
+} from '../src/lib/cheques-archivo'
 
 let ok = 0, fail = 0
 function assert(cond: boolean, msg: string) {
@@ -226,6 +229,45 @@ igual(validarChequesDelAlta(
 igual(sumaDeCheques([nuevo({ importe: 600 }), nuevo({ importe: 400 })]), 1000,
   'la suma de la lista es el nominal de la operación')
 igual(sumaDeCheques([]), 0, 'una lista vacía suma cero')
+
+// ── 6. La imagen del cheque ───────────────────────────────────────────────
+console.log('\n── Imagen del cheque ──')
+
+const archivo = (type: string, size = 1_000_000) => ({ type, size })
+
+for (const t of ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'])
+  igual(problemaDelArchivo(archivo(t)), null, `${t} se acepta`)
+assert(problemaDelArchivo(archivo('image/gif')) !== null, 'un GIF no se acepta')
+assert(problemaDelArchivo(archivo('text/plain')) !== null, 'un texto plano no se acepta')
+assert(problemaDelArchivo(archivo('video/mp4')) !== null, 'un video no se acepta')
+assert(problemaDelArchivo(archivo('image/jpeg', TAMANO_MAXIMO + 1)) !== null,
+  'un archivo que pasa el máximo no se acepta')
+igual(problemaDelArchivo(archivo('image/jpeg', TAMANO_MAXIMO)), null,
+  'justo en el máximo todavía entra')
+assert(problemaDelArchivo(archivo('image/jpeg', 0)) !== null, 'un archivo vacío no se acepta')
+
+// LA COMPROBACIÓN QUE IMPORTA: la ruta que genera el navegador tiene que pasar el
+// filtro del servidor. Son dos archivos distintos y, si se separan, la imagen se sube
+// bien al bucket y después la ficha la rechaza al guardarla — con el archivo ya subido.
+const ES_RUTA_DEL_SERVIDOR = /^\d{4}\/\d{2}\/[A-Za-z0-9._-]+$/
+for (const t of ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf']) {
+  const r = rutaDeArchivo(t, new Date(Date.UTC(2026, 10, 23)))
+  assert(ES_RUTA_DEL_SERVIDOR.test(r) && !r.includes('..'),
+    `la ruta de un ${t} pasa el filtro del servidor (${r})`)
+}
+assert(rutaDeArchivo('application/pdf').endsWith('.pdf'), 'un PDF termina en .pdf')
+assert(rutaDeArchivo('image/jpeg').endsWith('.jpg'), 'un JPEG termina en .jpg')
+assert(rutaDeArchivo('image/jpeg', new Date(Date.UTC(2027, 0, 5))).startsWith('2027/01/'),
+  'la ruta arranca con año y mes, con el mes en dos dígitos')
+
+// Dos rutas seguidas no pueden coincidir: si coincidieran, la segunda subida pisaría a
+// la primera y dos cheques compartirían imagen.
+assert(rutaDeArchivo('image/jpeg') !== rutaDeArchivo('image/jpeg'), 'dos rutas nunca son iguales')
+
+assert(esPdf('2026/11/abc.pdf'), 'reconoce un PDF')
+assert(esPdf('2026/11/ABC.PDF'), 'lo reconoce con mayúsculas')
+assert(!esPdf('2026/11/abc.jpg'), 'una foto no es un PDF')
+assert(!esPdf(null), 'sin archivo no es un PDF')
 
 // ── Final ─────────────────────────────────────────────────────────────────
 console.log(`\n${ok} OK, ${fail} fallidas`)

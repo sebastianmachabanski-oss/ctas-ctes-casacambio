@@ -1,4 +1,5 @@
 'use client'
+import SubirImagen from '@/components/cheques/SubirImagen'
 import { chequeNuevoVacio, pesosExacto, sumaDeCheques, type ChequeNuevo } from '@/lib/cheques'
 
 // Carga de los cheques de una operación de descuento (23/11/2026).
@@ -107,6 +108,13 @@ export default function AltaCheques({ cheques, onChange, fechaOperacion, deshabi
               <option value="echeq">Echeq</option>
             </select>
           </label>
+
+          <div style={{ display: 'grid', gap: 3 }}>
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>Imagen</span>
+            <SubirImagen compacto deshabilitado={deshabilitado}
+              valor={c.archivo_url}
+              onChange={ruta => cambiar(i, 'archivo_url', ruta)} />
+          </div>
 
           <button type="button" className="chip" disabled={deshabilitado}
             onClick={() => quitar(i)}

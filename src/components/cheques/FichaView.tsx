@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import SubirImagen from '@/components/cheques/SubirImagen'
+import { esPdf } from '@/lib/cheques-archivo'
 import { useRouter } from 'next/navigation'
 import {
   ESTADO_LABEL, TRANSICIONES, esTerminal, textoVencimiento, vencidoSinDepositar,
@@ -44,8 +46,10 @@ function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode
   )
 }
 
-export default function FichaView({ cheque, eventos, origen, hoy }: {
+export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
   cheque: Cheque; eventos: Evento[]; origen: Origen; hoy: string
+  /** Enlace FIRMADO y de vida corta. El bucket es privado: no hay URL fija. */
+  imagen: string | null
 }) {
   const router = useRouter()
   const [enviando, setEnviando] = useState<Estado | null>(null)
@@ -71,6 +75,23 @@ export default function FichaView({ cheque, eventos, origen, hoy }: {
       setAviso('No se pudo conectar. Probá de nuevo.')
     } finally {
       setEnviando(null)
+    }
+  }
+
+  /** Guarda la RUTA que devolvió la subida. El archivo ya está en el bucket. */
+  async function guardarImagen(ruta: string | null) {
+    setAviso(null)
+    try {
+      const r = await fetch(`/api/cheques/${cheque.id}/imagen`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archivo_url: ruta }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok) { setAviso(j.error || 'No se pudo guardar la imagen'); return }
+      router.refresh()
+    } catch {
+      setAviso('No se pudo conectar. Probá de nuevo.')
     }
   }
 
@@ -107,10 +128,25 @@ export default function FichaView({ cheque, eventos, origen, hoy }: {
 
       {/* Datos del instrumento, con la imagen al lado */}
       <div className="card" style={{ padding: 16, display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-        <div style={{ width: 300, flex: '1 1 260px', maxWidth: 300 }}>
-          {cheque.archivo_url ? (
+        <div style={{ width: 300, flex: '1 1 260px', maxWidth: 300, display: 'grid', gap: 8, alignContent: 'start' }}>
+          {imagen && esPdf(cheque.archivo_url) ? (
+            // Un echeq llega como archivo, no como foto. Mostrarlo embebido no aporta:
+            // se abre en una pestaña, que es donde el lector de PDF del navegador sirve.
+            <a href={imagen} target="_blank" rel="noopener noreferrer" style={{
+              height: 180, border: '1px solid var(--ring)', borderRadius: 10,
+              background: 'var(--bg-2, #f8fafc)', display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none',
+            }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+              </svg>
+              <span style={{ fontSize: 12.5, fontWeight: 600 }}>Abrir el archivo</span>
+            </a>
+          ) : imagen ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={cheque.archivo_url} alt={`Imagen del cheque ${cheque.numero}`}
+            <img src={imagen} alt={`Imagen del cheque ${cheque.numero}`}
               style={{ width: '100%', borderRadius: 10, border: '1px solid var(--ring)' }} />
           ) : (
             <div style={{
@@ -125,11 +161,10 @@ export default function FichaView({ cheque, eventos, origen, hoy }: {
                 <path d="M14 10h5M14 14h3" />
               </svg>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-2)' }}>Sin imagen</div>
-              <div style={{ fontSize: 11.5, color: 'var(--muted)', textAlign: 'center', maxWidth: 220 }}>
-                Los datos de al lado se cargaron a mano.
-              </div>
             </div>
           )}
+
+          <SubirImagen valor={cheque.archivo_url} onChange={guardarImagen} />
         </div>
 
         <div style={{ flex: '2 1 340px', minWidth: 0 }}>

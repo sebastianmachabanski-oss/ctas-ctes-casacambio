@@ -4,6 +4,7 @@ import { esStaff } from '@/lib/roles'
 import { hoyArgentina } from '@/lib/periodos'
 import FichaView from '@/components/cheques/FichaView'
 import type { Cheque, Evento } from '@/lib/cheques'
+import { BUCKET_CHEQUES } from '@/lib/cheques-archivo'
 
 // Ficha de un cheque (23/11/2026).
 //
@@ -53,12 +54,26 @@ export default async function ChequePage({ params }: { params: { id: string } })
     .eq('id', cheque.movimiento_id)
     .maybeSingle()
 
+  // EL ENLACE A LA IMAGEN SE FIRMA ACÁ Y EN CADA VISITA.
+  //
+  // El bucket es privado porque un cheque muestra la firma de un tercero, así que no hay
+  // URL fija que sirva. `cheques.archivo_url` guarda la RUTA, y la firma —de vida corta—
+  // se pide al dibujar la pantalla. Guardar la URL firmada sería guardar algo que dentro
+  // de una hora no funciona.
+  let imagen: string | null = null
+  if (cheque.archivo_url) {
+    const { data: firma } = await supabase
+      .storage.from(BUCKET_CHEQUES).createSignedUrl(cheque.archivo_url, 60 * 60)
+    imagen = firma?.signedUrl ?? null
+  }
+
   return (
     <FichaView
       cheque={cheque}
       eventos={eventos}
       origen={(mov as any) ?? null}
       hoy={hoyArgentina()}
+      imagen={imagen}
     />
   )
 }

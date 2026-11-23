@@ -285,6 +285,8 @@ export async function POST(request: Request) {
         banco: limpio(c.banco),
         sucursal: limpio(c.sucursal),
         cuenta: limpio(c.cuenta),
+        // La RUTA dentro del bucket privado, no una URL: una firmada vence.
+        archivo_url: limpio(c.archivo_url),
         origen_datos: 'manual',
         creado_por: user.id,
       })))

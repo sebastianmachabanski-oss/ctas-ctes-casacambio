@@ -214,12 +214,14 @@ export type ChequeNuevo = {
   sucursal: string | null
   cuenta: string | null
   tipo: 'papel' | 'echeq'
+  /** Ruta dentro del bucket privado, no una URL. Ver `src/lib/cheques-archivo.ts`. */
+  archivo_url: string | null
 }
 
 export const chequeNuevoVacio = (): ChequeNuevo => ({
   numero: '', importe: 0, fecha_pago: '', fecha_emision: null,
   librador: '', cuit_librador: null, banco: null, sucursal: null, cuenta: null,
-  tipo: 'papel',
+  tipo: 'papel', archivo_url: null,
 })
 
 const ES_FECHA = /^\d{4}-\d{2}-\d{2}$/
