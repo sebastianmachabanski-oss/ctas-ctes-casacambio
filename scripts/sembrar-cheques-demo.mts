@@ -1,11 +1,13 @@
 /**
  * Llena la cartera de cheques de una base DE DEMOSTRACIÓN.
  *
- *   npx tsx scripts/sembrar-cheques-demo.mts --vista-previa
+ *   npx tsx scripts/sembrar-cheques-demo.mts --vista-previa     ← muestra y no escribe
  *
- *   SUPABASE_URL=https://xxx.supabase.co \
- *   SERVICE_ROLE_KEY=eyJ... \
+ *   npm run base demo                                           ← apuntar a la de demo
  *   npx tsx scripts/sembrar-cheques-demo.mts --confirmo-que-es-una-base-de-demo
+ *
+ * Las credenciales salen del `.env.local`, que es el que `npm run base` deja apuntando a
+ * la base elegida. Antes de escribir dice a qué proyecto va, para que se pueda frenar.
  *
  * ── PARA QUÉ ───────────────────────────────────────────────────────────────
  * La cartera de cheques vacía no se puede mostrar: todo el valor de la pantalla está en
@@ -30,10 +32,31 @@
  *   3. Que la tabla `cheques` esté VACÍA. Si encuentra uno solo, aborta.
  * Ninguna alcanza por sí sola.
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
-import { LIBRADORES, EVENTUALES, CUENTAS, pareceBaseDeDemo } from './elenco-demo'
+import { LIBRADORES, CUENTAS, pareceBaseDeDemo } from './elenco-demo'
 import { sumarDias, type Estado } from '../src/lib/cheques'
+
+/**
+ * Credenciales del `.env.local`, que es el que `npm run base` deja apuntando a la base
+ * elegida. Tipearlas en la línea de comandos las deja en el historial de la terminal y
+ * además invita a pegar la URL equivocada; así basta con elegir la base de demo antes.
+ * Lo que ya venga en el ambiente gana: si alguien exporta las variables a propósito, esa
+ * decisión manda.
+ */
+function cargarEnvLocal(archivo = '.env.local') {
+  let texto: string
+  try { texto = readFileSync(resolve(process.cwd(), archivo), 'utf8') } catch { return }
+  for (const linea of texto.split(/\r?\n/)) {
+    const m = linea.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
+    if (!m) continue
+    const valor = m[2].trim().replace(/^(['"])(.*)\1$/, '$2')
+    if (process.env[m[1]] === undefined) process.env[m[1]] = valor
+  }
+}
+cargarEnvLocal()
 
 const URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
 const KEY = process.env.SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -43,7 +66,9 @@ const VISTA_PREVIA = process.argv.includes('--vista-previa')
 function salir(msg: string): never { console.error(`\n❌ ${msg}\n`); process.exit(1) }
 
 if (!VISTA_PREVIA && (!URL || !KEY)) salir(
-  'Faltan SUPABASE_URL y SERVICE_ROLE_KEY en el entorno (Supabase → Project Settings → API).')
+  'No se encontraron las credenciales de Supabase.\n'
+  + '   Se buscan en el `.env.local` del proyecto y después en el ambiente.\n'
+  + '   Corré el script desde la raíz, con `npm run base demo` hecho antes.')
 if (!VISTA_PREVIA && !CONFIRMADO) salir(
   'Falta la bandera --confirmo-que-es-una-base-de-demo\n'
   + '   Este script carga cheques FICTICIOS. Apuntado a la base de un cliente real,\n'
@@ -222,6 +247,9 @@ if (VISTA_PREVIA) {
 }
 
 // ── Las guardas que necesitan la base ─────────────────────────────────────
+// La referencia del proyecto no es secreta y es la última oportunidad de frenar si el
+// `.env.local` quedó apuntando a otra base.
+console.log(`\n🎯 proyecto ${URL!.replace(/^https?:\/\//, '').split('.')[0]}`)
 const db = createClient(URL!, KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
 
 const { data: cc, error: errorCuentas } = await db.from('cuentas_corrientes').select('nombre')
