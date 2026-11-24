@@ -284,8 +284,18 @@ valor. Tres criterios, configurables en el drawer:
 | **Al costo** | `0` | Postura conservadora: sin ganancia hasta vender |
 | **A precio de cierre** | `stock x (cierre - t1)` si sobran compras; `stock x (t2 - cierre)` si sobran ventas | Valuación a mercado |
 
-Los supuestos **son propios de cada par** (`SUPUESTOS_PAR` en `GananciasView.tsx`) y se
-reponen al cambiar de moneda: arrastrar los de la anterior daría un número sin sentido.
+Los supuestos **son propios de cada par** (`SUPUESTOS_PAR`, hoy en
+`src/lib/ganancias-composicion.ts`) y se reponen al cambiar de moneda: arrastrar los de
+la anterior daría un número sin sentido.
+
+> **El criterio elegido en el drawer NO se guarda, y las otras dos pantallas no lo ven**
+> (24/11/2026). Es estado de React: se pierde al recargar y es por navegador, así que es
+> un "qué pasaría si" y no una configuración de la casa. Las pantallas de composición y
+> tablero usan siempre `SUPUESTOS_PAR`, de modo que elegir "a precio de cierre" acá no
+> las cambia. No son números mal calculados —cada pantalla dice con qué supuesto
+> trabaja— pero sí dos respuestas distintas para el mismo mes.
+> Está anotado como punto 4.7 del roadmap: el criterio pasa a `app_config`, por moneda,
+> y lo leen las tres.
 
 #### Cheques: valuación a valor nominal
 

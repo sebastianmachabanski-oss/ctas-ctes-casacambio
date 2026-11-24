@@ -338,6 +338,44 @@ el resultado informado de todos los períodos hacia atrás.
 > del contador. Y la respuesta a la objeción más probable de un cliente con formación
 > contable, que es exactamente de donde salió.
 
+### 4.7. El criterio de valuación, elegible por cliente — **8 a 10 h**
+
+La versión barata de 4.6: en vez de que decidamos nosotros el criterio, el cliente elige
+el suyo. Surgió el 24/11/2026.
+
+**Las dos piezas difíciles ya están hechas, cada una por su lado.** Los tres criterios
+están implementados y se eligen en el drawer de Configuración de Ganancias (`resid`:
+margen fijo / al costo / a precio de cierre). Y `app_config` —tabla `key`/`value` en
+JSON— ya existe y ya se usa para el umbral de alerta y la paridad de la libra, con su
+ruta de API. Falta unirlas.
+
+**Hoy el criterio no se guarda:** es estado de React, se pierde al recargar y es por
+navegador. Es un "qué pasaría si", no una configuración.
+
+**Y las pantallas de composición y tablero lo ignoran** (se agregaron el 24/11/2026 y
+usan `SUPUESTOS_PAR` por defecto). Se puede elegir "a precio de cierre" en Ganancias y
+que las otras dos sigan mostrando margen fijo. No son números mal calculados, pero son
+dos respuestas distintas para el mismo mes.
+
+El trabajo:
+
+- **El criterio de la casa va a `app_config`**, por moneda, y lo leen las tres pantallas
+  desde el servidor. Es la decisión contable del cliente, no una preferencia de quien
+  está mirando.
+- **El drawer sigue siendo un "qué pasa si"**: no persiste. Sirve para explorar sin
+  cambiarle el número al resto.
+- **Pantalla para elegirlo**, con dos cuidados que no son negociables:
+  - CHEQUES no puede heredar el default de divisas. Con cierre 1.500, un millón en
+    cartera muestra 1.499 millones de ganancia inexistente. Por eso el criterio es por
+    moneda y los cheques quedan clavados en valor nominal salvo pedido explícito.
+  - Cambiar el criterio mueve el resultado informado de TODOS los períodos hacia atrás.
+    Tiene que quedar en auditoría quién lo cambió y cuándo.
+- **Un validador** que impida que dos pantallas muestren criterios distintos, como el que
+  ya cuida que el tablero no contradiga a la composición.
+
+> **Gancho comercial:** convierte una objeción en una función. "¿Y si mi contador usa
+> otro criterio?" deja de ser un problema y pasa a ser una opción de configuración.
+
 ---
 
 ## 5. Calidad de datos y cumplimiento
