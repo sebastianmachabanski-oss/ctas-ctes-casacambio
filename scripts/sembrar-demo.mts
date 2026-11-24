@@ -30,7 +30,7 @@ import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
-import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES } from './env-local'
+import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES, problemaDeLaUrl } from './env-local'
 
 // Credenciales del `.env.local`; ver scripts/env-local.ts.
 cargarEnvLocal()
@@ -43,6 +43,9 @@ const VISTA_PREVIA = process.argv.includes('--vista-previa')
 function salir(msg: string): never { console.error(`❌ ${msg}`); process.exit(1) }
 
 if (!VISTA_PREVIA && (!BASE_URL || !KEY)) salir(FALTAN_CREDENCIALES)
+// Se revisa la URL acá y no adentro de `createClient`, que muere con un
+// `Invalid supabaseUrl` y un stack que no dice de cuál de los dos lugares salió.
+{ const p = BASE_URL ? problemaDeLaUrl(BASE_URL) : null; if (p) salir(p) }
 if (!VISTA_PREVIA && !CONFIRMADO) salir(
   'Falta la bandera --confirmo-que-es-una-base-de-demo\n'
   + '   Este script carga operaciones FICTICIAS. Apuntado a la base de un cliente real,\n'

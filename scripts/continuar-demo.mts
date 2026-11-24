@@ -48,7 +48,7 @@ import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
-import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES } from './env-local'
+import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES, problemaDeLaUrl } from './env-local'
 import { serieMensual } from '../src/lib/ganancias-series'
 import { ttVacio } from '../src/lib/ganancias-tt'
 import type { DiaAgg, ParAgg } from '../src/lib/ganancias-composicion'
@@ -73,6 +73,9 @@ const VISTA_PREVIA = process.argv.includes('--vista-previa')
 function salir(msg: string): never { console.error(`❌ ${msg}`); process.exit(1) }
 
 if (!BASE_URL || !KEY) salir(FALTAN_CREDENCIALES)
+// Se revisa la URL acá y no adentro de `createClient`, que muere con un
+// `Invalid supabaseUrl` y un stack que no dice de cuál de los dos lugares salió.
+{ const p = BASE_URL ? problemaDeLaUrl(BASE_URL) : null; if (p) salir(p) }
 if (!CONFIRMADO && !VISTA_PREVIA) salir(
   'Falta la bandera --confirmo-que-es-una-base-de-demo\n'
   + '   Este script carga operaciones FICTICIAS sobre una base que YA TIENE datos.\n'

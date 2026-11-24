@@ -24,7 +24,7 @@ export function cargarEnvLocal(archivo = '.env.local'): void {
     const m = linea.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/)
     if (!m) continue
     const valor = m[2].trim().replace(/^(['"])(.*)\1$/, '$2')
-    if (process.env[m[1]] === undefined) process.env[m[1]] = valor
+    if (process.env[m[1]] === undefined) { process.env[m[1]] = valor; leidaDelArchivo.add(m[1]) }
   }
 }
 
@@ -42,3 +42,37 @@ export const FALTAN_CREDENCIALES =
   + '   Se buscan en el `.env.local` del proyecto y después en el ambiente.\n'
   + '   Corré el script desde la raíz del proyecto, con `npm run base <base>` hecho antes.\n'
   + '   `npm run base` sin argumentos te dice a cuál está apuntando ahora.'
+
+/**
+ * Revisa que la URL sirva ANTES de pasársela al cliente de Supabase.
+ *
+ * Sin esto, una URL mal formada muere adentro de `@supabase/supabase-js` con un
+ * `Invalid supabaseUrl` y siete líneas de stack que no dicen de dónde salió el valor —
+ * que es lo que importa, porque son dos lugares distintos y el del ambiente le gana al
+ * archivo. Pasó el 24/11/2026 con una variable exportada a mano que todavía tenía el
+ * `<ref>` de la plantilla adentro.
+ *
+ * Devuelve el motivo del rechazo, o `null` si la URL sirve.
+ */
+export function problemaDeLaUrl(url: string): string | null {
+  const delArchivo = leidaDelArchivo.has('SUPABASE_URL')
+    || leidaDelArchivo.has('NEXT_PUBLIC_SUPABASE_URL')
+  const origen = delArchivo
+    ? 'Sale del `.env.local`: revisá esa línea.'
+    : 'Sale de una variable del AMBIENTE, que le gana al `.env.local`. Si la exportaste\n'
+      + '   a mano, borrala para que mande el archivo:\n'
+      + '     Remove-Item Env:SUPABASE_URL, Env:NEXT_PUBLIC_SUPABASE_URL -ErrorAction SilentlyContinue'
+
+  let host: string
+  try { host = new URL(url).host } catch {
+    return `La URL de Supabase no es válida: ${url}\n   ${origen}\n`
+      + '   Tiene que ser como https://abcdefgh.supabase.co, sin < >, comillas ni espacios.'
+  }
+  if (!/^[a-z0-9-]+\.supabase\.(co|in)$/i.test(host)) {
+    return `La URL de Supabase apunta a "${host}", que no parece un proyecto de Supabase.\n   ${origen}`
+  }
+  return null
+}
+
+/** Qué claves salieron del archivo, para poder decir de dónde viene cada valor. */
+const leidaDelArchivo = new Set<string>()
