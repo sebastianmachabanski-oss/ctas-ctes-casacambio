@@ -319,24 +319,49 @@ function registrar(m: {
 // ── La operatoria, día por día ─────────────────────────────────────────────
 // Mismas proporciones que `sembrar-demo.mts`: si fueran otras, el tramo nuevo se
 // distinguiría del viejo en cualquier gráfico.
-console.log(`→ Generando del ${fechas[0]} al ${fechas[fechas.length - 1]} (${fechas.length} días hábiles)…`)
+if (fechasAtras.length) console.log(
+  `→ Rellenando hacia atrás del ${fechasAtras[0]} al ${fechasAtras[fechasAtras.length - 1]}`
+  + ` (${fechasAtras.length} días hábiles)…`)
+if (fechas.length) console.log(
+  `→ Generando del ${fechas[0]} al ${fechas[fechas.length - 1]} (${fechas.length} días hábiles)…`)
 
 const tomarGastoFijoDelMes = controlGastoFijo()
 const elenco = { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO }
 
 /**
- * Primero el relleno hacia atrás, con una moneda que entra y sale por igual.
+ * Primero el relleno hacia atrás, con su propio controlador.
  *
- * Acá NO se usa `convieneQueEntre`: ese controlador empuja el stock hacia el objetivo, y
- * para días del pasado eso no significa nada. Lo que se busca es que el tramo viejo no
- * desbalancee la caja; lo que igual se desbalancee se compensa después, exacto, en el
- * SALDO INICIAL.
+ * NO se usa `convieneQueEntre`: ese empuja el stock hacia el objetivo de HOY, y para días
+ * del pasado eso no significa nada. Lo que se busca es que el tramo viejo termine con un
+ * neto cercano a cero, porque lo que se desbalancee hay que descontárselo al SALDO
+ * INICIAL y ese no puede quedar negativo.
+ *
+ * TAMPOCO SIRVE TIRAR UNA MONEDA 50/50, que fue el primer intento. Eso es una caminata
+ * aleatoria: sobre trescientos días hábiles el desvío acumulado del dólar ronda los
+ * 300.000 —del orden del saldo inicial entero— y la corrida aborta. El azar sin memoria
+ * no se compensa solo; hay que empujarlo.
+ *
+ * Acá la probabilidad sigue al neto ACUMULADO del propio relleno: si viene comprando de
+ * más, empieza a vender. Con eso el neto queda acotado a una fracción del stock en vez
+ * de crecer con la raíz del tiempo.
  */
+const stockAlEmpezarRelleno: Record<string, number> = { ...stock }
+/** Cuánto tolera desviarse antes de tirar fuerte: ~12 % del stock objetivo. */
+const ESCALA: Record<string, number> = Object.fromEntries(
+  Object.entries(OBJETIVO).map(([m, v]) => [m, Math.max(1, v * 0.12)]),
+)
+function convieneQueEntreEnElRelleno(moneda: string): boolean {
+  const neto = (stock[moneda] ?? 0) - (stockAlEmpezarRelleno[moneda] ?? 0)
+  const escala = ESCALA[moneda]
+  if (!escala) return azar() < 0.5
+  return azar() < Math.min(0.9, Math.max(0.1, 0.5 - neto / escala))
+}
+
 const desdeMovimiento = movimientos.length
 fechasAtras.forEach((fecha, dia) => {
   generarDia({
     fecha, indice: dia, azar, cotizacion: cotizacionAtras,
-    convieneQueEntre: () => azar() < 0.5,
+    convieneQueEntre: convieneQueEntreEnElRelleno,
     tomarGastoFijoDelMes, registrar, elenco,
   })
 })
