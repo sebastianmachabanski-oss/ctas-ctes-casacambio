@@ -31,7 +31,7 @@ import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 
 /** Sin la barra del final: ver la nota en scripts/crear-primer-admin.mts. */
-const URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
+const BASE_URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
 const KEY = process.env.SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
 const CONFIRMADO = process.argv.includes('--confirmo-que-es-una-base-de-demo')
 /** Genera y muestra el resumen SIN escribir nada ni conectarse. Para revisar antes. */
@@ -39,14 +39,14 @@ const VISTA_PREVIA = process.argv.includes('--vista-previa')
 
 function salir(msg: string): never { console.error(`❌ ${msg}`); process.exit(1) }
 
-if (!VISTA_PREVIA && (!URL || !KEY)) salir(
+if (!VISTA_PREVIA && (!BASE_URL || !KEY)) salir(
   'Faltan SUPABASE_URL y SERVICE_ROLE_KEY en el entorno (Supabase → Project Settings → API).')
 if (!VISTA_PREVIA && !CONFIRMADO) salir(
   'Falta la bandera --confirmo-que-es-una-base-de-demo\n'
   + '   Este script carga operaciones FICTICIAS. Apuntado a la base de un cliente real,\n'
   + '   le mezcla datos falsos con los verdaderos. Escribila entera, a propósito.')
 
-const db = createClient(URL ?? 'http://localhost', KEY ?? 'sin-clave', { auth: { persistSession: false, autoRefreshToken: false } })
+const db = createClient(BASE_URL ?? 'http://localhost', KEY ?? 'sin-clave', { auth: { persistSession: false, autoRefreshToken: false } })
 
 // El elenco ficticio vive en scripts/elenco-demo.ts: lo comparten este script, el que crea
 // el usuario del cliente y el que llena la auditoría. Repetido, se desincroniza.
@@ -300,7 +300,7 @@ if ((count ?? 0) > 0) salir(
  * Ctrl+C si no era ese. Se saltea con --sin-espera para correrlo desatendido.
  */
 {
-  console.log(`\n⚠️  Se va a ESCRIBIR en: ${new URL(URL!).host}`)
+  console.log(`\n⚠️  Se va a ESCRIBIR en: ${new URL(BASE_URL!).host}`)
   console.log('   Si no es la base de DEMOSTRACIÓN, cortá ahora con Ctrl+C.')
   if (!process.argv.includes('--sin-espera')) {
     for (let i = 5; i > 0; i--) {
