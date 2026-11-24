@@ -39,6 +39,9 @@ function conEntorno(env: Record<string, string>, expr: string): string {
 const RUTAS_DE_MODULO = [
   '/dashboard/nueva-transferencia', '/dashboard/transferencias', '/dashboard/gastos',
   '/dashboard/calle', '/dashboard/deudores', '/dashboard/ganancias',
+  // Cuelga de /dashboard/ganancias, así que el interruptor del módulo la tiene que
+  // cubrir sola, por prefijo. Si alguien la mueve fuera de ahí, esto falla.
+  '/dashboard/ganancias/composicion',
   '/dashboard/admin/auditoria', '/dashboard/cheques',
 ]
 const RUTAS_NUCLEO = [
