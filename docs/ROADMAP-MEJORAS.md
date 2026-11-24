@@ -324,6 +324,21 @@ Son dos cosas, y la primera es más grave de lo que parece.
   Depende de tener una **cotización de cierre**: es la decisión de fuente de cotización
   que ya está pendiente del cliente.
 
+- **El margen fijo de 0,05 distorsiona, y ya tenemos con qué reemplazarlo — 4 a 6 h.**
+  Visto en la demo del 24/11/2026 con datos reales. El supuesto por defecto es
+  arbitrario: cinco centavos por unidad no sale de ningún lado, y es el que se usa en
+  todas las monedas por igual, valgan 290 pesos o 1.950.
+
+  La novedad es que **ya no hace falta inventarlo**. Desde el 19/11/2026 la tabla
+  `cotizaciones_mercado` guarda cotizaciones reales cada quince minutos, y monitorargy
+  tiene quince años de historia diaria para los meses hacia atrás. O sea que el valor de
+  cierre se puede calcular de verdad, en vez de suponerlo.
+
+  Dos caminos, y conviene el segundo:
+  1. Dejar el margen fijo pero que el valor se configure por moneda (parte de 4.7).
+  2. Valuar a la cotización de cierre real del período, tomada de `cotizaciones_mercado`.
+     Es lo correcto contablemente y además deja de ser un supuesto que haya que explicar.
+
 - **Devengar la ganancia del cheque hasta su vencimiento — 6 a 8 h.** Hoy se reconoce
   entera el día del descuento. Es interés: descontar a 90 días es prestar plata 90 días,
   y reconocer todo en el primer mes infla ese mes y deja los otros dos en cero. El dato
