@@ -17,8 +17,9 @@ const TITLES: [string, string][] = [
   ['/dashboard/cheques', 'Cartera de cheques'],
   ['/dashboard/calle', 'Dinero en calle'],
   ['/dashboard/deudores', 'Posición Ctas Ctes'],
-  // Más específica primero: el match es por prefijo y gana la primera que coincida.
+  // Más específicas primero: el match es por prefijo y gana la primera que coincida.
   ['/dashboard/ganancias/composicion', 'De dónde sale la ganancia'],
+  ['/dashboard/ganancias/tablero', 'Tablero de Ganancias'],
   ['/dashboard/ganancias', 'Ganancias'],
   // El listado se mudó a Inicio (10/9/2026) y esta ruta solo sirve a la pantalla de
   // edición; sin esta línea, editar mostraba el nombre de la app en vez de un título.

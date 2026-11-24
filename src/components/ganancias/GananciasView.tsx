@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import SelectorPeriodo from '@/components/SelectorPeriodo'
 import {
   calcPar, cotizacionPar, cotizacionUsd, SUPUESTOS_PAR, NOMBRE_PAR, SIMBOLO as SYM,
@@ -30,8 +29,11 @@ const monedasConSaldo = (t: TTAgg) =>
     .map(k => [k, t[k]] as const)
     .filter(([, v]) => Math.round(v) !== 0)
 
-export default function GananciasView({ dias, abiertas, puntasAbiertas, paresNegativos, periodo, fecha, rDesde, rHasta, hoy }: {
+export default function GananciasView({ dias, abiertas, puntasAbiertas, paresNegativos, periodo, fecha, rDesde, rHasta, hoy, nav }: {
   dias: DiaAgg[]
+  /** La navegación entre las tres vistas. Llega armada del servidor: es un Link y no
+      puede construirse acá sin leer la URL con un hook que exigiría Suspense. */
+  nav?: React.ReactNode
   /** Posición de las patas de transferencia que todavía no encontraron pareja. */
   abiertas: TTAgg
   /** Cuántas patas de transferencia quedaron sin parear. */
@@ -85,11 +87,8 @@ export default function GananciasView({ dias, abiertas, puntasAbiertas, paresNeg
           ruta="/dashboard/ganancias"
           periodo={periodo} fecha={fecha} rDesde={rDesde} rHasta={rHasta} hoy={hoy}
         />
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {/* Esta pantalla calcula UNA moneda por vez. La de composición suma todas y
-              descuenta los gastos una sola vez: es la que contesta cuánto ganó el
-              negocio, no cuánto ganó el dólar. */}
-          <Link href="/dashboard/ganancias/composicion" className="chip">De dónde sale</Link>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {nav}
           <button className="chip" onClick={() => document.body.classList.add('cfg-open')}>⚙ Configuración</button>
         </div>
       </div>

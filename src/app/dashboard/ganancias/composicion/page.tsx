@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import ComposicionView from '@/components/ganancias/ComposicionView'
+import NavGanancias from '@/components/ganancias/NavGanancias'
 import { veGanancias } from '@/lib/roles'
 import { esPeriodoValido, hoyArgentina, rangoDe } from '@/lib/periodos'
 import { cargarGanancias } from '@/lib/ganancias-datos'
@@ -54,8 +55,13 @@ export default async function ComposicionPage({
 
   const { dias } = await cargarGanancias(supabase, ini, fin)
 
+  const qs = new URLSearchParams(
+    esRango ? { desde: searchParams.desde!, hasta: searchParams.hasta! } : { p, fecha },
+  ).toString()
+
   return (
     <ComposicionView
+      nav={<NavGanancias actual="composicion" qs={qs} />}
       dias={dias}
       periodo={esRango ? '' : p}
       fecha={fecha}

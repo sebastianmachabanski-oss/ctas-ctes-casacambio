@@ -41,7 +41,7 @@ const RUTAS_DE_MODULO = [
   '/dashboard/calle', '/dashboard/deudores', '/dashboard/ganancias',
   // Cuelga de /dashboard/ganancias, así que el interruptor del módulo la tiene que
   // cubrir sola, por prefijo. Si alguien la mueve fuera de ahí, esto falla.
-  '/dashboard/ganancias/composicion',
+  '/dashboard/ganancias/composicion', '/dashboard/ganancias/tablero',
   '/dashboard/admin/auditoria', '/dashboard/cheques',
 ]
 const RUTAS_NUCLEO = [

@@ -1,6 +1,5 @@
 'use client'
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
 import SelectorPeriodo from '@/components/SelectorPeriodo'
 import { componer, SIMBOLO, type DiaAgg } from '@/lib/ganancias-composicion'
 
@@ -30,10 +29,12 @@ const COLOR: Record<string, string> = {
 }
 
 export default function ComposicionView({
-  dias, periodo, fecha, rDesde, rHasta, hoy,
+  dias, periodo, fecha, rDesde, rHasta, hoy, nav,
 }: {
   dias: DiaAgg[]
   periodo: string; fecha: string; rDesde: string; rHasta: string; hoy: string
+  /** La navegación entre las tres vistas, armada en el servidor. */
+  nav?: React.ReactNode
 }) {
   const esRango = !!(rDesde && rHasta)
   const [cc, setCc] = useState(true)
@@ -57,14 +58,16 @@ export default function ComposicionView({
   const mayor = Math.max(1, ...c.monedas.map(m => Math.abs(m.aporta)))
 
   return (
-    <div className="px-4 md:px-6 pt-4 pb-6" style={{ display: 'grid', gap: 12 }}>
+    // `minmax(0, 1fr)` y no `1fr`: sin eso los hijos de una grilla no bajan de su ancho
+    // mínimo de contenido y la tabla arrastra la página a lo ancho en el teléfono.
+    <div className="px-4 md:px-6 pt-4 pb-6" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 12 }}>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
         <SelectorPeriodo
           ruta="/dashboard/ganancias/composicion"
           periodo={periodo} fecha={fecha} rDesde={rDesde} rHasta={rHasta} hoy={hoy}
         />
-        <Link href="/dashboard/ganancias" className="chip">Ver por moneda</Link>
+        {nav}
       </div>
 
       {/* El resultado, en las dos monedas */}

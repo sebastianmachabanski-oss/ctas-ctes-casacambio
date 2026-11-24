@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import GananciasView from '@/components/ganancias/GananciasView'
+import NavGanancias from '@/components/ganancias/NavGanancias'
 import { veGanancias } from '@/lib/roles'
 import { esPeriodoValido, hoyArgentina, rangoDe } from '@/lib/periodos'
 import { cargarGanancias } from '@/lib/ganancias-datos'
@@ -59,8 +60,14 @@ export default async function GananciasPage({
 
   const { dias, abiertas, puntasAbiertas, paresNegativos } = await cargarGanancias(supabase, ini, fin)
 
+  // El período viaja a las otras vistas para no perderlo al cambiar de pantalla.
+  const qs = new URLSearchParams(
+    esRango ? { desde: searchParams.desde!, hasta: searchParams.hasta! } : { p, fecha },
+  ).toString()
+
   return (
     <GananciasView
+      nav={<NavGanancias actual="moneda" qs={qs} />}
       dias={dias}
       abiertas={abiertas}
       puntasAbiertas={puntasAbiertas}
