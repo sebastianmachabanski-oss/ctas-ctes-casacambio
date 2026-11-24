@@ -19,8 +19,15 @@
 # cada pantalla): tapan agujeros que viven del lado del visitante y que desde
 # el código de la app no se pueden cerrar.
 #
-# Van acá y no en `next.config.js` porque Netlify los aplica a TODA respuesta,
-# incluidos los archivos estáticos y los errores, que no pasan por Next.
+# OJO (24/11/2026): esto NO alcanza para toda respuesta. Verificado en producción,
+# el plugin de Next arma sus propias respuestas para lo que renderiza el servidor
+# —páginas y rutas de API— y esas se saltean estas reglas: un `/_next/static/...`
+# devuelve los cinco encabezados y `/login` no devuelve ninguno.
+#
+# Por eso los mismos cinco están TAMBIÉN en `next.config.js`, en `headers()`:
+#   acá               → archivos estáticos y páginas de error, que no pasan por Next.
+#   next.config.js    → todo lo que renderiza Next, que es casi toda la app.
+# Si se cambian, hay que cambiarlos en los dos archivos.
 # ──────────────────────────────────────────────────────────────────────────────
 [[headers]]
   for = "/*"
