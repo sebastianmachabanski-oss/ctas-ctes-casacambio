@@ -50,6 +50,7 @@ import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } f
 import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
 import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES, problemaDeLaUrl } from './env-local'
 import { serieMensual } from '../src/lib/ganancias-series'
+import { cargarGanancias } from '../src/lib/ganancias-datos'
 import { ttVacio } from '../src/lib/ganancias-tt'
 import type { DiaAgg, ParAgg } from '../src/lib/ganancias-composicion'
 
@@ -456,6 +457,23 @@ for (const m of movimientos) {
     if (volcc < 0 && arscc > 0) { agg.vVcc += -volcc; agg.aVcc += arscc }
   }
 }
+/**
+ * A lo generado se le suma LO QUE YA ESTÁ EN LA BASE, con el mismo cargador que usan las
+ * pantallas.
+ *
+ * Sin esto la serie miente, y de la peor manera: muestra en CERO los meses que ya tienen
+ * datos —porque este script no los generó— y en una fracción el mes en curso. La primera
+ * corrida real mostró julio a octubre en cero y noviembre con 662.225 cuando la base
+ * tenía el mes casi entero. Sobre eso no se puede decidir si la serie convence.
+ *
+ * Los tramos no se pisan: el relleno termina antes del primer día de la base y lo de
+ * adelante empieza después del último, así que alcanza con no sobrescribir un día que ya
+ * vino de la base.
+ */
+for (const d of (await cargarGanancias(db, desde ?? primeraFecha, hoy)).dias) {
+  if (!porMesDia.has(d.f)) porMesDia.set(d.f, d)
+}
+
 const diasSerie = Array.from(porMesDia.values()).sort((a, b) => a.f.localeCompare(b.f))
 const serie = diasSerie.length
   ? serieMensual(diasSerie, diasSerie[diasSerie.length - 1].f,
@@ -480,7 +498,7 @@ ${fechas.length ? `  Se agrega adelante      ${fechas[0]} → ${fechas[fechas.le
   De cuenta corriente     ${diario.length}
   Transferencias          ${movimientos.filter(m => m.op === 'T').length / 2} (dos patas cada una)
 ${desde ? `  SALDO INICIAL          se muda al ${desde} y se ajusta para que los saldos de hoy NO cambien\n` : ''}\
-RESULTADO POR MES — lo que va a mostrar el tablero
+RESULTADO POR MES — lo que va a mostrar el tablero (lo nuevo MÁS lo que ya hay)
 ${serie.map((m, i) => {
   const prev = i > 0 ? serie[i - 1].neto : null
   const v = prev && prev > 0 ? ((m.neto - prev) / prev * 100) : null
