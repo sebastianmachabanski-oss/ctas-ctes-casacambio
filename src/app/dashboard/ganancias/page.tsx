@@ -155,69 +155,24 @@ export default async function GananciasPage({
 
   const dias = Array.from(porDia.values()).sort((a, b) => a.f.localeCompare(b.f))
 
-  // ── Reportes de caja (venían de Inicio, 10/9/2026) ───────────────────────
-  // Saldos por cliente del período y evolución del saldo en dólares. Se consultan con el
-  // MISMO rango que la ganancia: son la lectura de detalle del número de arriba.
+  // Los "Reportes de caja" —saldos por cliente y evolución del saldo en dólares— se
+  // sacaron de esta pantalla el 24/11/2026. Habían llegado desde Inicio el 10/9/2026 como
+  // el detalle detrás del número, pero no lo eran: contestaban "cuánto me debe cada uno",
+  // que es la pregunta de Cuentas Corrientes y Deudores, no la de Ganancias. Mezcladas acá
+  // competían con el cálculo, que es lo único que esta pantalla tiene que explicar.
   //
-  // Postgrest corta CUALQUIER respuesta —también las RPC— en 1.000 filas y hay más de
-  // 1.000 clientes: sin paginar, la lista llega incompleta y clientes enteros
-  // "desaparecen" del reporte sin ninguna señal.
-  let clientesCaja: any[] = []
-  let rpcOk = true
-  for (let from = 0; ; from += PAGE) {
-    const { data: pg, error } = await (supabase as any)
-      .rpc('caja_clientes_periodo', { p_desde: ini, p_hasta: fin })
-      .order('cliente')
-      .range(from, from + PAGE - 1)
-    if (error) { rpcOk = false; break }
-    const rows = (pg ?? []) as any[]
-    clientesCaja.push(...rows)
-    if (rows.length < PAGE) break
-  }
-  if (!rpcOk) {
-    // Si la migración de la RPC aún no corrió, cae a la vista sin filtro de período.
-    clientesCaja = []
-    for (let from = 0; ; from += PAGE) {
-      const { data: pg } = await supabase.from('caja_clientes')
-        .select('cliente,pesos,dolares,euros,reales,libras,ultimo_movimiento')
-        .order('cliente').range(from, from + PAGE - 1)
-      const rows = (pg ?? []) as any[]
-      clientesCaja.push(...rows)
-      if (rows.length < PAGE) break
-    }
-  }
-  const clientesCC: any[] = []
-  for (let from = 0; ; from += PAGE) {
-    const { data: pg } = await supabase.from('saldos_cuenta_corriente')
-      .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales,saldo_libras,ultimo_movimiento')
-      .order('cuenta_cte').range(from, from + PAGE - 1)
-    const rows = (pg ?? []) as any[]
-    clientesCC.push(...rows)
-    if (rows.length < PAGE) break
-  }
-  const { data: serieData } = await (supabase as any).rpc('caja_saldo_diario', { p_moneda: 'dolares' })
-  const serie = ((serieData ?? []) as any[]).map(r => ({ fecha: r.fecha as string, saldo: Number(r.saldo) }))
-
-  // `ultimo` es la fecha del último movimiento: con ella el reporte esconde —sin
-  // perderlos— a los clientes que no aparecen hace meses. Puede venir vacío si la
-  // migración todavía no corrió; en ese caso nadie se oculta.
-  const clientesCajaN = clientesCaja.map(c => ({
-    nombre: c.cliente, pesos: Number(c.pesos) || 0, dolares: Number(c.dolares) || 0,
-    euros: Number(c.euros) || 0, reales: Number(c.reales) || 0, libras: Number(c.libras) || 0,
-    ultimo: (c.ultimo_movimiento as string | null) ?? null,
-  }))
-  const clientesCCN = clientesCC.map(c => ({
-    nombre: c.cuenta_cte, pesos: Number(c.saldo_pesos) || 0, dolares: Number(c.saldo_dolares) || 0,
-    euros: Number(c.saldo_euros) || 0, reales: Number(c.saldo_reales) || 0, libras: Number(c.saldo_libras) || 0,
-    ultimo: (c.ultimo_movimiento as string | null) ?? null,
-  }))
+  // El costo tampoco era menor: eran seis consultas, dos de ellas paginando más de mil
+  // clientes, en cada carga de la pantalla.
+  //
+  // Lo que quedó en la base: la vista `caja_clientes` y las funciones
+  // `caja_clientes_periodo` y `caja_saldo_diario` siguen existiendo, sin que nadie las
+  // llame. No se borran acá a propósito: eso es una migración y una decisión aparte.
+  // `saldos_cuenta_corriente` SÍ se sigue usando, en Deudores, Cuentas Corrientes y el
+  // extracto — esa no se toca.
 
   return (
     <GananciasView
       dias={dias}
-      clientesCaja={clientesCajaN}
-      clientesCC={clientesCCN}
-      serieUSD={serie}
       abiertas={abiertas}
       puntasAbiertas={puntasAbiertas}
       paresNegativos={negativosDelPeriodo}
