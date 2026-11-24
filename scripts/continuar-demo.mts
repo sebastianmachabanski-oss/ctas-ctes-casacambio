@@ -49,18 +49,9 @@ import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
 import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES, problemaDeLaUrl } from './env-local'
-import { serieMensual } from '../src/lib/ganancias-series'
 import { cargarGanancias } from '../src/lib/ganancias-datos'
-import { ttVacio } from '../src/lib/ganancias-tt'
-import type { DiaAgg, ParAgg } from '../src/lib/ganancias-composicion'
+import { agruparPorDia, informeDeSerie, serieDeDias } from './serie-demo'
 
-const parVacio = (): ParAgg => ({ vC: 0, aC: 0, vV: 0, aV: 0, vCcc: 0, aCcc: 0, vVcc: 0, aVcc: 0 })
-/** Cuántos meses hay entre dos fechas, ambas incluidas. */
-const mesesEntre = (a: string, b: string): number => {
-  const [a1, m1] = a.slice(0, 7).split('-').map(Number)
-  const [a2, m2] = b.slice(0, 7).split('-').map(Number)
-  return (a2 * 12 + m2) - (a1 * 12 + m1) + 1
-}
 
 // Las credenciales salen del `.env.local`, que es el que `npm run base` deja apuntando a
 // la base elegida. Ver scripts/env-local.ts.
@@ -420,67 +411,16 @@ const fmt = (n: number) => new Intl.NumberFormat('es-AR', { maximumFractionDigit
 const sinClasificar = movimientos.filter(m => !m.cuenta).length
 
 /**
- * El resultado mes a mes, calculado con el MISMO motor que la pantalla.
+ * El resultado mes a mes, con lo generado MÁS lo que ya está en la base.
  *
- * Es el control que de verdad importa antes de escribir: un generador puede producir
- * saldos correctos y, aun así, una serie que ningún negocio tendría —meses que varían
- * 500 %—, y eso se ve recién en el tablero, con los datos ya cargados. Acá se ve antes.
- *
- * Si la serie no convence, se vuelve a correr con `--semilla=` otro número.
+ * Sin lo que ya está, la serie muestra en cero los meses que este script no generó. Ver
+ * scripts/serie-demo.ts, que es el mismo bloque que usa `sembrar-demo.mts`.
  */
-const porMesDia = new Map<string, DiaAgg>()
-const diaSerie = (f: string): DiaAgg => {
-  let d = porMesDia.get(f)
-  if (!d) {
-    d = {
-      f, usd: parVacio(), eur: parVacio(), brl: parVacio(),
-      usdt: parVacio(), gbp: parVacio(), chq: parVacio(), g: 0, gcc: 0, tt: ttVacio(),
-    }
-    porMesDia.set(f, d)
-  }
-  return d
-}
-const PAR_DE: Record<string, 'usd' | 'eur' | 'brl' | 'usdt' | 'gbp'> = {
-  dolares: 'usd', euros: 'eur', reales: 'brl', usdt: 'usdt', libras: 'gbp',
-}
-for (const m of movimientos) {
-  const d = diaSerie(m.fecha)
-  if (m.operacion === 'GASTOS') { d.g += Number(m.pesos) || 0; continue }
-  if (m.op === 'T') { d.tt.usd += Number(m.dolares) || 0; continue }
-  for (const [col, par] of Object.entries(PAR_DE)) {
-    const vol = Number(m[col]) || 0, ars = Number(m.pesos) || 0
-    const volcc = Number(m[`cc_${col}`]) || 0, arscc = Number(m.cc_pesos) || 0
-    const agg = d[par]
-    if (m.operacion === 'COMPRA' && vol > 0 && ars < 0) { agg.vC += vol; agg.aC += -ars }
-    if (m.operacion === 'VENTA' && vol < 0 && ars > 0) { agg.vV += -vol; agg.aV += ars }
-    if (volcc > 0 && arscc < 0) { agg.vCcc += volcc; agg.aCcc += -arscc }
-    if (volcc < 0 && arscc > 0) { agg.vVcc += -volcc; agg.aVcc += arscc }
-  }
-}
-/**
- * A lo generado se le suma LO QUE YA ESTÁ EN LA BASE, con el mismo cargador que usan las
- * pantallas.
- *
- * Sin esto la serie miente, y de la peor manera: muestra en CERO los meses que ya tienen
- * datos —porque este script no los generó— y en una fracción el mes en curso. La primera
- * corrida real mostró julio a octubre en cero y noviembre con 662.225 cuando la base
- * tenía el mes casi entero. Sobre eso no se puede decidir si la serie convence.
- *
- * Los tramos no se pisan: el relleno termina antes del primer día de la base y lo de
- * adelante empieza después del último, así que alcanza con no sobrescribir un día que ya
- * vino de la base.
- */
+const porDia = agruparPorDia(movimientos)
 for (const d of (await cargarGanancias(db, desde ?? primeraFecha, hoy)).dias) {
-  if (!porMesDia.has(d.f)) porMesDia.set(d.f, d)
+  if (!porDia.has(d.f)) porDia.set(d.f, d)
 }
-
-const diasSerie = Array.from(porMesDia.values()).sort((a, b) => a.f.localeCompare(b.f))
-const serie = diasSerie.length
-  ? serieMensual(diasSerie, diasSerie[diasSerie.length - 1].f,
-      { cc: true, gastos: true, transferencias: true },
-      // Tantos meses como abarque lo generado.
-      mesesEntre(diasSerie[0].f, diasSerie[diasSerie.length - 1].f))
-  : []
+const serie = serieDeDias(porDia)
 
 /** Gastos por mes, que son los que antes hacían saltar el resultado. */
 const porMes = new Map<string, number>()
@@ -499,13 +439,7 @@ ${fechas.length ? `  Se agrega adelante      ${fechas[0]} → ${fechas[fechas.le
   Transferencias          ${movimientos.filter(m => m.op === 'T').length / 2} (dos patas cada una)
 ${desde ? `  SALDO INICIAL          se muda al ${desde} y se ajusta para que los saldos de hoy NO cambien\n` : ''}\
 RESULTADO POR MES — lo que va a mostrar el tablero (lo nuevo MÁS lo que ya hay)
-${serie.map((m, i) => {
-  const prev = i > 0 ? serie[i - 1].neto : null
-  const v = prev && prev > 0 ? ((m.neto - prev) / prev * 100) : null
-  return `  ${m.mes}  ${fmt(m.neto).padStart(13)}   ${v === null ? '' : (v >= 0 ? '+' : '') + v.toFixed(1) + ' %'}`
-}).join('\n')}
-  Si la serie no convence —un negocio real no salta de un mes a otro—, volvé a correrlo
-  con --semilla=<otro numero>. Lo generado es repetible: la misma semilla da lo mismo.
+${informeDeSerie(serie)}
 
 GASTOS POR MES (tienen que parecerse entre sí)
 ${Array.from(porMes.entries()).sort().map(([k, v]) => `  ${k}  ${fmt(v)}`).join('\n')}

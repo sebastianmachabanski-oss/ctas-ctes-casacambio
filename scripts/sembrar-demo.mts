@@ -1,9 +1,12 @@
 /**
  * Llena una base DE DEMOSTRACIÓN con datos ficticios.
  *
- *   SUPABASE_URL=https://xxx.supabase.co \
- *   SERVICE_ROLE_KEY=eyJ... \
+ *   npm run base demo                                    ← apuntar a la base de demo
  *   npx tsx scripts/sembrar-demo.mts --confirmo-que-es-una-base-de-demo
+ *
+ * Las credenciales salen del `.env.local`; ver scripts/env-local.ts. Con `--vista-previa`
+ * genera y muestra el resumen sin escribir ni conectarse, y con `--dias=N` se cambia la
+ * ventana (por defecto 420, catorce meses, porque el tablero mira trece).
  *
  * PARA QUÉ
  * Para mostrarle el sistema a un cliente potencial hace falta que se vea VIVO: saldos en
@@ -31,6 +34,7 @@ import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
 import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES, problemaDeLaUrl } from './env-local'
+import { agruparPorDia, informeDeSerie, serieDeDias } from './serie-demo'
 
 // Credenciales del `.env.local`; ver scripts/env-local.ts.
 cargarEnvLocal()
@@ -56,27 +60,62 @@ const db = createClient(BASE_URL ?? 'http://localhost', KEY ?? 'sin-clave', { au
 // El elenco ficticio vive en scripts/elenco-demo.ts: lo comparten este script, el que crea
 // el usuario del cliente y el que llena la auditoría. Repetido, se desincroniza.
 
-/** Azar REPETIBLE: la misma semilla da siempre la misma demo. */
-let semilla = 20261020
+/** Azar REPETIBLE: la misma semilla da siempre la misma demo. `--semilla=N` la cambia. */
+/**
+ * 555 no es un número cualquiera: es la semilla que produce la mejor serie mensual.
+ *
+ * Probadas ocho sobre catorce meses, la variación promedio entre meses iba de 18 % a
+ * 53 %. Con esta, 18,2 %, y solo tres meses pasan el 30 % —uno de ellos es el mes en
+ * curso, que va por la mitad—. Elegir entre tiradas igualmente válidas es legítimo para
+ * datos de demostración: el modelo no cambia, cambia el sorteo.
+ */
+let semilla = Number(process.argv.find(a => a.startsWith('--semilla='))?.slice(10) ?? 555)
+if (!Number.isFinite(semilla)) salir('--semilla espera un número.')
 const azar = () => (semilla = (semilla * 1103515245 + 12345) % 2147483648) / 2147483648
 const entre = (a: number, b: number) => a + Math.floor(azar() * (b - a + 1))
 const uno = <T,>(xs: T[]): T => xs[entre(0, xs.length - 1)]
 const redondo = (n: number, paso: number) => Math.max(paso, Math.round(n / paso) * paso)
 
-/** Cotizaciones por moneda, con una deriva suave para que los gráficos no sean planos. */
+/**
+ * Cotizaciones por moneda, con una deriva suave para que los gráficos no sean planos.
+ *
+ * La deriva es POR DÍA y no una fracción de la ventana: con `dia / DIAS` el movimiento
+ * total sería el mismo sembrando cuatro meses que sembrando catorce, y en el de catorce
+ * el dólar quedaría quieto. 0,11 % diario son unos 46 puntos en catorce meses, que para
+ * la Argentina no llama la atención.
+ */
 function cotizacion(moneda: string, dia: number): number {
   const base: Record<string, number> = { DOLARES: 1500, EUROS: 1700, REALES: 290, USDT: 1495, LIBRAS: 1950 }
-  const deriva = 1 + (dia / 120) * 0.18 + (azar() - 0.5) * 0.012
-  return Math.round(base[moneda] * deriva)
+  // Las bases son de HOY, así que se retrocede desde el final: el día más viejo es el
+  // más barato. Si no, la demo arrancaría cara y terminaría más cara todavía.
+  const deriva = 1 - (DIAS - dia) * 0.0011 + (azar() - 0.5) * 0.012
+  return Math.round(base[moneda] * Math.max(0.3, deriva))
 }
 
-const DIAS = 120
+/**
+ * Cuántos días hacia atrás se siembra. `--dias=N` para cambiarlo.
+ *
+ * El default son catorce meses porque el TABLERO MIRA TRECE: con los 120 días de antes
+ * —cuatro meses—, nueve columnas del gráfico salían vacías justo en la pantalla que se
+ * usa para mostrar la tendencia.
+ */
+const DIAS_PEDIDOS = Number(process.argv.find(a => a.startsWith('--dias='))?.slice(7) ?? 420)
+if (!Number.isFinite(DIAS_PEDIDOS) || DIAS_PEDIDOS < 1) salir('--dias espera un número de días mayor que cero.')
 const hoy = new Date()
 const fechaDe = (diasAtras: number) => {
   const d = new Date(hoy)
   d.setDate(d.getDate() - diasAtras)
   return d.toISOString().slice(0, 10)
 }
+
+/**
+ * Se corre el arranque al día 1 de su mes.
+ *
+ * Si no, el primer mes de la serie puede tener dos o tres días: el tablero abre con una
+ * columna enana y una variación absurda contra la siguiente, que no dice nada del
+ * negocio y es lo primero que se ve.
+ */
+const DIAS = DIAS_PEDIDOS + Number(fechaDe(DIAS_PEDIDOS).slice(8, 10)) - 1
 
 type Fila = Record<string, any>
 const movimientos: Fila[] = []
@@ -162,8 +201,18 @@ const stock: Record<string, number> = Object.fromEntries(INICIAL.map(([m]) => [m
 function convieneQueEntre(moneda: string): boolean {
   const objetivo = Object.fromEntries(INICIAL)[moneda] ?? 0
   if (!objetivo) return azar() < 0.5
-  const desvio = (objetivo - stock[moneda]) / objetivo
-  return azar() < Math.min(0.85, Math.max(0.15, 0.5 + desvio))
+  // El desvío se mide contra el 30 % del objetivo, no contra el objetivo entero.
+  //
+  // Con el objetivo entero el controlador casi no reacciona: el stock deriva, un mes
+  // queda con 70 % de compras y 30 % de ventas, y como la ganancia sale del CALCE
+  // —`min(compras, ventas)`— ese mes rinde la mitad. La serie saltaba ±60 % sin que
+  // hubiera pasado nada en el negocio.
+  //
+  // Una casa de cambio real cierra posición seguido, no deja correr un desbalance de
+  // semanas. Medido sobre catorce meses, 0,30 deja los meses interiores en ±14 % de
+  // variación promedio; con 1 quedaban en ±30 % con picos de 84 %.
+  const desvio = (objetivo - stock[moneda]) / (objetivo * 0.30)
+  return azar() < Math.min(0.9, Math.max(0.1, 0.5 + desvio))
 }
 
 for (const [moneda, monto] of INICIAL) {
@@ -201,6 +250,9 @@ VISTA PREVIA — no se escribió nada.
   Transferencias        ${movimientos.filter(m => m.op === 'T').length / 2} (dos patas cada una)
   Desde                 ${movimientos[0].fecha}
   Hasta                 ${movimientos[movimientos.length - 1].fecha}
+
+RESULTADO POR MES — lo que va a mostrar el tablero
+${informeDeSerie(serieDeDias(agruparPorDia(movimientos)))}
 
 SALDOS DE CAJA
   Pesos      ${fmt(suma('pesos'))}
