@@ -307,6 +307,37 @@ hoy, así que conviene sacarlas recién cuando estén las nuevas.
 > cómo viene el negocio". Se vende después de 4.0, nunca antes: un tablero lindo sobre un
 > número que deja afuera dos monedas es peor que no tenerlo.
 
+### 4.6. Valuar la posición de verdad, y devengar los cheques — **14 a 20 h**
+
+Surgió el 24/11/2026 de una pregunta del cliente sobre el principio de prudencia. El
+razonamiento contable completo está en `docs/GANANCIAS.md`; acá va el trabajo.
+
+Son dos cosas, y la primera es más grave de lo que parece.
+
+- **Valuar la posición acumulada, no el desbalance del período — 8 a 12 h.** Hoy el
+  "stock" que se valúa es `|compras − ventas|` *del período*, que no es la tenencia de la
+  casa: en un mes cualquiera es ruido de calendario. Medido sobre la base real, los
+  desbalances mensuales suman **36,5 veces** el desbalance anual, porque se compensan
+  entre sí. Hay que traer la posición al cierre —acumulada desde el principio— y valuar
+  esa. Cuesta porque la pantalla hoy trae solo los días del período, igual que la
+  evolución de 4.5, y conviene hacerlas juntas.
+  Depende de tener una **cotización de cierre**: es la decisión de fuente de cotización
+  que ya está pendiente del cliente.
+
+- **Devengar la ganancia del cheque hasta su vencimiento — 6 a 8 h.** Hoy se reconoce
+  entera el día del descuento. Es interés: descontar a 90 días es prestar plata 90 días,
+  y reconocer todo en el primer mes infla ese mes y deja los otros dos en cero. El dato
+  necesario ya existe (`cheques.fecha_pago`); falta repartir y que el período del cobro
+  siga dando cero, sin duplicar.
+
+No se tocó nada todavía: para la demo quedó el criterio actual (margen fijo en divisas,
+valor nominal en cheques). Se confirma con el cliente antes de cambiarlo, porque mueve
+el resultado informado de todos los períodos hacia atrás.
+
+> **Gancho comercial:** es la conversación que convierte al sistema en el interlocutor
+> del contador. Y la respuesta a la objeción más probable de un cliente con formación
+> contable, que es exactamente de donde salió.
+
 ---
 
 ## 5. Calidad de datos y cumplimiento

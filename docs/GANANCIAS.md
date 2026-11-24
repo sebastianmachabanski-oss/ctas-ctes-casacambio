@@ -309,6 +309,49 @@ descuento y deja el período del cobro en cero, sin duplicar. El margen fijo aci
 descuento del 3 % seguiría informando 50.000 cuando la ganancia real es 30.000. Y heredar
 el default de divisas produciría cifras absurdas, de ahí que los supuestos sean por par.
 
+#### El principio de prudencia y por qué cada moneda se trata distinto (24/11/2026)
+
+La pregunta aparece sola: si la ganancia se reconoce cuando se realiza, ¿no habría que
+esperar a vender la moneda y a cobrar el cheque? La respuesta es distinta en cada caso, y
+conviene tenerla escrita porque el cliente la va a hacer.
+
+**La moneda extranjera es la excepción clásica a la prudencia.** La norma argentina
+(RT 17) la mide al tipo de cambio de cierre y manda la diferencia a resultados del
+período. No es un criterio agresivo: es el estándar. La prudencia rige donde el precio de
+venta es incierto, y acá no lo es — hay mercado transparente y precio conocido. Diferir
+esa diferencia no sería prudente, sería esconder información, y para una casa de cambio
+más que para cualquier otro negocio: **tener posición es parte del negocio**, no un
+accidente. Sin valuarla, un mes en que el dólar saltó 10 % con stock en caja se ve igual
+que un mes plano.
+
+**La ganancia del cheque es interés, y los intereses se devengan.** Hoy se reconoce
+entera el día del descuento, que es la más agresiva de tres posturas:
+
+| Criterio | Cuándo reconoce | |
+|---|---|---|
+| Al descuento | Todo el día 1 | Lo que hace hoy |
+| **Devengado** | Repartido hasta el vencimiento | Lo técnicamente correcto |
+| Al cobro | Todo el último día | Lo más prudente, pero es criterio de caja |
+
+Descontar un cheque a 90 días es prestar plata 90 días: reconocer todo en el mes del
+descuento infla ese mes y deja los dos siguientes en cero, cuando el dinero estuvo
+prestado los tres.
+
+**Lo que de verdad falta por prudencia en los cheques no es el momento, es el riesgo.**
+Un cheque puede rebotar y hoy la ganancia se reconoce completa sin previsión por
+incobrabilidad. Ver 6.6 en el roadmap.
+
+**Y hay un problema más grande que los dos anteriores:** el `stock` que la pantalla valúa
+NO es la posición de la casa. Es `|vC − vV|` *del período*, que en un mes cualquiera es
+ruido de calendario y no inventario — medido sobre la base real, los desbalances
+mensuales sumaban **36,5 veces** el desbalance anual, porque se compensan entre sí. Antes
+de discutir con qué criterio valuar, hay que valuar **la posición acumulada**.
+
+**Criterio al que se apunta**, pendiente de confirmar con el cliente: posición acumulada
+a cotización de cierre para las monedas, y devengamiento hasta el vencimiento para los
+cheques. Hasta que el cliente lo confirme NO SE CAMBIÓ NADA: la pantalla sigue con el
+margen fijo y con los cheques a valor nominal. Ver 4.6 en el roadmap.
+
 ### Gastos
 
 Solo existen en **pesos** (regla del dominio) y entran con su signo, restando. Se pueden
