@@ -14,8 +14,8 @@
  *   - Que la variación no invente porcentajes sobre bases negativas o en cero.
  */
 import {
-  compararUltimo, inicioDeVentana, mesDe, mesesHasta, serieMensual, variacion,
-  MESES_TABLERO,
+  compararUltimo, inicioDeVentana, mesDe, mesesHasta, serieMensual, tramoDeComparacion,
+  variacion, MESES_TABLERO,
 } from '../src/lib/ganancias-series'
 import { componer, type DiaAgg, type ParAgg, type TTAgg } from '../src/lib/ganancias-composicion'
 
@@ -194,6 +194,49 @@ const OP = { cc: true, gastos: true, transferencias: true }
 }
 {
   asert('14a · una serie vacía devuelve null', compararUltimo([]) === null)
+}
+
+// ── 15. El recorte por tramo ──────────────────────────────────────────────
+// El problema real: el mes en curso va por el día 24 y el anterior está completo.
+// Comparar así da una caída enorme que no significa nada.
+{
+  const dias = [
+    // Octubre: 100.000 en la primera quincena y 300.000 más en la segunda.
+    diaUsd('2026-10-05', 1000, 1000, 1000, 1100),
+    diaUsd('2026-10-25', 3000, 1000, 3000, 1100),
+    // Noviembre, que va por el día 10: 120.000.
+    diaUsd('2026-11-05', 1200, 1000, 1200, 1100),
+  ]
+
+  const enteros = serieMensual(dias, '2026-11-10', OP, 2)
+  igual('15a · octubre entero', enteros[0].neto, 400_000)
+  const cmpEntero = compararUltimo(enteros)
+  // 120.000 contra 400.000: una caída del 70 % que es puro artefacto del calendario.
+  igual('15b · comparado entero, parece un desastre', cmpEntero!.vsAnterior ?? 0, -0.7, 0.001)
+
+  const recortados = serieMensual(dias, '2026-11-10', OP, 2, 10)
+  igual('15c · octubre al día 10 deja afuera el 25', recortados[0].neto, 100_000)
+  igual('15d · noviembre no cambia: ya estaba dentro del tramo', recortados[1].neto, 120_000)
+  const cmpTramo = compararUltimo(recortados, 10)
+  igual('15e · tramo contra tramo: sube 20 %', cmpTramo!.vsAnterior ?? 0, 0.2, 0.001)
+  asert('15f · el tramo viaja para el rótulo', cmpTramo!.tramo === 10)
+  asert('15g · sin recorte el tramo es null', cmpEntero!.tramo === null)
+}
+
+// El recorte toma el día del mes, no la posición del día dentro de los datos.
+{
+  const dias = [diaUsd('2026-11-03', 1000, 1000, 1000, 1100), diaUsd('2026-11-28', 1000, 1000, 1000, 1200)]
+  igual('16a · el día 3 entra con corte en 10', serieMensual(dias, '2026-11-10', OP, 1, 10)[0].neto, 100_000)
+  igual('16b · el día 28 queda afuera', serieMensual(dias, '2026-11-10', OP, 1, 10)[0].conDatos ? 1 : 0, 1)
+  igual('16c · sin corte entran los dos', serieMensual(dias, '2026-11-30', OP, 1)[0].neto, 300_000)
+}
+
+// `tramoDeComparacion`: recorta solo el mes en curso.
+{
+  asert('17a · el mes en curso devuelve el día de hoy', tramoDeComparacion('2026-11', '2026-11-24') === 24)
+  asert('17b · un mes cerrado no se recorta', tramoDeComparacion('2026-10', '2026-11-24') === null)
+  asert('17c · un mes futuro tampoco', tramoDeComparacion('2026-12', '2026-11-24') === null)
+  asert('17d · el día 1 del mes en curso', tramoDeComparacion('2026-11', '2026-11-01') === 1)
 }
 
 console.log(fallas.length === 0

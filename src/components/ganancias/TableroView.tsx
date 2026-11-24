@@ -1,8 +1,8 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { SIMBOLO } from '@/lib/ganancias-composicion'
-import { compararUltimo, type MesSerie } from '@/lib/ganancias-series'
+import type { Comparacion, MesSerie } from '@/lib/ganancias-series'
 
 /**
  * Cómo viene el negocio: trece meses y la comparación.
@@ -48,8 +48,14 @@ const partesDe = (m: MesSerie) => ({
   gastos: m.c.gastos,
 })
 
-export default function TableroView({ serie, mesCursor, mesAnterior, mesSiguiente, haySiguiente, nav }: {
+export default function TableroView({ serie, comparacion, mesCursor, mesAnterior, mesSiguiente, haySiguiente, nav }: {
   serie: MesSerie[]
+  /**
+   * La comparación, calculada en el servidor. Viene aparte de `serie` porque cuando el
+   * mes en curso todavía no cerró se calcula sobre los meses RECORTADOS al mismo tramo,
+   * mientras que el gráfico sigue mostrando los meses enteros.
+   */
+  comparacion: Comparacion | null
   /** La navegación entre las tres vistas, armada en el servidor. */
   nav?: React.ReactNode
   /** 'AAAA-MM' del mes que se está mirando: el último de la serie. */
@@ -66,8 +72,12 @@ export default function TableroView({ serie, mesCursor, mesAnterior, mesSiguient
   // en vertical. Dentro de la columna, el tooltip existía en el DOM y no se veía.
   const [sobre, setSobre] = useState<{ i: number; x: number; y: number } | null>(null)
 
-  const cmp = useMemo(() => compararUltimo(serie), [serie])
-  const actual = cmp?.actual
+  const cmp = comparacion
+  // El resultado grande es el del mes ENTERO que corre, no el del tramo recortado: lo que
+  // se recorta es la base de la comparación, no lo ganado.
+  const actual = serie[serie.length - 1]
+  /** Día hasta el que llega el mes en curso, o `null` si el mes ya cerró. */
+  const tramo = comparacion?.tramo ?? null
 
   // Escala común a las trece columnas. Se mide el apilado positivo y el negativo por
   // separado: con los gastos abajo, el cero no está en el piso del gráfico.
@@ -128,20 +138,24 @@ export default function TableroView({ serie, mesCursor, mesAnterior, mesSiguient
             {actual?.c.netoUsd != null
               ? <>{usd(Math.round(actual.c.netoUsd))} a la cotización del período</>
               : 'en pesos'}
+            {/* Que el mes esté en curso cambia cómo se lee todo lo de al lado. */}
+            {tramo && <> · <b>mes en curso, al día {tramo}</b></>}
           </div>
         </div>
 
-        <Comparacion
-          titulo="vs. mes anterior"
+        <TarjetaComparacion
+          titulo={tramo ? 'vs. el mismo tramo del mes anterior' : 'vs. mes anterior'}
           variacion={cmp?.vsAnterior ?? null}
           base={cmp?.anterior?.neto ?? null}
           etiquetaBase={cmp?.anterior ? nombreMes(cmp.anterior.mes) : null}
+          tramo={tramo}
         />
-        <Comparacion
-          titulo="vs. mismo mes del año pasado"
+        <TarjetaComparacion
+          titulo={tramo ? 'vs. el mismo tramo del año pasado' : 'vs. mismo mes del año pasado'}
           variacion={cmp?.vsAnioPasado ?? null}
           base={cmp?.anioPasado?.neto ?? null}
           etiquetaBase={cmp?.anioPasado ? nombreMes(cmp.anioPasado.mes) : null}
+          tramo={tramo}
         />
       </div>
 
@@ -285,8 +299,16 @@ export default function TableroView({ serie, mesCursor, mesAnterior, mesSiguient
   )
 }
 
-function Comparacion({ titulo, variacion, base, etiquetaBase }: {
+/**
+ * Una comparación.
+ *
+ * Cuando el mes en curso no cerró, la base es el MISMO TRAMO del mes de referencia —los
+ * primeros N días— y el rótulo lo dice. Comparar veinticuatro días contra un mes entero
+ * da una caída enorme que no significa nada, y es la primera cosa que alguien mira.
+ */
+function TarjetaComparacion({ titulo, variacion, base, etiquetaBase, tramo }: {
   titulo: string; variacion: number | null; base: number | null; etiquetaBase: string | null
+  tramo: number | null
 }) {
   return (
     <div className="card gn-card">
@@ -307,7 +329,11 @@ function Comparacion({ titulo, variacion, base, etiquetaBase }: {
           </div>
           <div className="gn-pie num">
             desde {ars(Math.round(base ?? 0))}
-            {etiquetaBase && <span style={{ textTransform: 'lowercase' }}> · {etiquetaBase}</span>}
+            {etiquetaBase && (
+              <span style={{ textTransform: 'lowercase' }}>
+                {' · '}{etiquetaBase}{tramo ? `, al día ${tramo}` : ''}
+              </span>
+            )}
           </div>
         </>
       )}
@@ -402,49 +428,65 @@ const COLOR_MONEDA: Record<string, string> = {
   usdt: '#0891b2', gbp: '#be185d', chq: '#475569',
 }
 
+/**
+ * UNA sola grilla para todas las filas, no una grilla por fila.
+ *
+ * Con una grilla por fila, las columnas `auto` se dimensionan con el contenido de ESA
+ * fila: los importes quedaban casi alineados por casualidad, y el subtotal —que estaba
+ * afuera, pegado al borde— no alineaba con ninguno. Acá las cuatro columnas son las
+ * mismas para todas las filas y el subtotal cae justo debajo de los importes.
+ *
+ * La columna de la barra es `minmax(0, 1fr)`: es la que cede cuando la pantalla angosta.
+ */
 function PorMoneda({ c }: { c: MesSerie['c'] }) {
   const mayor = Math.max(1, ...c.monedas.map(m => Math.abs(m.aporta)))
   const total = c.monedas.reduce((a, m) => a + m.aporta, 0)
   return (
     <div style={{ marginTop: 8 }}>
-      {c.monedas.map(m => (
-        // Tres columnas, y la de la barra es la que cede: `minmax(0, 1fr)` la deja
-        // encogerse. Con la barra y los importes en una sola columna flexible, a ancho
-        // de teléfono no entraban y empujaban la página entera.
-        <div key={m.par} style={{
-          display: 'grid', gridTemplateColumns: '104px minmax(0, 1fr) auto',
-          alignItems: 'center', columnGap: 12, padding: '7px 0',
-        }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 600 }}>
-            <i aria-hidden="true" style={{
-              width: 9, height: 9, borderRadius: '50%', flex: 'none',
+      <div style={{
+        display: 'grid', gridTemplateColumns: '104px minmax(0, 1fr) auto auto',
+        alignItems: 'center', columnGap: 12, rowGap: 0,
+      }}>
+        {c.monedas.map(m => (
+          <Fragment key={m.par}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 600, padding: '7px 0' }}>
+              <i aria-hidden="true" style={{
+                width: 9, height: 9, borderRadius: '50%', flex: 'none',
+                background: COLOR_MONEDA[m.par] ?? 'var(--ink-2)',
+              }} />
+              {m.nombre}
+            </span>
+            <span aria-hidden="true" style={{
+              height: 20, borderRadius: '0 4px 4px 0',
+              width: `${Math.max(1, Math.abs(m.aporta) / mayor * 100)}%`,
               background: COLOR_MONEDA[m.par] ?? 'var(--ink-2)',
+              opacity: m.aporta >= 0 ? 1 : 0.35,
             }} />
-            {m.nombre}
-          </span>
-          <div aria-hidden="true" style={{
-            height: 20, borderRadius: '0 4px 4px 0',
-            width: `${Math.max(1, Math.abs(m.aporta) / mayor * 100)}%`,
-            background: COLOR_MONEDA[m.par] ?? 'var(--ink-2)',
-            opacity: m.aporta >= 0 ? 1 : 0.35,
-          }} />
-          <span style={{ display: 'flex', gap: 10, alignItems: 'baseline', whiteSpace: 'nowrap' }}>
-            <span className="num" style={{ fontSize: 12.5, fontWeight: 600 }}>
+            <span className="num" style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', textAlign: 'right' }}>
               {ars(Math.round(m.aporta))}
             </span>
-            <span className="num" style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+            <span className="num" style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap', textAlign: 'right', minWidth: 46 }}>
               {total > 0 ? `${fmt1.format(m.aporta / total * 100)} %` : ''}
             </span>
-          </span>
-        </div>
-      ))}
-      <div style={{
-        borderTop: '1px solid var(--grid)', marginTop: 6, paddingTop: 9,
-        display: 'flex', justifyContent: 'space-between',
-      }}>
-        <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>Subtotal por cambio de monedas</span>
-        <span className="num" style={{ fontSize: 12.5, fontWeight: 650 }}>{ars(Math.round(c.subtotalMonedas))}</span>
+          </Fragment>
+        ))}
+
+        {/* El subtotal, en las mismas columnas: el importe cae bajo los importes. */}
+        <span style={{
+          gridColumn: '1 / 3', fontSize: 12.5, color: 'var(--ink-2)',
+          borderTop: '1px solid var(--grid)', paddingTop: 9, marginTop: 6,
+        }}>
+          Subtotal por cambio de monedas
+        </span>
+        <span className="num" style={{
+          fontSize: 12.5, fontWeight: 650, whiteSpace: 'nowrap', textAlign: 'right',
+          borderTop: '1px solid var(--grid)', paddingTop: 9, marginTop: 6,
+        }}>
+          {ars(Math.round(c.subtotalMonedas))}
+        </span>
+        <span style={{ borderTop: '1px solid var(--grid)', paddingTop: 9, marginTop: 6 }} />
       </div>
+
       {c.ttSinCotizacion.length > 0 && (
         <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 8 }}>
           Transferencias en {c.ttSinCotizacion.map(p => SIMBOLO[p]).join(', ')} sin cotización

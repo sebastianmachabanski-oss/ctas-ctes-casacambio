@@ -29,6 +29,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
+import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
 
 /** Sin la barra del final: ver la nota en scripts/crear-primer-admin.mts. */
 const BASE_URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
@@ -168,67 +169,16 @@ for (const [moneda, monto] of INICIAL) {
   })
 }
 
+const tomarGastoFijoDelMes = controlGastoFijo()
+const elenco = { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO }
+
 for (let atras = DIAS; atras >= 0; atras--) {
   const fecha = fechaDe(atras)
-  const diaSemana = new Date(`${fecha}T12:00:00Z`).getUTCDay()
-  if (diaSemana === 0 || diaSemana === 6) continue   // la casa no abre los fines de semana
-
-  // Mostrador: compras y ventas del día. El dólar manda; el resto aparece salteado para
-  // que las tarjetas de las otras monedas tengan saldo sin dominar la pantalla.
-  for (let i = 0; i < entre(4, 9); i++) {
-    const moneda = azar() < 0.72 ? 'DOLARES' : uno(['EUROS', 'REALES', 'USDT', 'LIBRAS'])
-    const compra = convieneQueEntre(moneda)
-    const cot = cotizacion(moneda, DIAS - atras)
-    // La casa compra más barato de lo que vende: de ahí sale la ganancia del período.
-    const spread = compra ? -entre(8, 18) : entre(8, 18)
-    registrar({
-      fecha, tipo: 'CAJA', cliente: uno(EVENTUALES),
-      operacion: compra ? 'COMPRA' : 'VENTA',
-      propio: moneda, externo: 'PESOS',
-      monto: redondo(entre(200, 12_000), 50),
-      cotizacion: cot + spread,
-      // Una parte de lo vendido sale con un repartidor: alimenta "Dinero en calle".
-      debe: !compra && azar() < 0.12 ? uno(REPARTIDORES) : null,
-    })
-  }
-
-  // Cuentas corrientes: ingresos y egresos de los clientes con cuenta.
-  for (let i = 0; i < entre(1, 4); i++) {
-    const moneda = azar() < 0.8 ? 'DOLARES' : uno(['PESOS', 'EUROS'])
-    registrar({
-      fecha, tipo: 'CTA CTE', cliente: uno(CUENTAS),
-      // INGRESAN hace entrar moneda a la caja; EGRESAN la saca. Mismo criterio que el
-      // mostrador, por el mismo motivo.
-      operacion: convieneQueEntre(moneda) ? 'INGRESAN' : 'EGRESAN',
-      // En CUENTA CORRIENTE `externo` lleva la moneda: el motor le antepone "CC" y arma
-      // el código `CTA CTEINGRESANDOLARESCC DOLARES`, que sí está en la tabla. Es al
-      // revés que en CAJA, donde estas operaciones van con `externo` VACÍO porque no
-      // cambian una moneda por otra.
-      propio: moneda, externo: moneda,
-      monto: redondo(entre(500, 9_000), 100),
-      notas: azar() < 0.5 ? 'ENTREGA' : 'RETIRO',
-    })
-  }
-
-  // Transferencias: SIEMPRE las dos patas juntas, como las carga el sistema desde el
-  // 13/10/2026. Una sola pata dejaría la demo con un panel de "transferencias en curso"
-  // pidiendo explicaciones.
-  if (azar() < 0.35) {
-    const ref = uno(CONTRAPARTES_TT)
-    const entra = redondo(entre(3_000, 40_000), 100)
-    const sale = entra - redondo(entra * (entre(4, 12) / 1000), 10)   // margen de 0,4% a 1,2%
-    const [a, b] = ref.split(' - ')
-    registrar({ fecha, tipo: 'CAJA', cliente: `${a} X TT`, operacion: 'INGRESAN', propio: 'DOLARES', externo: '', monto: entra, op: 'T', notas: ref })
-    registrar({ fecha, tipo: 'CAJA', cliente: `${b} X TT`, operacion: 'EGRESAN', propio: 'DOLARES', externo: '', monto: sale, op: 'T', notas: ref })
-  }
-
-  // Gastos: solo en pesos (regla del dominio), unas pocas veces por mes.
-  if (azar() < 0.1) {
-    registrar({
-      fecha, tipo: 'CAJA', cliente: uno(CONCEPTOS_GASTO), operacion: 'GASTOS',
-      propio: 'PESOS', externo: '', monto: redondo(entre(150_000, 3_500_000), 10_000),
-    })
-  }
+  if (!esHabil(fecha)) continue
+  generarDia({
+    fecha, indice: DIAS - atras, azar, cotizacion, convieneQueEntre,
+    tomarGastoFijoDelMes, registrar, elenco,
+  })
 }
 
 // ── Vista previa ───────────────────────────────────────────────────────────

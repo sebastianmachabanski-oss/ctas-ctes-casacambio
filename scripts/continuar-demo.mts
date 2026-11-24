@@ -5,6 +5,12 @@
  *   SERVICE_ROLE_KEY=eyJ... \
  *   npx tsx scripts/continuar-demo.mts --confirmo-que-es-una-base-de-demo
  *
+ * Y para que además tenga historia hacia atrás —el tablero mira trece meses—:
+ *
+ *   npx tsx scripts/continuar-demo.mts --desde=2025-10-01 --confirmo-que-es-una-base-de-demo
+ *
+ * Con `--vista-previa` lee la base y muestra todo lo que haría, sin escribir una fila.
+ *
  * PARA QUÉ
  * `sembrar-demo.mts` genera 120 días hacia atrás contando desde el día que se corre, y
  * solo acepta una base VACÍA. Entonces la demo envejece: sembrada el 20/10, al mes
@@ -41,6 +47,18 @@
 import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
+import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
+import { serieMensual } from '../src/lib/ganancias-series'
+import { ttVacio } from '../src/lib/ganancias-tt'
+import type { DiaAgg, ParAgg } from '../src/lib/ganancias-composicion'
+
+const parVacio = (): ParAgg => ({ vC: 0, aC: 0, vV: 0, aV: 0, vCcc: 0, aCcc: 0, vVcc: 0, aVcc: 0 })
+/** Cuántos meses hay entre dos fechas, ambas incluidas. */
+const mesesEntre = (a: string, b: string): number => {
+  const [a1, m1] = a.slice(0, 7).split('-').map(Number)
+  const [a2, m2] = b.slice(0, 7).split('-').map(Number)
+  return (a2 * 12 + m2) - (a1 * 12 + m1) + 1
+}
 
 /** Sin la barra del final: ver la nota en scripts/crear-primer-admin.mts. */
 const BASE_URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
@@ -101,6 +119,12 @@ const { data: ultimaFila } = await db.from('movimientos_caja')
 const ultimaFecha = (ultimaFila as { fecha: string } | null)?.fecha
 if (!ultimaFecha) salir('No se pudo determinar la fecha del último movimiento.')
 
+/** Primer día con movimientos: hasta ahí llega el relleno hacia atrás. */
+const { data: primeraFila } = await db.from('movimientos_caja')
+  .select('fecha').order('fecha', { ascending: true }).limit(1).single()
+const primeraFecha = (primeraFila as { fecha: string } | null)?.fecha
+if (!primeraFecha) salir('No se pudo determinar la fecha del primer movimiento.')
+
 /**
  * Stock actual por moneda, sumando TODA la tabla.
  *
@@ -132,13 +156,17 @@ const stock: Record<string, number> = Object.fromEntries(MONEDAS.map(m => [m, 0]
 const REFERENCIA: Record<string, number> = {
   DOLARES: 1500, EUROS: 1700, REALES: 290, USDT: 1495, LIBRAS: 1950,
 }
+const DIVISAS = ['DOLARES', 'EUROS', 'REALES', 'USDT', 'LIBRAS']
 const ultimaCot: Record<string, number> = {}
-for (const m of ['DOLARES', 'EUROS', 'REALES', 'USDT', 'LIBRAS']) {
-  const { data } = await db.from('movimientos_caja')
-    .select('cot').eq('propio', m).in('operacion', ['COMPRA', 'VENTA'])
-    .not('cot', 'is', null).order('fecha', { ascending: false }).limit(1)
-  const cot = Number(((data ?? []) as any[])[0]?.cot)
-  ultimaCot[m] = cot > 0 ? cot : REFERENCIA[m]
+const primeraCot: Record<string, number> = {}
+for (const m of DIVISAS) {
+  for (const [destino, asc] of [[ultimaCot, false], [primeraCot, true]] as const) {
+    const { data } = await db.from('movimientos_caja')
+      .select('cot').eq('propio', m).in('operacion', ['COMPRA', 'VENTA'])
+      .not('cot', 'is', null).order('fecha', { ascending: asc }).limit(1)
+    const cot = Number(((data ?? []) as any[])[0]?.cot)
+    destino[m] = cot > 0 ? cot : REFERENCIA[m]
+  }
 }
 
 // ── Los días que faltan ────────────────────────────────────────────────────
@@ -149,16 +177,45 @@ const diaSiguiente = (f: string) => {
   return d.toISOString().slice(0, 10)
 }
 
+const diaAnterior = (f: string) => {
+  const d = new Date(`${f}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
 const fechas: string[] = []
 for (let f = diaSiguiente(ultimaFecha); f <= hoy; f = diaSiguiente(f)) {
-  const dow = new Date(`${f}T12:00:00Z`).getUTCDay()
-  if (dow === 0 || dow === 6) continue   // la casa no abre los fines de semana
+  if (!esHabil(f)) continue   // la casa no abre los fines de semana
   fechas.push(f)
 }
 
-if (fechas.length === 0) {
-  console.log(`\n✅ La demo ya está al día: el último movimiento es del ${ultimaFecha}.`)
-  console.log('   No hay días hábiles pendientes. No se escribió nada.\n')
+/**
+ * `--desde AAAA-MM-DD`: además de poner la demo al día, la extiende HACIA ATRÁS.
+ *
+ * Hace falta porque el tablero mira trece meses y la siembra original genera cuatro: sin
+ * esto, nueve columnas del gráfico salen vacías y la pantalla que se usa para mostrar la
+ * tendencia no muestra ninguna.
+ *
+ * LOS SALDOS DE HOY NO CAMBIAN. Lo que se agrega atrás mueve el stock, así que al final
+ * se reescriben los movimientos de SALDO INICIAL —que además pasan a la fecha nueva—
+ * descontándoles exactamente lo que el relleno aportó. El resultado es que Inicio muestra
+ * los mismos saldos antes y después.
+ */
+const argDesde = process.argv.find(a => a.startsWith('--desde='))?.slice(8)
+if (argDesde && !/^\d{4}-\d{2}-\d{2}$/.test(argDesde)) salir('--desde espera AAAA-MM-DD.')
+const desde = argDesde && argDesde < primeraFecha ? argDesde : null
+
+const fechasAtras: string[] = []
+if (desde) {
+  for (let f = desde; f < primeraFecha; f = diaSiguiente(f)) {
+    if (esHabil(f)) fechasAtras.push(f)
+  }
+}
+
+if (fechas.length === 0 && fechasAtras.length === 0) {
+  console.log(`\n✅ La demo ya está al día: del ${primeraFecha} al ${ultimaFecha}.`)
+  if (argDesde) console.log(`   --desde=${argDesde} no agrega nada: ya hay datos desde el ${primeraFecha}.`)
+  console.log('   No se escribió nada.\n')
   process.exit(0)
 }
 
@@ -169,7 +226,8 @@ if (fechas.length === 0) {
  * veces para el mismo tramo genera lo mismo — y continuar desde otro día genera otra
  * cosa, en vez de repetir la misma racha de operaciones.
  */
-let semilla = Number(fechas[0].replace(/-/g, ''))
+const argSemilla = process.argv.find(a => a.startsWith('--semilla='))?.slice(10)
+let semilla = argSemilla ? Number(argSemilla) : Number((fechas[0] ?? fechasAtras[0]).replace(/-/g, ''))
 const azar = () => (semilla = (semilla * 1103515245 + 12345) % 2147483648) / 2147483648
 const entre = (a: number, b: number) => a + Math.floor(azar() * (b - a + 1))
 const uno = <T,>(xs: T[]): T => xs[entre(0, xs.length - 1)]
@@ -178,6 +236,14 @@ const redondo = (n: number, paso: number) => Math.max(paso, Math.round(n / paso)
 /** Deriva desde la última cotización real: 0,15 % por día hábil más un poco de ruido. */
 const cotizacion = (moneda: string, dia: number): number =>
   Math.round(ultimaCot[moneda] * (1 + dia * 0.0015 + (azar() - 0.5) * 0.012))
+
+/**
+ * Para el relleno hacia atrás, la deriva va al revés: cuanto más viejo el día, más BAJA
+ * la cotización. Arranca de la PRIMERA cotización conocida y retrocede, así el empalme
+ * con lo que ya está en la base no tiene un escalón.
+ */
+const cotizacionAtras = (moneda: string, dia: number): number =>
+  Math.round(primeraCot[moneda] * (1 - (fechasAtras.length - dia) * 0.0015 + (azar() - 0.5) * 0.012))
 
 /**
  * Stock objetivo por moneda.
@@ -250,66 +316,151 @@ function registrar(m: {
 // distinguiría del viejo en cualquier gráfico.
 console.log(`→ Generando del ${fechas[0]} al ${fechas[fechas.length - 1]} (${fechas.length} días hábiles)…`)
 
+const tomarGastoFijoDelMes = controlGastoFijo()
+const elenco = { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO }
+
+/**
+ * Primero el relleno hacia atrás, con una moneda que entra y sale por igual.
+ *
+ * Acá NO se usa `convieneQueEntre`: ese controlador empuja el stock hacia el objetivo, y
+ * para días del pasado eso no significa nada. Lo que se busca es que el tramo viejo no
+ * desbalancee la caja; lo que igual se desbalancee se compensa después, exacto, en el
+ * SALDO INICIAL.
+ */
+const desdeMovimiento = movimientos.length
+fechasAtras.forEach((fecha, dia) => {
+  generarDia({
+    fecha, indice: dia, azar, cotizacion: cotizacionAtras,
+    convieneQueEntre: () => azar() < 0.5,
+    tomarGastoFijoDelMes, registrar, elenco,
+  })
+})
+const movimientosAtras = movimientos.length - desdeMovimiento
+
+/** Cuánto aportó el relleno a cada moneda: es lo que hay que descontar del saldo inicial. */
+const netoAtras: Record<string, number> = Object.fromEntries(MONEDAS.map(m => [m, 0]))
+for (const f of movimientos.slice(desdeMovimiento)) {
+  for (const m of MONEDAS) netoAtras[m] += Number(f[COLUMNA[m]]) || 0
+}
+
+/**
+ * El SALDO INICIAL se muda al principio nuevo y se le descuenta lo que aportó el relleno.
+ *
+ * Sin esto, agregar nueve meses de operaciones cambiaría todos los saldos que el cliente
+ * ya vio en Inicio. Con esto, los saldos de hoy quedan EXACTAMENTE iguales: lo único que
+ * cambia es que ahora hay historia atrás.
+ */
+const inicialesABorrar: string[] = []
+if (desde) {
+  const { data: viejos, error } = await db.from('movimientos_caja')
+    .select('id,propio,monto').eq('operacion', 'SALDO INICIAL')
+  if (error) salir(`No se pudieron leer los movimientos de SALDO INICIAL: ${error.message}`)
+  const filas = (viejos ?? []) as { id: string; propio: string; monto: number }[]
+  if (filas.length === 0) salir(
+    'No hay movimientos de SALDO INICIAL en esta base.\n'
+    + '   Sin ellos no se puede compensar el relleno y los saldos de hoy cambiarían.')
+
+  for (const v of filas) {
+    const ajustado = Number(v.monto) - (netoAtras[v.propio] ?? 0)
+    if (ajustado <= 0) salir(
+      `El relleno dejaría el saldo inicial de ${v.propio} en ${Math.round(ajustado)}.\n`
+      + '   Es un tramo demasiado desbalanceado; probá con menos meses. No se escribió nada.')
+    inicialesABorrar.push(v.id)
+    registrar({
+      fecha: desde, tipo: 'CAJA', cliente: 'SALDO INICIAL',
+      operacion: 'SALDO INICIAL', propio: v.propio, externo: '', monto: ajustado,
+    })
+  }
+  // El saldo inicial viejo sigue sumado en `stock`, y el nuevo se acaba de sumar también.
+  // Para que el resumen muestre el saldo REAL de después, se descuenta el viejo.
+  for (const v of filas) stock[v.propio] -= Number(v.monto)
+}
+
+// Y después los días que faltan hasta hoy.
 fechas.forEach((fecha, dia) => {
-  // Mostrador
-  for (let i = 0; i < entre(4, 9); i++) {
-    const moneda = azar() < 0.72 ? 'DOLARES' : uno(['EUROS', 'REALES', 'USDT', 'LIBRAS'])
-    const compra = convieneQueEntre(moneda)
-    const cot = cotizacion(moneda, dia)
-    // La casa compra más barato de lo que vende: de ahí sale la ganancia del período.
-    const spread = compra ? -entre(8, 18) : entre(8, 18)
-    registrar({
-      fecha, tipo: 'CAJA', cliente: uno(EVENTUALES),
-      operacion: compra ? 'COMPRA' : 'VENTA',
-      propio: moneda, externo: 'PESOS',
-      monto: redondo(entre(200, 12_000), 50),
-      cotizacion: cot + spread,
-      debe: !compra && azar() < 0.12 ? uno(REPARTIDORES) : null,
-    })
-  }
-
-  // Cuentas corrientes
-  for (let i = 0; i < entre(1, 4); i++) {
-    const moneda = azar() < 0.8 ? 'DOLARES' : uno(['PESOS', 'EUROS'])
-    registrar({
-      fecha, tipo: 'CTA CTE', cliente: uno(CUENTAS),
-      operacion: convieneQueEntre(moneda) ? 'INGRESAN' : 'EGRESAN',
-      // En CUENTA CORRIENTE `externo` lleva la moneda: el motor le antepone "CC".
-      propio: moneda, externo: moneda,
-      monto: redondo(entre(500, 9_000), 100),
-      notas: azar() < 0.5 ? 'ENTREGA' : 'RETIRO',
-    })
-  }
-
-  // Transferencias: SIEMPRE las dos patas juntas.
-  if (azar() < 0.35) {
-    const ref = uno(CONTRAPARTES_TT)
-    const entra = redondo(entre(3_000, 40_000), 100)
-    const sale = entra - redondo(entra * (entre(4, 12) / 1000), 10)   // margen de 0,4% a 1,2%
-    const [a, b] = ref.split(' - ')
-    registrar({ fecha, tipo: 'CAJA', cliente: `${a} X TT`, operacion: 'INGRESAN', propio: 'DOLARES', externo: '', monto: entra, op: 'T', notas: ref })
-    registrar({ fecha, tipo: 'CAJA', cliente: `${b} X TT`, operacion: 'EGRESAN', propio: 'DOLARES', externo: '', monto: sale, op: 'T', notas: ref })
-  }
-
-  // Gastos: solo en pesos (regla del dominio).
-  if (azar() < 0.1) {
-    registrar({
-      fecha, tipo: 'CAJA', cliente: uno(CONCEPTOS_GASTO), operacion: 'GASTOS',
-      propio: 'PESOS', externo: '', monto: redondo(entre(150_000, 3_500_000), 10_000),
-    })
-  }
+  generarDia({
+    fecha, indice: dia, azar, cotizacion, convieneQueEntre,
+    tomarGastoFijoDelMes, registrar, elenco,
+  })
 })
 
 // ── Resumen ────────────────────────────────────────────────────────────────
 const fmt = (n: number) => new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(Math.round(n))
 const sinClasificar = movimientos.filter(m => !m.cuenta).length
 
+/**
+ * El resultado mes a mes, calculado con el MISMO motor que la pantalla.
+ *
+ * Es el control que de verdad importa antes de escribir: un generador puede producir
+ * saldos correctos y, aun así, una serie que ningún negocio tendría —meses que varían
+ * 500 %—, y eso se ve recién en el tablero, con los datos ya cargados. Acá se ve antes.
+ *
+ * Si la serie no convence, se vuelve a correr con `--semilla=` otro número.
+ */
+const porMesDia = new Map<string, DiaAgg>()
+const diaSerie = (f: string): DiaAgg => {
+  let d = porMesDia.get(f)
+  if (!d) {
+    d = {
+      f, usd: parVacio(), eur: parVacio(), brl: parVacio(),
+      usdt: parVacio(), gbp: parVacio(), chq: parVacio(), g: 0, gcc: 0, tt: ttVacio(),
+    }
+    porMesDia.set(f, d)
+  }
+  return d
+}
+const PAR_DE: Record<string, 'usd' | 'eur' | 'brl' | 'usdt' | 'gbp'> = {
+  dolares: 'usd', euros: 'eur', reales: 'brl', usdt: 'usdt', libras: 'gbp',
+}
+for (const m of movimientos) {
+  const d = diaSerie(m.fecha)
+  if (m.operacion === 'GASTOS') { d.g += Number(m.pesos) || 0; continue }
+  if (m.op === 'T') { d.tt.usd += Number(m.dolares) || 0; continue }
+  for (const [col, par] of Object.entries(PAR_DE)) {
+    const vol = Number(m[col]) || 0, ars = Number(m.pesos) || 0
+    const volcc = Number(m[`cc_${col}`]) || 0, arscc = Number(m.cc_pesos) || 0
+    const agg = d[par]
+    if (m.operacion === 'COMPRA' && vol > 0 && ars < 0) { agg.vC += vol; agg.aC += -ars }
+    if (m.operacion === 'VENTA' && vol < 0 && ars > 0) { agg.vV += -vol; agg.aV += ars }
+    if (volcc > 0 && arscc < 0) { agg.vCcc += volcc; agg.aCcc += -arscc }
+    if (volcc < 0 && arscc > 0) { agg.vVcc += -volcc; agg.aVcc += arscc }
+  }
+}
+const diasSerie = Array.from(porMesDia.values()).sort((a, b) => a.f.localeCompare(b.f))
+const serie = diasSerie.length
+  ? serieMensual(diasSerie, diasSerie[diasSerie.length - 1].f,
+      { cc: true, gastos: true, transferencias: true },
+      // Tantos meses como abarque lo generado.
+      mesesEntre(diasSerie[0].f, diasSerie[diasSerie.length - 1].f))
+  : []
+
+/** Gastos por mes, que son los que antes hacían saltar el resultado. */
+const porMes = new Map<string, number>()
+for (const m of movimientos) {
+  if (m.operacion !== 'GASTOS') continue
+  const k = (m.fecha as string).slice(0, 7)
+  porMes.set(k, (porMes.get(k) ?? 0) + (Number(m.pesos) || 0))
+}
+
 console.log(`
-  Último día en la base   ${ultimaFecha}
-  Se agrega del           ${fechas[0]} al ${fechas[fechas.length - 1]}
-  Movimientos             ${movimientos.length}
+  La base va del          ${primeraFecha} al ${ultimaFecha}
+${desde ? `  Se rellena hacia atrás  ${desde} → ${primeraFecha} (${fechasAtras.length} días hábiles, ${movimientosAtras} movimientos)\n` : ''}\
+${fechas.length ? `  Se agrega adelante      ${fechas[0]} → ${fechas[fechas.length - 1]} (${fechas.length} días hábiles)` : '  Adelante                nada pendiente'}
+  Movimientos en total    ${movimientos.length}
   De cuenta corriente     ${diario.length}
   Transferencias          ${movimientos.filter(m => m.op === 'T').length / 2} (dos patas cada una)
+${desde ? `  SALDO INICIAL          se muda al ${desde} y se ajusta para que los saldos de hoy NO cambien\n` : ''}\
+RESULTADO POR MES — lo que va a mostrar el tablero
+${serie.map((m, i) => {
+  const prev = i > 0 ? serie[i - 1].neto : null
+  const v = prev && prev > 0 ? ((m.neto - prev) / prev * 100) : null
+  return `  ${m.mes}  ${fmt(m.neto).padStart(13)}   ${v === null ? '' : (v >= 0 ? '+' : '') + v.toFixed(1) + ' %'}`
+}).join('\n')}
+  Si la serie no convence —un negocio real no salta de un mes a otro—, volvé a correrlo
+  con --semilla=<otro numero>. Lo generado es repetible: la misma semilla da lo mismo.
+
+GASTOS POR MES (tienen que parecerse entre sí)
+${Array.from(porMes.entries()).sort().map(([k, v]) => `  ${k}  ${fmt(v)}`).join('\n')}
 
 SALDOS DE CAJA, DESPUÉS
 ${MONEDAS.map(m => `  ${m.padEnd(10)} ${fmt(stock[m])}`).join('\n')}
@@ -358,6 +509,17 @@ async function insertar(tabla: string, filas: Fila[]) {
 
 await insertar('movimientos_caja', movimientos)
 await insertar('diario', diario)
+
+// Los SALDO INICIAL viejos se borran DESPUÉS de insertar los nuevos: si algo fallara en
+// el medio, la base queda con saldo inicial de más y no de menos. De más se nota en el
+// acto —los saldos se duplican—; de menos pasa desapercibido.
+if (inicialesABorrar.length > 0) {
+  const { error } = await db.from('movimientos_caja').delete().in('id', inicialesABorrar)
+  if (error) salir(
+    `Se insertó todo pero NO se pudieron borrar los SALDO INICIAL viejos: ${error.message}\n`
+    + `   Los saldos van a estar duplicados. Borrá a mano estas filas: ${inicialesABorrar.join(', ')}`)
+  console.log(`   SALDO INICIAL: ${inicialesABorrar.length} filas viejas borradas`)
+}
 
 console.log(`
 ✅ Demo al día.

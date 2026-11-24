@@ -68,9 +68,15 @@ export const inicioDeVentana = (hasta: string, cuantos = MESES_TABLERO): string 
  */
 export function serieMensual(
   dias: DiaAgg[], hasta: string, op: OpcionesComposicion, cuantos = MESES_TABLERO,
+  hastaDiaDelMes?: number,
 ): MesSerie[] {
   const porMes = new Map<string, DiaAgg[]>()
   for (const d of dias) {
+    // Con `hastaDiaDelMes`, de CADA mes se toman solo los días hasta ese número. Es lo
+    // que permite comparar el mes en curso contra el mismo tramo de los anteriores en
+    // vez de contra meses completos: el día 24 de noviembre contra un octubre entero no
+    // dice nada, y la variación que sale de ahí es la que asusta sin motivo.
+    if (hastaDiaDelMes != null && Number(d.f.slice(8, 10)) > hastaDiaDelMes) continue
     const k = mesDe(d.f)
     const xs = porMes.get(k)
     if (xs) xs.push(d); else porMes.set(k, [d])
@@ -97,6 +103,12 @@ export function serieMensual(
 }
 
 export type Comparacion = {
+  /**
+   * Día del mes hasta el que se recortaron los meses de base, o `null` si se compararon
+   * enteros. La pantalla lo necesita para rotular: "vs. el mismo tramo de octubre" no es
+   * lo mismo que "vs. octubre".
+   */
+  tramo?: number | null
   /** El mes que se está mirando. */
   actual: MesSerie
   /** El mes anterior, si está en la ventana y tiene datos. */
@@ -122,8 +134,13 @@ export function variacion(actual: number, base: number): number | null {
   return (actual - base) / base
 }
 
-/** Arma la comparación del último mes de la serie contra el anterior y contra el año pasado. */
-export function compararUltimo(serie: MesSerie[]): Comparacion | null {
+/**
+ * Arma la comparación del último mes de la serie contra el anterior y contra el año pasado.
+ *
+ * `tramo` no cambia la cuenta: la serie que entra ya viene recortada si hacía falta. Solo
+ * viaja hasta la pantalla para que el rótulo diga la verdad.
+ */
+export function compararUltimo(serie: MesSerie[], tramo: number | null = null): Comparacion | null {
   if (serie.length === 0) return null
   const actual = serie[serie.length - 1]
   const buscar = (mes: string) => serie.find(s => s.mes === mes && s.conDatos) ?? null
@@ -137,8 +154,19 @@ export function compararUltimo(serie: MesSerie[]): Comparacion | null {
   const anioPasado = buscar(mesAnioPasado)
 
   return {
+    tramo,
     actual, anterior, anioPasado,
     vsAnterior: anterior ? variacion(actual.neto, anterior.neto) : null,
     vsAnioPasado: anioPasado ? variacion(actual.neto, anioPasado.neto) : null,
   }
+}
+
+/**
+ * ¿Hasta qué día hay que recortar para comparar de igual a igual?
+ *
+ * Devuelve el día del mes de `hoy` cuando el mes que se mira es el mes en curso, y `null`
+ * cuando es un mes cerrado, que se compara entero.
+ */
+export function tramoDeComparacion(mes: string, hoy: string): number | null {
+  return mes === hoy.slice(0, 7) ? Number(hoy.slice(8, 10)) : null
 }

@@ -110,12 +110,10 @@ export default function ComposicionView({
           </span>
         </div>
 
-        {c.monedas.length === 0 ? (
-          <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--muted)' }}>
-            No hubo operaciones de cambio en el período.
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
+        {/* El cierre va DENTRO de la tabla, en un `tfoot`. Afuera, los importes quedaban
+            pegados al borde de la tarjeta y no debajo de la columna "Aporta", que es con
+            la que tienen que leerse en vertical. */}
+        <div style={{ overflowX: 'auto' }}>
             <table className="cc-tbl densa">
               <thead>
                 <tr>
@@ -173,42 +171,41 @@ export default function ComposicionView({
                     </td>
                   </tr>
                 ))}
+                {c.monedas.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ color: 'var(--muted)', fontWeight: 400 }}>
+                      No hubo operaciones de cambio en el período.
+                    </td>
+                  </tr>
+                )}
               </tbody>
-            </table>
-          </div>
-        )}
 
-        <div style={{ padding: '8px 16px 11px', fontSize: 11.5, lineHeight: 1.5, color: 'var(--muted)', borderTop: '1px solid var(--grid)' }}>
+              {/* El cierre: lo que se cuenta UNA sola vez. Los importes caen bajo la
+                  columna "Aporta", que es la que continúan. */}
+              <tfoot>
+                <Cierre texto="Subtotal por cambio de monedas" valor={c.subtotalMonedas} primera />
+                <Cierre
+                  texto="Transferencias"
+                  nota={transferencias ? 'una sola vez' : 'sin contar'}
+                  valor={c.transferencias}
+                  apagado={!transferencias}
+                />
+                <Cierre
+                  texto="Gastos"
+                  nota={gastos ? 'una sola vez' : 'sin contar'}
+                  valor={c.gastos}
+                  apagado={!gastos}
+                />
+                <Cierre texto={lead} valor={c.neto} total />
+              </tfoot>
+            </table>
+        </div>
+
+        <div style={{ padding: '10px 16px 11px', fontSize: 11.5, lineHeight: 1.5, color: 'var(--muted)', borderTop: '1px solid var(--grid)' }}>
           <b style={{ color: 'var(--ink-2)' }}>Operado</b> es todo lo que pasó por la ventanilla,
           compras más ventas. <b style={{ color: 'var(--ink-2)' }}>Calzado</b> es la parte que se
           compró <i>y</i> se vendió: la única que generó spread. La diferencia quedó en stock, y
           el stock se valúa con el supuesto de cada moneda.
-        </div>
-
-        {/* Lo que se cuenta UNA sola vez */}
-        <div style={{ borderTop: '2px solid var(--grid)' }}>
-          <Linea texto="Subtotal por cambio de monedas" valor={c.subtotalMonedas} />
-          <Linea
-            texto="Transferencias"
-            nota={transferencias ? 'una sola vez' : 'sin contar'}
-            valor={c.transferencias}
-            apagado={!transferencias}
-          />
-          <Linea
-            texto="Gastos"
-            nota={gastos ? 'una sola vez' : 'sin contar'}
-            valor={c.gastos}
-            apagado={!gastos}
-          />
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 16px', borderTop: '2px solid var(--grid)',
-          }}>
-            <span style={{ fontSize: 13.5, fontWeight: 700 }}>{lead}</span>
-            <span className={`num ${c.neto >= 0 ? 'pos' : 'neg'}`} style={{ fontSize: 17, fontWeight: 800 }}>
-              {ars(Math.round(c.neto))}
-            </span>
-          </div>
         </div>
       </div>
 
@@ -246,23 +243,38 @@ export default function ComposicionView({
   )
 }
 
-/** Una línea del cierre: concepto a la izquierda, importe a la derecha. */
-function Linea({ texto, nota, valor, apagado = false }: {
-  texto: string; nota?: string; valor: number; apagado?: boolean
+/**
+ * Una línea del cierre, como fila de la tabla.
+ *
+ * El concepto ocupa las cinco primeras columnas y el importe cae en la sexta, que es la
+ * de "Aporta": así la columna de plata se lee de corrido, de las monedas al total. La
+ * séptima —la de las barras— queda vacía a propósito: un subtotal no tiene barra porque
+ * no se compara contra las monedas, las resume.
+ */
+function Cierre({ texto, nota, valor, apagado = false, primera = false, total = false }: {
+  texto: string; nota?: string; valor: number
+  apagado?: boolean
+  /** Primera del cierre: la separa de las monedas con una línea más marcada. */
+  primera?: boolean
+  /** El resultado final: más grande y en el color del signo. */
+  total?: boolean
 }) {
+  const borde = total || primera ? '2px solid var(--grid)' : undefined
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '9px 16px', borderTop: '1px solid var(--grid)',
-      opacity: apagado ? 0.5 : 1,
-    }}>
-      <span style={{ fontSize: 13 }}>
+    <tr style={{ opacity: apagado ? 0.5 : 1 }}>
+      <td colSpan={5} style={{
+        fontSize: total ? 13.5 : 13, fontWeight: total ? 700 : 400,
+        borderTop: borde, padding: total ? '11px 9px' : undefined,
+      }}>
         {texto}
-        {nota && <span style={{ color: 'var(--muted)' }}> · {nota}</span>}
-      </span>
-      <span className={`num ${valor < 0 ? 'neg' : ''}`} style={{ fontSize: 13, fontWeight: 650 }}>
+        {nota && <span style={{ color: 'var(--muted)', fontWeight: 400 }}> · {nota}</span>}
+      </td>
+      <td className={`num ${total ? (valor >= 0 ? 'pos' : 'neg') : (valor < 0 ? 'neg' : '')}`} style={{
+        fontSize: total ? 16 : 13, fontWeight: total ? 800 : 650, borderTop: borde,
+      }}>
         {ars(Math.round(valor))}
-      </span>
-    </div>
+      </td>
+      <td style={{ borderTop: borde }} />
+    </tr>
   )
 }

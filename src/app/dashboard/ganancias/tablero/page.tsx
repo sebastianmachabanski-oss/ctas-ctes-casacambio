@@ -5,7 +5,9 @@ import NavGanancias from '@/components/ganancias/NavGanancias'
 import { veGanancias } from '@/lib/roles'
 import { hoyArgentina } from '@/lib/periodos'
 import { cargarGanancias } from '@/lib/ganancias-datos'
-import { inicioDeVentana, serieMensual, MESES_TABLERO } from '@/lib/ganancias-series'
+import {
+  compararUltimo, inicioDeVentana, serieMensual, tramoDeComparacion, MESES_TABLERO,
+} from '@/lib/ganancias-series'
 
 // Tablero de Ganancias (24/11/2026): trece meses y la comparación.
 //
@@ -69,12 +71,22 @@ export default async function TableroPage({
   const hasta = finDeMes(mes)
   const { dias } = await cargarGanancias(supabase, desde, hasta)
 
-  const serie = serieMensual(dias, `${mes}-01`, { cc: true, gastos: true, transferencias: true }, MESES_TABLERO)
+  const OP = { cc: true, gastos: true, transferencias: true }
+  const serie = serieMensual(dias, `${mes}-01`, OP, MESES_TABLERO)
+
+  // DOS series, de la misma carga. El gráfico muestra los meses ENTEROS, que es la
+  // historia real. La comparación, en cambio, se hace contra el MISMO TRAMO de los meses
+  // anteriores cuando el mes que se mira todavía no cerró: el día 24 de noviembre contra
+  // un octubre completo no dice nada, y la variación que sale de ahí asusta sin motivo.
+  const tramo = tramoDeComparacion(mes, hoy)
+  const serieCmp = tramo == null ? serie : serieMensual(dias, `${mes}-01`, OP, MESES_TABLERO, tramo)
+  const comparacion = compararUltimo(serieCmp, tramo)
 
   return (
     <TableroView
       nav={<NavGanancias actual="tablero" />}
       serie={serie}
+      comparacion={comparacion}
       mesCursor={mes}
       mesAnterior={mesVecino(mes, -1)}
       mesSiguiente={mesVecino(mes, 1)}
