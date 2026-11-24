@@ -1,18 +1,25 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import GananciasView, { type DiaAgg, type ParAgg, type TTAgg } from '@/components/ganancias/GananciasView'
+import GananciasView from '@/components/ganancias/GananciasView'
+import NavGanancias from '@/components/ganancias/NavGanancias'
 import { veGanancias } from '@/lib/roles'
 import { esPeriodoValido, hoyArgentina, rangoDe } from '@/lib/periodos'
-import { repartirTT, ttVacio } from '@/lib/ganancias-tt'
+import { cargarGanancias } from '@/lib/ganancias-datos'
 
 // Módulo de Ganancias — exclusivo del rol superadmin (ver src/lib/roles.ts).
 // Réplica de la solapa COLO: el servidor agrega por día las operaciones COMPRA/VENTA/
-// GASTOS del período usando las columnas CALCULADAS POR LA PLANILLA (exactitud
-// garantizada); el cliente aplica la configuración (par, cta cte, valuación del stock,
-// gastos) sin volver a consultar.
-
-
-const parVacio = (): ParAgg => ({ vC: 0, aC: 0, vV: 0, aV: 0, vCcc: 0, aCcc: 0, vVcc: 0, aVcc: 0 })
+// GASTOS del período usando las columnas CALCULADAS POR EL MOTOR (exactitud garantizada);
+// el cliente aplica la configuración (par, cta cte, valuación del stock, gastos) sin
+// volver a consultar.
+//
+// La carga vive en `src/lib/ganancias-datos.ts` porque la comparte con la pantalla de
+// composición; el cálculo, en `src/lib/ganancias-composicion.ts`.
+//
+// Los "Reportes de caja" —saldos por cliente y evolución del saldo en dólares— se sacaron
+// el 24/11/2026: contestaban "cuánto me debe cada uno", que es la pregunta de Cuentas
+// Corrientes y Deudores, no la de esta pantalla. La vista `caja_clientes` y las funciones
+// `caja_clientes_periodo` y `caja_saldo_diario` quedaron en la base sin que nadie las
+// llame; borrarlas es una migración aparte.
 
 export default async function GananciasPage({
   searchParams,
@@ -51,176 +58,20 @@ export default async function GananciasPage({
   const esRango = !!(searchParams.desde && searchParams.hasta)
   const [ini, fin] = esRango ? [searchParams.desde!, searchParams.hasta!] : rangoDe(p, fecha)
 
-  // Trae las operaciones del período (solo columnas necesarias) y agrega por día.
-  const PAGE = 1000
-  const filas: any[] = []
-  for (let from = 0; ; from += PAGE) {
-    const { data: pg } = await supabase.from('movimientos_caja')
-      // `cc_usdt` va en la lista desde el 20/11/2026. Faltaba, y como la pata se lee por
-      // nombre de columna, su ausencia no daba error: devolvía `undefined`, que se
-      // redondea a 0. Las compras y ventas de USDT por CUENTA CORRIENTE —que existen
-      // desde el 25/8/2026— no contaban en Ganancias y no había nada en pantalla que lo
-      // dijera. `cc_cheques` sí está bien ausente: esa columna no existe en la tabla.
-      .select('fecha,operacion,pesos,cheques,dolares,euros,reales,usdt,libras,cc_pesos,cc_dolares,cc_euros,cc_reales,cc_usdt,cc_libras')
-      .in('operacion', ['COMPRA', 'VENTA', 'GASTOS'])
-      // Las transferencias se miden con su propia regla (más abajo), no con el calce de
-      // compras y ventas. Si alguna vez una COMPRA se marcara con T, contarla en los dos
-      // lados la duplicaría. Va con `or` y no con `neq` porque `op` es NULL en casi todo
-      // el histórico y un `neq` dejaría afuera justamente esas filas.
-      .or('op.is.null,op.neq.T')
-      .gte('fecha', ini)
-      .lte('fecha', fin)
-      .order('fecha', { ascending: true })
-      .range(from, from + PAGE - 1)
-    const rows = (pg ?? []) as any[]
-    filas.push(...rows)
-    if (rows.length < PAGE) break
-  }
+  const { dias, abiertas, puntasAbiertas, paresNegativos } = await cargarGanancias(supabase, ini, fin)
 
-  // CHEQUES es el único que solo tiene columna de caja (no existe `cc_cheques`): su pata
-  // CC queda siempre en 0, y no es una pérdida, porque en cuenta corriente el cheque se
-  // registra igual en la columna CHEQUES con la contrapartida en CC PESOS, así que el
-  // margen se mide lo mismo. USDT sí tiene `cc_usdt` desde el 25/8/2026.
-  const PARES: ['usd' | 'eur' | 'brl' | 'usdt' | 'gbp' | 'chq', string, string][] = [
-    ['usd', 'dolares', 'cc_dolares'], ['eur', 'euros', 'cc_euros'], ['brl', 'reales', 'cc_reales'],
-    ['usdt', 'usdt', 'cc_usdt'], ['gbp', 'libras', 'cc_libras'], ['chq', 'cheques', 'cc_cheques'],
-  ]
-  const porDia = new Map<string, DiaAgg>()
-  const diaDe = (f: string): DiaAgg => {
-    let d = porDia.get(f)
-    if (!d) { d = { f, usd: parVacio(), eur: parVacio(), brl: parVacio(), usdt: parVacio(), gbp: parVacio(), chq: parVacio(), g: 0, gcc: 0, tt: ttVacio() }; porDia.set(f, d) }
-    return d
-  }
-  for (const m of filas) {
-    const dia = diaDe(m.fecha)
-    if (m.operacion === 'GASTOS') {
-      // GASTOS solo existe en PESOS (regla del dominio); las columnas ya traen el signo.
-      dia.g += Number(m.pesos) || 0
-      dia.gcc += Number(m.cc_pesos) || 0
-      continue
-    }
-    for (const [par, col, colCC] of PARES) {
-      // Pata por caja y pata por cta cte: en una fila solo una tiene valores.
-      const patas: [number, number, boolean][] = [
-        [Number(m[col]) || 0, Number(m.pesos) || 0, false],
-        [Number(m[colCC]) || 0, Number(m.cc_pesos) || 0, true],
-      ]
-      for (const [vol, ars, esCC] of patas) {
-        if (!vol || !ars) continue // no es un cambio de esta moneda contra pesos
-        const agg = dia[par]
-        if (m.operacion === 'COMPRA' && vol > 0 && ars < 0) {
-          if (esCC) { agg.vCcc += vol; agg.aCcc += -ars } else { agg.vC += vol; agg.aC += -ars }
-        } else if (m.operacion === 'VENTA' && vol < 0 && ars > 0) {
-          if (esCC) { agg.vVcc += -vol; agg.aVcc += ars } else { agg.vV += -vol; agg.aV += ars }
-        }
-      }
-    }
-  }
-
-  // ── Transferencias (op = 'T') ────────────────────────────────────────────
-  // La ganancia de una transferencia NO sale del calce de compras y ventas: no hay pata
-  // en pesos y por lo tanto no hay tasa de la que sacar un spread. Es, simplemente, lo
-  // que ENTRA menos lo que SALE de cada par de movimientos — criterio confirmado por el
-  // cliente el 1/9/2026.
-  //
-  // Las columnas de caja ya traen el signo puesto (INGRESAN suma, EGRESAN resta), así que
-  // sumarlas da la diferencia directamente. Se suma la pata de CAJA y no la de cuenta
-  // corriente: en una fila de cta cte las dos son la misma plata con signo opuesto y
-  // sumar ambas daría siempre cero.
-  // Se traen TODAS las transferencias hasta el fin del período, no solo las del período:
-  // para saber si un grupo tiene sus dos puntas hay que mirar su historia completa. Una
-  // punta puede haberse cargado meses antes.
-  const filasTT: any[] = []
-  for (let from = 0; ; from += PAGE) {
-    const { data: pg } = await supabase.from('movimientos_caja')
-      .select('id,fecha,notas,operacion,pesos,dolares,euros,reales,usdt,libras,cheques')
-      .eq('op', 'T')
-      .lte('fecha', fin)
-      .order('fecha', { ascending: true })
-      .range(from, from + PAGE - 1)
-    const rows = (pg ?? []) as any[]
-    filasTT.push(...rows)
-    if (rows.length < PAGE) break
-  }
-
-  // El reparto entre "resultado del período" y "posición abierta" vive en `src/lib/
-  // ganancias-tt.ts` para poder validarlo sin montar un navegador ni tener la base
-  // delante (mismo criterio que `posicion.ts`). Ver scripts/validar-ganancias-tt.mts.
-  const { porFecha, abiertas, puntasAbiertas, paresNegativos } = repartirTT(filasTT, ini)
-  porFecha.forEach((t, f) => { diaDe(f).tt = t })
-  // Pares cuyo egreso superó al ingreso. Por definición del negocio no deberían existir
-  // (ver ganancias-tt.ts); los que se realizaron DENTRO del período se avisan en pantalla
-  // para corregir la carga, en vez de dejarlos diluidos adentro del total.
-  const negativosDelPeriodo = paresNegativos.filter(p => p.fecha >= ini).length
-
-  const dias = Array.from(porDia.values()).sort((a, b) => a.f.localeCompare(b.f))
-
-  // ── Reportes de caja (venían de Inicio, 10/9/2026) ───────────────────────
-  // Saldos por cliente del período y evolución del saldo en dólares. Se consultan con el
-  // MISMO rango que la ganancia: son la lectura de detalle del número de arriba.
-  //
-  // Postgrest corta CUALQUIER respuesta —también las RPC— en 1.000 filas y hay más de
-  // 1.000 clientes: sin paginar, la lista llega incompleta y clientes enteros
-  // "desaparecen" del reporte sin ninguna señal.
-  let clientesCaja: any[] = []
-  let rpcOk = true
-  for (let from = 0; ; from += PAGE) {
-    const { data: pg, error } = await (supabase as any)
-      .rpc('caja_clientes_periodo', { p_desde: ini, p_hasta: fin })
-      .order('cliente')
-      .range(from, from + PAGE - 1)
-    if (error) { rpcOk = false; break }
-    const rows = (pg ?? []) as any[]
-    clientesCaja.push(...rows)
-    if (rows.length < PAGE) break
-  }
-  if (!rpcOk) {
-    // Si la migración de la RPC aún no corrió, cae a la vista sin filtro de período.
-    clientesCaja = []
-    for (let from = 0; ; from += PAGE) {
-      const { data: pg } = await supabase.from('caja_clientes')
-        .select('cliente,pesos,dolares,euros,reales,libras,ultimo_movimiento')
-        .order('cliente').range(from, from + PAGE - 1)
-      const rows = (pg ?? []) as any[]
-      clientesCaja.push(...rows)
-      if (rows.length < PAGE) break
-    }
-  }
-  const clientesCC: any[] = []
-  for (let from = 0; ; from += PAGE) {
-    const { data: pg } = await supabase.from('saldos_cuenta_corriente')
-      .select('cuenta_cte,saldo_pesos,saldo_dolares,saldo_euros,saldo_reales,saldo_libras,ultimo_movimiento')
-      .order('cuenta_cte').range(from, from + PAGE - 1)
-    const rows = (pg ?? []) as any[]
-    clientesCC.push(...rows)
-    if (rows.length < PAGE) break
-  }
-  const { data: serieData } = await (supabase as any).rpc('caja_saldo_diario', { p_moneda: 'dolares' })
-  const serie = ((serieData ?? []) as any[]).map(r => ({ fecha: r.fecha as string, saldo: Number(r.saldo) }))
-
-  // `ultimo` es la fecha del último movimiento: con ella el reporte esconde —sin
-  // perderlos— a los clientes que no aparecen hace meses. Puede venir vacío si la
-  // migración todavía no corrió; en ese caso nadie se oculta.
-  const clientesCajaN = clientesCaja.map(c => ({
-    nombre: c.cliente, pesos: Number(c.pesos) || 0, dolares: Number(c.dolares) || 0,
-    euros: Number(c.euros) || 0, reales: Number(c.reales) || 0, libras: Number(c.libras) || 0,
-    ultimo: (c.ultimo_movimiento as string | null) ?? null,
-  }))
-  const clientesCCN = clientesCC.map(c => ({
-    nombre: c.cuenta_cte, pesos: Number(c.saldo_pesos) || 0, dolares: Number(c.saldo_dolares) || 0,
-    euros: Number(c.saldo_euros) || 0, reales: Number(c.saldo_reales) || 0, libras: Number(c.saldo_libras) || 0,
-    ultimo: (c.ultimo_movimiento as string | null) ?? null,
-  }))
+  // El período viaja a las otras vistas para no perderlo al cambiar de pantalla.
+  const qs = new URLSearchParams(
+    esRango ? { desde: searchParams.desde!, hasta: searchParams.hasta! } : { p, fecha },
+  ).toString()
 
   return (
     <GananciasView
+      nav={<NavGanancias actual="moneda" qs={qs} />}
       dias={dias}
-      clientesCaja={clientesCajaN}
-      clientesCC={clientesCCN}
-      serieUSD={serie}
       abiertas={abiertas}
       puntasAbiertas={puntasAbiertas}
-      paresNegativos={negativosDelPeriodo}
+      paresNegativos={paresNegativos}
       periodo={esRango ? '' : p}
       fecha={fecha}
       rDesde={esRango ? searchParams.desde! : ''}

@@ -1,36 +1,27 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import SelectorPeriodo from '@/components/SelectorPeriodo'
-import ReportesCaja, { type Cliente, type Punto } from '@/components/reportes/ReportesCaja'
+import {
+  calcPar, cotizacionPar, cotizacionUsd, SUPUESTOS_PAR, NOMBRE_PAR, SIMBOLO as SYM,
+  type Cfg, type DiaAgg, type ParAgg, type TTAgg,
+} from '@/lib/ganancias-composicion'
 
 // "COMPRA" -> "Compra" en los chips de operación.
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-// Cálculo de la ganancia del período:
-//   ganancia = calzado × (tasa venta − tasa compra) + valuación del stock + gastos
-// El servidor manda los días agregados; acá se aplica la configuración en vivo.
+// EL CÁLCULO NO ESTÁ ACÁ. Vive en `src/lib/ganancias-composicion.ts`, por dos razones:
+// para poder correrlo sin montar un navegador (mismo criterio que `posicion.ts`, ver
+// scripts/validar-ganancias-composicion.mts), y porque lo comparte con la pantalla de
+// composición. Una fórmula de plata duplicada en dos archivos se desincroniza sin que
+// nadie lo note: las dos pantallas siguen mostrando un número plausible.
 //
-// La ganancia es de PERÍODO, no de transacción: nace del calce entre lo comprado y lo
-// vendido, así que una compra no genera ganancia hasta que se vende. Ver docs/GANANCIAS.md.
-
-export type ParAgg = { vC: number; aC: number; vV: number; aV: number; vCcc: number; aCcc: number; vVcc: number; aVcc: number }
-/** Neto de las transferencias (op = 'T') del día, por moneda: lo que entra menos lo que sale. */
-export type TTAgg = { usd: number; eur: number; brl: number; usdt: number; gbp: number; chq: number; pesos: number }
-export type DiaAgg = { f: string; usd: ParAgg; eur: ParAgg; brl: ParAgg; usdt: ParAgg; gbp: ParAgg; chq: ParAgg; g: number; gcc: number; tt: TTAgg }
-
-type Cfg = {
-  ops: Set<string>; par: 'usd' | 'eur' | 'brl' | 'usdt' | 'gbp' | 'chq'; cc: boolean
-  resid: 'fijo' | 'costo' | 'mtm'; margen: number; cierre: number; gastos: boolean
-  /** Sumar el resultado de las transferencias (op = 'T'). */
-  transferencias: boolean
-}
+// Se re-exportan los tipos para no obligar a cada pantalla a saber dónde viven.
+export type { ParAgg, TTAgg, DiaAgg }
 
 const fmt0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
 const fmt3 = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
 const ars = (n: number) => `$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
 const usd = (n: number) => `US$ ${n < 0 ? '(' + fmt0.format(-n) + ')' : fmt0.format(n)}`
-const SYM: Record<string, string> = { usd: 'US$', eur: '€', brl: 'R$', usdt: 'USDT', gbp: '£', chq: 'CH$', pesos: '$' }
-const NOMBRE_PAR: Record<string, string> = { usd: 'Dólares', eur: 'Euros', brl: 'Reales', usdt: 'USDT', gbp: 'Libras', chq: 'Cheques' }
 
 /** Las monedas de un neto de transferencias que efectivamente tienen algo, para listarlas. */
 const monedasConSaldo = (t: TTAgg) =>
@@ -38,92 +29,11 @@ const monedasConSaldo = (t: TTAgg) =>
     .map(k => [k, t[k]] as const)
     .filter(([, v]) => Math.round(v) !== 0)
 
-// Supuestos de valuación del stock, por par. En divisas el estándar del negocio es el
-// margen fijo. CHEQUES es distinto: la ganancia del descuento de documentos se reconoce
-// EN EL MOMENTO DEL DESCUENTO (criterio del cliente, 11/8/2026), no cuando el cheque se
-// cobra. Eso se obtiene valuando la cartera a VALOR NOMINAL —"cotización de cierre" = 1
-// peso por peso de cheque—: la diferencia entre el nominal y lo pagado cae como ganancia
-// en el período en que se tomó el documento, y el período del cobro queda en cero, sin
-// duplicar. Heredar el default de divisas sería desastroso: con cierre 1.500, un millón
-// de cheques en cartera mostraría más de 1.499 millones de ganancia inexistente.
-const SUPUESTOS_PAR: Record<Cfg['par'], Pick<Cfg, 'resid' | 'margen' | 'cierre'>> = {
-  usd:  { resid: 'fijo', margen: 0.05, cierre: 1500 },
-  eur:  { resid: 'fijo', margen: 0.05, cierre: 1500 },
-  brl:  { resid: 'fijo', margen: 0.05, cierre: 1500 },
-  usdt: { resid: 'fijo', margen: 0.05, cierre: 1500 },
-  gbp:  { resid: 'fijo', margen: 0.05, cierre: 1500 },
-  chq:  { resid: 'mtm',  margen: 0.05, cierre: 1 },
-}
-
-
-// Totales del período según la configuración (misma cuenta que el mockup validado).
-//
-// `cotPar` es la cotización implícita del par en el período; se necesita para expresar en
-// pesos el resultado de las transferencias, que nace en la moneda de la operación.
-function calc(dias: DiaAgg[], cfg: Cfg, cotPar: number | null) {
-  let vC = 0, aC = 0, vV = 0, aV = 0, g = 0
-  for (const d of dias) {
-    const p = d[cfg.par]
-    if (cfg.ops.has('COMPRA')) { vC += p.vC + (cfg.cc ? p.vCcc : 0); aC += p.aC + (cfg.cc ? p.aCcc : 0) }
-    if (cfg.ops.has('VENTA')) { vV += p.vV + (cfg.cc ? p.vVcc : 0); aV += p.aV + (cfg.cc ? p.aVcc : 0) }
-    if (cfg.ops.has('GASTOS') && cfg.gastos) g += d.g + (cfg.cc ? d.gcc : 0)
-  }
-  // TRANSFERENCIAS (op = 'T'): la ganancia es lo que entra menos lo que sale, sin calce
-  // ni spread — no tienen pata en pesos de la que sacar una tasa. El neto nace en la
-  // moneda de la operación, así que para sumarlo al total en pesos hay que convertirlo
-  // con la cotización del período. Las transferencias que YA son en pesos entran directo.
-  let ttMoneda = 0, ttEnPesosDirecto = 0
-  for (const d of dias) { ttMoneda += d.tt[cfg.par]; ttEnPesosDirecto += d.tt.pesos }
-  const ttConvertible = cotPar != null
-  const ttEnPesos = cfg.transferencias
-    ? (ttConvertible ? ttMoneda * cotPar! : 0) + ttEnPesosDirecto
-    : 0
-
-  const t1 = vC ? aC / vC : 0, t2 = vV ? aV / vV : 0
-  const spread = (vC && vV) ? t2 - t1 : 0
-  const calzado = Math.min(vC, vV), stock = Math.abs(vC - vV)
-  let gResid = 0
-  if (cfg.resid === 'fijo') gResid = stock * cfg.margen
-  else if (cfg.resid === 'mtm') gResid = vC >= vV ? stock * (cfg.cierre - t1) : stock * (t2 - cfg.cierre)
-  const neto = calzado * spread + gResid + g + ttEnPesos
-  return {
-    vC, aC, vV, aV, t1, t2, spread, calzado, stock, gResid, g, neto,
-    ttMoneda, ttEnPesos,
-    // Hubo transferencias pero no se pudieron pasar a pesos: sin operaciones del par en
-    // el período no hay cotización de la cual tomarla. Se avisa en vez de sumar cero
-    // como si no hubiera pasado nada.
-    ttSinCotizacion: cfg.transferencias && ttMoneda !== 0 && !ttConvertible,
-  }
-}
-
-/**
- * Cotización con la que se expresa el resultado en dólares: promedio de TODAS las
- * operaciones en dólares del período, ponderado por volumen (compras + ventas, caja y
- * cuenta corriente). Sale de las operaciones reales, no de una cotización externa ni
- * de la del día de hoy.
- *
- * Se toma SIEMPRE del par dólares, sin importar el par elegido en la configuración:
- * si se usara la del par, con euros seleccionado el panel mostraría euros rotulados
- * como dólares.
- *
- * Devuelve null si en el período no hubo operaciones en dólares de las que derivarla.
- */
-function cotizacionPar(dias: DiaAgg[], par: Cfg['par']): number | null {
-  let vol = 0, ars = 0
-  for (const d of dias) {
-    const p = d[par]
-    vol += p.vC + p.vCcc + p.vV + p.vVcc
-    ars += p.aC + p.aCcc + p.aV + p.aVcc
-  }
-  return vol > 0 ? ars / vol : null
-}
-const cotizacionUsd = (dias: DiaAgg[]) => cotizacionPar(dias, 'usd')
-
-
-export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD, abiertas, puntasAbiertas, paresNegativos, periodo, fecha, rDesde, rHasta, hoy }: {
+export default function GananciasView({ dias, abiertas, puntasAbiertas, paresNegativos, periodo, fecha, rDesde, rHasta, hoy, nav }: {
   dias: DiaAgg[]
-  /** Reportes de caja que hasta el 10/9/2026 vivían en Inicio. */
-  clientesCaja: Cliente[]; clientesCC: Cliente[]; serieUSD: Punto[]
+  /** La navegación entre las tres vistas. Llega armada del servidor: es un Link y no
+      puede construirse acá sin leer la URL con un hook que exigiría Suspense. */
+  nav?: React.ReactNode
   /** Posición de las patas de transferencia que todavía no encontraron pareja. */
   abiertas: TTAgg
   /** Cuántas patas de transferencia quedaron sin parear. */
@@ -153,7 +63,7 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
   }, [])
 
   const cotPar = useMemo(() => cotizacionPar(dias, cfg.par), [dias, cfg.par])
-  const r = useMemo(() => calc(dias, cfg, cotPar), [dias, cfg, cotPar])
+  const r = useMemo(() => calcPar(dias, cfg, cotPar), [dias, cfg, cotPar])
   // Equivalente en dólares del mismo resultado. Por construcción se cumple exacto que
   // netoUsd × cotUsd = neto en pesos, así que los dos paneles nunca se contradicen.
   const cotUsd = useMemo(() => cotizacionUsd(dias), [dias])
@@ -177,7 +87,10 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
           ruta="/dashboard/ganancias"
           periodo={periodo} fecha={fecha} rDesde={rDesde} rHasta={rHasta} hoy={hoy}
         />
-        <button className="chip" onClick={() => document.body.classList.add('cfg-open')}>⚙ Configuración</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {nav}
+          <button className="chip" onClick={() => document.body.classList.add('cfg-open')}>⚙ Configuración</button>
+        </div>
       </div>
 
       {/* Resultado: el mismo número en las dos monedas y, al lado, la posición abierta.
@@ -481,26 +394,6 @@ export default function GananciasView({ dias, clientesCaja, clientesCC, serieUSD
       </aside>
     </div>
 
-      {/* Reportes de caja (venían de Inicio, 10/9/2026): el detalle detrás del número de
-          arriba. Van fuera de la columna de 760px del cálculo —que ya cerró— porque la
-          tabla de clientes y los gráficos van lado a lado y ahí no entrarían. */}
-      <div className="px-4 md:px-6 pb-4 md:pb-6">
-        <div className="sec-lbl" style={{ margin: '0 0 10px' }}>
-          Reportes de caja{' '}
-          <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400, color: 'var(--muted)' }}>
-            · responden al período elegido arriba
-          </span>
-        </div>
-        <ReportesCaja
-          clientesCaja={clientesCaja}
-          clientesCC={clientesCC}
-          serieUSD={serieUSD}
-          hoy={hoy}
-          periodo={esRango ? '' : periodo}
-          rDesde={rDesde}
-          rHasta={rHasta}
-        />
-      </div>
     </>
   )
 }

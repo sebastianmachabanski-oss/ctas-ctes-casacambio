@@ -307,6 +307,75 @@ hoy, así que conviene sacarlas recién cuando estén las nuevas.
 > cómo viene el negocio". Se vende después de 4.0, nunca antes: un tablero lindo sobre un
 > número que deja afuera dos monedas es peor que no tenerlo.
 
+### 4.6. Valuar la posición de verdad, y devengar los cheques — **14 a 20 h**
+
+Surgió el 24/11/2026 de una pregunta del cliente sobre el principio de prudencia. El
+razonamiento contable completo está en `docs/GANANCIAS.md`; acá va el trabajo.
+
+Son dos cosas, y la primera es más grave de lo que parece.
+
+- **Valuar la posición acumulada, no el desbalance del período — 8 a 12 h.** Hoy el
+  "stock" que se valúa es `|compras − ventas|` *del período*, que no es la tenencia de la
+  casa: en un mes cualquiera es ruido de calendario. Medido sobre la base real, los
+  desbalances mensuales suman **36,5 veces** el desbalance anual, porque se compensan
+  entre sí. Hay que traer la posición al cierre —acumulada desde el principio— y valuar
+  esa. Cuesta porque la pantalla hoy trae solo los días del período, igual que la
+  evolución de 4.5, y conviene hacerlas juntas.
+  Depende de tener una **cotización de cierre**: es la decisión de fuente de cotización
+  que ya está pendiente del cliente.
+
+- **Devengar la ganancia del cheque hasta su vencimiento — 6 a 8 h.** Hoy se reconoce
+  entera el día del descuento. Es interés: descontar a 90 días es prestar plata 90 días,
+  y reconocer todo en el primer mes infla ese mes y deja los otros dos en cero. El dato
+  necesario ya existe (`cheques.fecha_pago`); falta repartir y que el período del cobro
+  siga dando cero, sin duplicar.
+
+No se tocó nada todavía: para la demo quedó el criterio actual (margen fijo en divisas,
+valor nominal en cheques). Se confirma con el cliente antes de cambiarlo, porque mueve
+el resultado informado de todos los períodos hacia atrás.
+
+> **Gancho comercial:** es la conversación que convierte al sistema en el interlocutor
+> del contador. Y la respuesta a la objeción más probable de un cliente con formación
+> contable, que es exactamente de donde salió.
+
+### 4.7. El criterio de valuación, elegible por cliente — **8 a 10 h**
+
+La versión barata de 4.6: en vez de que decidamos nosotros el criterio, el cliente elige
+el suyo. Surgió el 24/11/2026.
+
+**Las dos piezas difíciles ya están hechas, cada una por su lado.** Los tres criterios
+están implementados y se eligen en el drawer de Configuración de Ganancias (`resid`:
+margen fijo / al costo / a precio de cierre). Y `app_config` —tabla `key`/`value` en
+JSON— ya existe y ya se usa para el umbral de alerta y la paridad de la libra, con su
+ruta de API. Falta unirlas.
+
+**Hoy el criterio no se guarda:** es estado de React, se pierde al recargar y es por
+navegador. Es un "qué pasaría si", no una configuración.
+
+**Y las pantallas de composición y tablero lo ignoran** (se agregaron el 24/11/2026 y
+usan `SUPUESTOS_PAR` por defecto). Se puede elegir "a precio de cierre" en Ganancias y
+que las otras dos sigan mostrando margen fijo. No son números mal calculados, pero son
+dos respuestas distintas para el mismo mes.
+
+El trabajo:
+
+- **El criterio de la casa va a `app_config`**, por moneda, y lo leen las tres pantallas
+  desde el servidor. Es la decisión contable del cliente, no una preferencia de quien
+  está mirando.
+- **El drawer sigue siendo un "qué pasa si"**: no persiste. Sirve para explorar sin
+  cambiarle el número al resto.
+- **Pantalla para elegirlo**, con dos cuidados que no son negociables:
+  - CHEQUES no puede heredar el default de divisas. Con cierre 1.500, un millón en
+    cartera muestra 1.499 millones de ganancia inexistente. Por eso el criterio es por
+    moneda y los cheques quedan clavados en valor nominal salvo pedido explícito.
+  - Cambiar el criterio mueve el resultado informado de TODOS los períodos hacia atrás.
+    Tiene que quedar en auditoría quién lo cambió y cuándo.
+- **Un validador** que impida que dos pantallas muestren criterios distintos, como el que
+  ya cuida que el tablero no contradiga a la composición.
+
+> **Gancho comercial:** convierte una objeción en una función. "¿Y si mi contador usa
+> otro criterio?" deja de ser un problema y pasa a ser una opción de configuración.
+
 ---
 
 ## 5. Calidad de datos y cumplimiento

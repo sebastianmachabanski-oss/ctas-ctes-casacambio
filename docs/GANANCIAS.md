@@ -284,8 +284,18 @@ valor. Tres criterios, configurables en el drawer:
 | **Al costo** | `0` | Postura conservadora: sin ganancia hasta vender |
 | **A precio de cierre** | `stock x (cierre - t1)` si sobran compras; `stock x (t2 - cierre)` si sobran ventas | Valuación a mercado |
 
-Los supuestos **son propios de cada par** (`SUPUESTOS_PAR` en `GananciasView.tsx`) y se
-reponen al cambiar de moneda: arrastrar los de la anterior daría un número sin sentido.
+Los supuestos **son propios de cada par** (`SUPUESTOS_PAR`, hoy en
+`src/lib/ganancias-composicion.ts`) y se reponen al cambiar de moneda: arrastrar los de
+la anterior daría un número sin sentido.
+
+> **El criterio elegido en el drawer NO se guarda, y las otras dos pantallas no lo ven**
+> (24/11/2026). Es estado de React: se pierde al recargar y es por navegador, así que es
+> un "qué pasaría si" y no una configuración de la casa. Las pantallas de composición y
+> tablero usan siempre `SUPUESTOS_PAR`, de modo que elegir "a precio de cierre" acá no
+> las cambia. No son números mal calculados —cada pantalla dice con qué supuesto
+> trabaja— pero sí dos respuestas distintas para el mismo mes.
+> Está anotado como punto 4.7 del roadmap: el criterio pasa a `app_config`, por moneda,
+> y lo leen las tres.
 
 #### Cheques: valuación a valor nominal
 
@@ -308,6 +318,49 @@ descuento y deja el período del cobro en cero, sin duplicar. El margen fijo aci
 únicamente por coincidencia —0,050 por peso nominal *es* un descuento del 5 %—; con un
 descuento del 3 % seguiría informando 50.000 cuando la ganancia real es 30.000. Y heredar
 el default de divisas produciría cifras absurdas, de ahí que los supuestos sean por par.
+
+#### El principio de prudencia y por qué cada moneda se trata distinto (24/11/2026)
+
+La pregunta aparece sola: si la ganancia se reconoce cuando se realiza, ¿no habría que
+esperar a vender la moneda y a cobrar el cheque? La respuesta es distinta en cada caso, y
+conviene tenerla escrita porque el cliente la va a hacer.
+
+**La moneda extranjera es la excepción clásica a la prudencia.** La norma argentina
+(RT 17) la mide al tipo de cambio de cierre y manda la diferencia a resultados del
+período. No es un criterio agresivo: es el estándar. La prudencia rige donde el precio de
+venta es incierto, y acá no lo es — hay mercado transparente y precio conocido. Diferir
+esa diferencia no sería prudente, sería esconder información, y para una casa de cambio
+más que para cualquier otro negocio: **tener posición es parte del negocio**, no un
+accidente. Sin valuarla, un mes en que el dólar saltó 10 % con stock en caja se ve igual
+que un mes plano.
+
+**La ganancia del cheque es interés, y los intereses se devengan.** Hoy se reconoce
+entera el día del descuento, que es la más agresiva de tres posturas:
+
+| Criterio | Cuándo reconoce | |
+|---|---|---|
+| Al descuento | Todo el día 1 | Lo que hace hoy |
+| **Devengado** | Repartido hasta el vencimiento | Lo técnicamente correcto |
+| Al cobro | Todo el último día | Lo más prudente, pero es criterio de caja |
+
+Descontar un cheque a 90 días es prestar plata 90 días: reconocer todo en el mes del
+descuento infla ese mes y deja los dos siguientes en cero, cuando el dinero estuvo
+prestado los tres.
+
+**Lo que de verdad falta por prudencia en los cheques no es el momento, es el riesgo.**
+Un cheque puede rebotar y hoy la ganancia se reconoce completa sin previsión por
+incobrabilidad. Ver 6.6 en el roadmap.
+
+**Y hay un problema más grande que los dos anteriores:** el `stock` que la pantalla valúa
+NO es la posición de la casa. Es `|vC − vV|` *del período*, que en un mes cualquiera es
+ruido de calendario y no inventario — medido sobre la base real, los desbalances
+mensuales sumaban **36,5 veces** el desbalance anual, porque se compensan entre sí. Antes
+de discutir con qué criterio valuar, hay que valuar **la posición acumulada**.
+
+**Criterio al que se apunta**, pendiente de confirmar con el cliente: posición acumulada
+a cotización de cierre para las monedas, y devengamiento hasta el vencimiento para los
+cheques. Hasta que el cliente lo confirme NO SE CAMBIÓ NADA: la pantalla sigue con el
+margen fijo y con los cheques a valor nominal. Ver 4.6 en el roadmap.
 
 ### Gastos
 
