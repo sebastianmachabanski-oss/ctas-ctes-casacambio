@@ -30,18 +30,19 @@ import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
+import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES } from './env-local'
 
-/** Sin la barra del final: ver la nota en scripts/crear-primer-admin.mts. */
-const BASE_URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
-const KEY = process.env.SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
+// Credenciales del `.env.local`; ver scripts/env-local.ts.
+cargarEnvLocal()
+const BASE_URL = urlDeSupabase()
+const KEY = claveDeServicio()
 const CONFIRMADO = process.argv.includes('--confirmo-que-es-una-base-de-demo')
 /** Genera y muestra el resumen SIN escribir nada ni conectarse. Para revisar antes. */
 const VISTA_PREVIA = process.argv.includes('--vista-previa')
 
 function salir(msg: string): never { console.error(`❌ ${msg}`); process.exit(1) }
 
-if (!VISTA_PREVIA && (!BASE_URL || !KEY)) salir(
-  'Faltan SUPABASE_URL y SERVICE_ROLE_KEY en el entorno (Supabase → Project Settings → API).')
+if (!VISTA_PREVIA && (!BASE_URL || !KEY)) salir(FALTAN_CREDENCIALES)
 if (!VISTA_PREVIA && !CONFIRMADO) salir(
   'Falta la bandera --confirmo-que-es-una-base-de-demo\n'
   + '   Este script carga operaciones FICTICIAS. Apuntado a la base de un cliente real,\n'

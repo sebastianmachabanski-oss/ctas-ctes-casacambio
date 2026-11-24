@@ -48,6 +48,7 @@ import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
+import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES } from './env-local'
 import { serieMensual } from '../src/lib/ganancias-series'
 import { ttVacio } from '../src/lib/ganancias-tt'
 import type { DiaAgg, ParAgg } from '../src/lib/ganancias-composicion'
@@ -60,17 +61,18 @@ const mesesEntre = (a: string, b: string): number => {
   return (a2 * 12 + m2) - (a1 * 12 + m1) + 1
 }
 
-/** Sin la barra del final: ver la nota en scripts/crear-primer-admin.mts. */
-const BASE_URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
-const KEY = process.env.SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
+// Las credenciales salen del `.env.local`, que es el que `npm run base` deja apuntando a
+// la base elegida. Ver scripts/env-local.ts.
+cargarEnvLocal()
+const BASE_URL = urlDeSupabase()
+const KEY = claveDeServicio()
 const CONFIRMADO = process.argv.includes('--confirmo-que-es-una-base-de-demo')
 /** Lee la base y muestra qué se generaría, sin escribir una sola fila. */
 const VISTA_PREVIA = process.argv.includes('--vista-previa')
 
 function salir(msg: string): never { console.error(`❌ ${msg}`); process.exit(1) }
 
-if (!BASE_URL || !KEY) salir(
-  'Faltan SUPABASE_URL y SERVICE_ROLE_KEY en el entorno (Supabase → Project Settings → API).')
+if (!BASE_URL || !KEY) salir(FALTAN_CREDENCIALES)
 if (!CONFIRMADO && !VISTA_PREVIA) salir(
   'Falta la bandera --confirmo-que-es-una-base-de-demo\n'
   + '   Este script carga operaciones FICTICIAS sobre una base que YA TIENE datos.\n'
