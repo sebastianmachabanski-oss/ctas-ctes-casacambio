@@ -33,29 +33,33 @@ import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
-import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES, problemaDeLaUrl } from './env-local'
+import { credenciales } from './env-local'
 import { agruparPorDia, informeDeSerie, serieDeDias } from './serie-demo'
 
-// Credenciales del `.env.local`; ver scripts/env-local.ts.
-cargarEnvLocal()
-const BASE_URL = urlDeSupabase()
-const KEY = claveDeServicio()
 const CONFIRMADO = process.argv.includes('--confirmo-que-es-una-base-de-demo')
 /** Genera y muestra el resumen SIN escribir nada ni conectarse. Para revisar antes. */
 const VISTA_PREVIA = process.argv.includes('--vista-previa')
 
 function salir(msg: string): never { console.error(`❌ ${msg}`); process.exit(1) }
 
-if (!VISTA_PREVIA && (!BASE_URL || !KEY)) salir(FALTAN_CREDENCIALES)
-// Se revisa la URL acá y no adentro de `createClient`, que muere con un
-// `Invalid supabaseUrl` y un stack que no dice de cuál de los dos lugares salió.
-{ const p = BASE_URL ? problemaDeLaUrl(BASE_URL) : null; if (p) salir(p) }
 if (!VISTA_PREVIA && !CONFIRMADO) salir(
   'Falta la bandera --confirmo-que-es-una-base-de-demo\n'
   + '   Este script carga operaciones FICTICIAS. Apuntado a la base de un cliente real,\n'
   + '   le mezcla datos falsos con los verdaderos. Escribila entera, a propósito.')
 
-const db = createClient(BASE_URL ?? 'http://localhost', KEY ?? 'sin-clave', { auth: { persistSession: false, autoRefreshToken: false } })
+/**
+ * Credenciales del `.env.local`, o del ambiente si están exportadas; ver
+ * scripts/env-local.ts. El par URL+clave se elige junto, para no mezclar nunca la
+ * dirección de un proyecto con la clave de otro.
+ *
+ * La vista previa no se conecta a nada, así que no las exige: se puede revisar la serie
+ * que se va a generar sin tener ninguna base a mano.
+ */
+const cred = credenciales()
+if (!VISTA_PREVIA && 'problema' in cred) salir(cred.problema)
+const db = 'problema' in cred
+  ? createClient('http://localhost', 'sin-clave', { auth: { persistSession: false, autoRefreshToken: false } })
+  : createClient(cred.url, cred.key, { auth: { persistSession: false, autoRefreshToken: false } })
 
 // El elenco ficticio vive en scripts/elenco-demo.ts: lo comparten este script, el que crea
 // el usuario del cliente y el que llena la auditoría. Repetido, se desincroniza.
@@ -306,7 +310,7 @@ if ((count ?? 0) > 0) salir(
  * Ctrl+C si no era ese. Se saltea con --sin-espera para correrlo desatendido.
  */
 {
-  console.log(`\n⚠️  Se va a ESCRIBIR en: ${new URL(BASE_URL!).host}`)
+  console.log(`\n⚠️  Se va a ESCRIBIR en el proyecto: ${'problema' in cred ? '?' : cred.proyecto}`)
   console.log('   Si no es la base de DEMOSTRACIÓN, cortá ahora con Ctrl+C.')
   if (!process.argv.includes('--sin-espera')) {
     for (let i = 5; i > 0; i--) {

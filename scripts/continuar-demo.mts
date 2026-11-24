@@ -1,8 +1,7 @@
 /**
  * Continúa una base de DEMOSTRACIÓN ya sembrada, desde su último día hasta hoy.
  *
- *   SUPABASE_URL=https://xxx.supabase.co \
- *   SERVICE_ROLE_KEY=eyJ... \
+ *   npm run base demo                                    ← apuntar a la base de demo
  *   npx tsx scripts/continuar-demo.mts --confirmo-que-es-una-base-de-demo
  *
  * Y para que además tenga historia hacia atrás —el tablero mira trece meses—:
@@ -48,32 +47,30 @@ import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
-import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES, problemaDeLaUrl } from './env-local'
+import { credenciales } from './env-local'
 import { cargarGanancias } from '../src/lib/ganancias-datos'
 import { agruparPorDia, informeDeSerie, serieDeDias } from './serie-demo'
 
 
-// Las credenciales salen del `.env.local`, que es el que `npm run base` deja apuntando a
-// la base elegida. Ver scripts/env-local.ts.
-cargarEnvLocal()
-const BASE_URL = urlDeSupabase()
-const KEY = claveDeServicio()
 const CONFIRMADO = process.argv.includes('--confirmo-que-es-una-base-de-demo')
 /** Lee la base y muestra qué se generaría, sin escribir una sola fila. */
 const VISTA_PREVIA = process.argv.includes('--vista-previa')
 
 function salir(msg: string): never { console.error(`❌ ${msg}`); process.exit(1) }
 
-if (!BASE_URL || !KEY) salir(FALTAN_CREDENCIALES)
-// Se revisa la URL acá y no adentro de `createClient`, que muere con un
-// `Invalid supabaseUrl` y un stack que no dice de cuál de los dos lugares salió.
-{ const p = BASE_URL ? problemaDeLaUrl(BASE_URL) : null; if (p) salir(p) }
 if (!CONFIRMADO && !VISTA_PREVIA) salir(
   'Falta la bandera --confirmo-que-es-una-base-de-demo\n'
   + '   Este script carga operaciones FICTICIAS sobre una base que YA TIENE datos.\n'
   + '   Escribila entera, a propósito.')
 
-const db = createClient(BASE_URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+/**
+ * Credenciales del `.env.local`, o del ambiente si están exportadas; ver
+ * scripts/env-local.ts. Acá SIEMPRE hacen falta, también en la vista previa: este script
+ * lee el estado de la base antes de generar nada.
+ */
+const cred = credenciales()
+if ('problema' in cred) salir(cred.problema)
+const db = createClient(cred.url, cred.key, { auth: { persistSession: false, autoRefreshToken: false } })
 
 const MONEDAS = ['PESOS', 'DOLARES', 'EUROS', 'REALES', 'USDT', 'LIBRAS'] as const
 type Moneda = typeof MONEDAS[number]
@@ -84,7 +81,7 @@ const COLUMNA: Record<Moneda, string> = {
 }
 
 // ── Lo que ya hay en la base ───────────────────────────────────────────────
-console.log(`→ Leyendo el estado de ${new URL(BASE_URL).host}…`)
+console.log(`→ Leyendo el estado del proyecto ${cred.proyecto}…`)
 
 const { count, error: errContar } = await db
   .from('movimientos_caja').select('*', { count: 'exact', head: true })
@@ -462,7 +459,7 @@ if (VISTA_PREVIA) {
 
 // ── Escritura ──────────────────────────────────────────────────────────────
 {
-  console.log(`\n⚠️  Se va a ESCRIBIR en: ${new URL(BASE_URL).host}`)
+  console.log(`\n⚠️  Se va a ESCRIBIR en el proyecto: ${cred.proyecto}`)
   console.log('   Si no es la base de DEMOSTRACIÓN, cortá ahora con Ctrl+C.')
   if (!process.argv.includes('--sin-espera')) {
     for (let i = 5; i > 0; i--) {

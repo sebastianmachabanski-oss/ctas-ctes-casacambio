@@ -36,22 +36,14 @@ import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { LIBRADORES, CUENTAS, pareceBaseDeDemo } from './elenco-demo'
 import { sumarDias, type Estado } from '../src/lib/cheques'
-import { cargarEnvLocal, claveDeServicio, urlDeSupabase, FALTAN_CREDENCIALES, problemaDeLaUrl } from './env-local'
+import { credenciales } from './env-local'
 
 // Credenciales del `.env.local`; ver scripts/env-local.ts.
-cargarEnvLocal()
-
-const URL = urlDeSupabase()
-const KEY = claveDeServicio()
 const CONFIRMADO = process.argv.includes('--confirmo-que-es-una-base-de-demo')
 const VISTA_PREVIA = process.argv.includes('--vista-previa')
 
 function salir(msg: string): never { console.error(`\n❌ ${msg}\n`); process.exit(1) }
 
-if (!VISTA_PREVIA && (!URL || !KEY)) salir(FALTAN_CREDENCIALES)
-// Se revisa la URL acá y no adentro de `createClient`, que muere con un
-// `Invalid supabaseUrl` y un stack que no dice de cuál de los dos lugares salió.
-{ const p = URL ? problemaDeLaUrl(URL) : null; if (p) salir(p) }
 if (!VISTA_PREVIA && !CONFIRMADO) salir(
   'Falta la bandera --confirmo-que-es-una-base-de-demo\n'
   + '   Este script carga cheques FICTICIOS. Apuntado a la base de un cliente real,\n'
@@ -230,10 +222,18 @@ if (VISTA_PREVIA) {
 }
 
 // ── Las guardas que necesitan la base ─────────────────────────────────────
+/**
+ * Credenciales del `.env.local`, o del ambiente si están exportadas; ver
+ * scripts/env-local.ts. La vista previa sale antes de llegar acá, así que a esta altura
+ * siempre hacen falta.
+ */
+const cred = credenciales()
+if ('problema' in cred) salir(cred.problema)
+const db = createClient(cred.url, cred.key, { auth: { persistSession: false, autoRefreshToken: false } })
+
 // La referencia del proyecto no es secreta y es la última oportunidad de frenar si el
 // `.env.local` quedó apuntando a otra base.
-console.log(`\n🎯 proyecto ${URL!.replace(/^https?:\/\//, '').split('.')[0]}`)
-const db = createClient(URL!, KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
+console.log(`\n🎯 proyecto ${cred.proyecto}`)
 
 const { data: cc, error: errorCuentas } = await db.from('cuentas_corrientes').select('nombre')
 if (errorCuentas) salir(`leyendo cuentas_corrientes: ${errorCuentas.message}`)
