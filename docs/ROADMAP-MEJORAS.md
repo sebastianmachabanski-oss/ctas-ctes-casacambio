@@ -254,6 +254,76 @@ Las consultas para reproducir todo esto están en `scripts/reales-de-donde-salen
 (la consulta 3 sirve para cualquier moneda cambiando el nombre de la columna) y en
 `scripts/comparar-valuacion-stock.sql`. Las dos solo leen.
 
+#### Definiciones del cliente — 25/11/2026
+
+Conversación con el cliente más dos consultas a producción. Lo que sigue está **cerrado**
+salvo donde dice lo contrario.
+
+**El universo es más chico de lo que se creía: no hay cuenta corriente.** Las 17.918
+compras y ventas de la base —10.486 y 7.432, del 2/12/2024 al 25/11/2026— son **todas de
+caja**. Cero filas con `tipo = 'CTA CTE'`. La cuenta corriente de este cliente es un libro
+de ingresos y egresos: nunca compró ni vendió moneda liquidando contra la cuenta de un
+cliente.
+
+Tres consecuencias:
+
+1. Moneda contra moneda es un problema **únicamente de caja**. Las patas `cc_*` no
+   participan y el desarrollo se simplifica.
+2. El interruptor de "cuenta corriente" en Configuración **hoy no hace nada** para este
+   cliente: prendido o apagado el resultado es idéntico, porque no hay nada que sumar.
+3. La rama `cc_*` del motor **nunca se ejecutó contra datos reales**. Está escrita y
+   cubierta por validadores, pero solo contra datos sintéticos. No es un error; es código
+   sin rodaje, y conviene saberlo si algún día el cliente empieza a operar así.
+
+**Qué opera este cliente.** Compra y venta de euros y de reales, siempre contra pesos o
+contra dólares, nunca entre sí y nunca contra cheques. Confirmado por el cliente y por los
+datos. **También hay libras** (2.450 en caja al 25/11/2026): siguen el mismo camino que
+euros y reales.
+
+**Cómo se calcula.**
+
+- **Contra pesos** — ya está definido e implementado. No cambia.
+- **Contra dólares** — la ganancia sale de la cotización que se carga en la transacción,
+  tomada como valor de mercado, con el mismo criterio que una operación pesos/dólares.
+- **La ganancia nace en dólares y se pasa a pesos con la cotización de cierre del
+  período** para el panel general. El mismo dólar con el que se valúa la posición: usar
+  uno para valuar el stock y otro para convertir la ganancia hace que el panel se
+  contradiga consigo mismo.
+
+**Lo que falta definir — una sola pregunta.** El cliente dijo textual *"es ganancia por
+transacción... si el mercado dice que el euro vale 1,5 y yo vendo 1,8, eso va directo a
+ganancia"*, y también que la tasa de referencia la digita él y puede diferir de la del
+mercado. Eso **no es** el criterio de calce de período que usa el motor hoy, donde una
+compra no genera ganancia hasta que se vende.
+
+Los dos se reconcilian así, y es lo más probable que el cliente quiera sin nombrarlo: la
+parte **calzada** gana el spread real (dato duro, sin supuesto) y el **remanente** en
+stock se valúa contra el precio de referencia que él carga. Eso ya existe en el motor —es
+`resid: 'mtm'` con cotización de cierre—, solo que hoy el cierre está clavado en 1.500
+(ver 4.0.b y 4.7).
+
+Si esa lectura es correcta, la pregunta al cliente se achica a: **¿el precio de referencia
+es uno por período, o uno por operación?** De la respuesta sale si alcanza con el cierre
+que ya existe o si hace falta una columna nueva en el alta. El cliente no la pudo
+contestar; queda pendiente.
+
+**Dos reglas técnicas que hay que respetar al implementar.**
+
+- **La pata en dólares no entra al par dólar.** Si se compran euros pagando dólares, esos
+  dólares que salen no son una venta de dólares: no tienen spread propio. Meterlos en el
+  cálculo del dólar cuenta la ganancia dos veces. Hoy no pasa —`ganancias-datos.ts` saltea
+  la fila entera con `if (!vol || !ars) continue`, porque no hay pata en pesos—, pero al
+  hacerla visible hay que excluirla explícitamente.
+- **¿Esa pata mueve el stock de dólares?** Debería, porque si no la posición de dólares
+  queda mal; pero mover el stock cambia la valuación del remanente del dólar y por lo
+  tanto el resultado. Es una decisión a tomar, no un detalle de implementación.
+
+**Alcance adicional (punto 6 del cliente).** Lo que este cliente *no* hace —moneda contra
+moneda entre euros y reales, cheques contra divisa, compras y ventas por cuenta
+corriente— se documenta igual, con el criterio recomendado para cada caso, para poder
+explicárselo a un cliente futuro que sí lo necesite. Suma **2 a 3 h** de redacción sobre
+la estimación del módulo.
+
 ### 4.1. Rentabilidad por cliente y por moneda — **6 a 8 h**
 Hoy Ganancias es un total global. Este módulo abre el margen por cliente, por moneda y
 por tipo de operación, con ranking de los que más y menos aportan.
