@@ -275,6 +275,9 @@ Tres consecuencias:
    cubierta por validadores, pero solo contra datos sintéticos. No es un error; es código
    sin rodaje, y conviene saberlo si algún día el cliente empieza a operar así.
 
+Para qué usa entonces la cuenta corriente —y qué oportunidad abre eso— va aparte, en
+**4.8**: es un depósito de valor por el que no cobra nada.
+
 **Qué opera este cliente.** Compra y venta de euros y de reales, siempre contra pesos o
 contra dólares, nunca entre sí y nunca contra cheques. Confirmado por el cliente y por los
 datos. **También hay libras** (2.450 en caja al 25/11/2026): siguen el mismo camino que
@@ -460,6 +463,73 @@ El trabajo:
 
 > **Gancho comercial:** convierte una objeción en una función. "¿Y si mi contador usa
 > otro criterio?" deja de ser un problema y pasa a ser una opción de configuración.
+
+### 4.8. Fondeo de clientes: cuánto vale la plata en custodia — **8 a 11 h**
+
+Surge del hallazgo del 25/11/2026 (ver 4.0.c): este cliente **no hace compras ni ventas
+por cuenta corriente**, pero tiene muchísimo movimiento de cuenta corriente. Averiguado
+con él el 27/11:
+
+1. La cuenta corriente es un **depósito de valor**. Los clientes dejan la plata ahí.
+2. **No cobra nada** por guardarla ni por moverla. Se usa además para mover dinero entre
+   clientes y proveedores: es un servicio recíproco, no un producto arancelado.
+3. Se podría registrar una **ganancia por tenencia** a modo de costo de oportunidad —a
+   validar con el cliente.
+
+#### El dato que lo justifica
+
+Saldos al 25/11/2026, tomados de la pantalla de Inicio. El saldo de cuenta corriente es
+negativo porque es **lo que la casa les debe a los clientes**:
+
+| | En caja | Debido a clientes | Capital propio |
+|---|---|---|---|
+| Pesos | 502.310.732 | 207.477.012 | ~294.833.720 |
+| Dólares | 454.961 | 472.797 | **−17.836** |
+| Euros | 43.855 | 14.230 | ~29.625 |
+
+No son saldos que se limpian: son posiciones grandes y persistentes. Y en dólares el
+número es contundente — **la casa debe más dólares de los que tiene en caja.** Dicho de
+otro modo, **el 100 % del efectivo en dólares de la casa es plata de clientes**: opera su
+negocio principal sin capital propio en esa moneda.
+
+> Los importes de arriba son los de un día y salen de una lectura de pantalla.
+> **Verificarlos contra `diario` antes de llevárselos al cliente**, y calcular el saldo
+> PROMEDIO del período, que es el que importa. El saldo de hoy no dice nada: lo relevante
+> es cuánto hubo en custodia a lo largo del año.
+
+#### Por qué NO va sumado a Ganancias
+
+El costo de oportunidad es un concepto de **análisis**, no de registro, y meterlo en el
+total operativo rompe tres cosas:
+
+- **No tiene contrapartida.** No es ganancia realizada ni realizable. Para sumarlo habría
+  que inventar un ingreso contra nada.
+- **Contamina la comparación entre meses.** Un mes mejoraría sin que la casa haya operado
+  mejor, solo porque un cliente dejó más plata depositada. Es exactamente el tipo de
+  salto que se corrigió en el tablero.
+- **La tasa es arbitraria y el resultado es hipersensible a ella.** Sobre 207 millones de
+  pesos, la diferencia entre 30 % y 60 % anual son decenas de millones. Un número que se
+  mueve así según un parámetro elegido a dedo no puede compartir total con el margen
+  medido.
+
+#### Qué construir en su lugar
+
+Un panel **aparte**, "Fondeo de clientes", al lado del resultado operativo y nunca dentro:
+
+- **Saldo promedio en custodia** por moneda en el período, calculado desde `diario`.
+- **Cuánto costaría conseguir ese capital en el mercado**, con la tasa visible y
+  configurable por moneda en `app_config` (no clavada en el código), y el supuesto
+  escrito en pantalla.
+- **Cobertura**: qué porcentaje de lo que se debe está efectivamente en caja. Es el otro
+  lado de la misma moneda — ese dinero es **exigible a la vista**, y hoy en dólares la
+  cobertura es del 96,2 %.
+
+Así se contesta la pregunta de negocio que el cliente tiene de verdad —"¿cuánto vale este
+servicio que doy gratis?"— sin ensuciar el margen, y de paso aparece la exposición de
+liquidez, que hoy no se mide en ningún lado.
+
+> **Pendiente de confirmar con el cliente:** si quiere verlo, con qué tasa, y si le
+> interesa el indicador de cobertura o prefiere no tenerlo en pantalla.
 
 ---
 
