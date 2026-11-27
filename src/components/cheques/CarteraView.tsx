@@ -134,8 +134,13 @@ export default function CarteraView({
   // depositables, y por eso un cheque ya depositado no se podía ni marcar: acreditar de a
   // uno desde la ficha era el único camino, con veinte cheques que el banco pagó el mismo
   // día. (27/11/2026)
+  //
+  // Los ya acreditados quedan afuera aunque la máquina los deje volver: eso es DESHACER
+  // un cobro, no una acción de tanda, y se hace desde la ficha. Acá el botón diría
+  // "Depositar" y estaría borrando plata.
   const depositables = useMemo(
-    () => cheques.filter(c => puedeIr(c.estado, 'depositado') || puedeIr(c.estado, 'acreditado')),
+    () => cheques.filter(c => c.estado !== 'acreditado'
+      && (puedeIr(c.estado, 'depositado') || puedeIr(c.estado, 'acreditado'))),
     [cheques])
 
   const seleccionados = cheques.filter(c => elegidos.has(c.id))
@@ -321,7 +326,10 @@ export default function CarteraView({
               </thead>
               <tbody>
                 {cheques.map(c => {
-                  const puede = puedeIr(c.estado, 'depositado')
+                  // Seleccionable es lo que admite ALGUNA acción de tanda, no solo el
+                  // depósito: un cheque ya depositado se puede acreditar, y antes no se
+                  // podía ni marcar.
+                  const puede = depositables.some(d => d.id === c.id)
                   const marcado = elegidos.has(c.id)
                   return (
                     <tr key={c.id} style={marcado ? { background: '#f1f6fd' } : undefined}>
@@ -330,7 +338,7 @@ export default function CarteraView({
                           onChange={() => alternar(c.id)}
                           aria-label={puede
                             ? `Seleccionar cheque ${c.numero}`
-                            : `El cheque ${c.numero} no se puede depositar: está ${ESTADO_LABEL[c.estado].toLowerCase()}`} />
+                            : `El cheque ${c.numero} no admite acciones en tanda: está ${ESTADO_LABEL[c.estado].toLowerCase()}`} />
                       </td>
                       <td style={{ textAlign: 'left', whiteSpace: 'nowrap', fontWeight: 400 }}>
                         <span className="num">{fechaCorta(c.fecha_pago)}</span>{' '}

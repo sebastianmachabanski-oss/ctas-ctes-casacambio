@@ -31,7 +31,11 @@ export const ESTADO_LABEL: Record<Estado, string> = {
  * se agrega acá y la pantalla lo muestra sola.
  */
 export const TRANSICIONES: Record<Estado, readonly Estado[]> = {
-  en_cartera: ['depositado', 'endosado', 'devuelto'],
+  // `acreditado` directo desde cartera es el COBRO POR VENTANILLA (27/11/2026): el cheque
+  // se cobra el día de pago sin pasar por el banco. Antes la máquina asumía que todo
+  // cheque se depositaba, y para registrar un cobro de ventanilla había que marcarlo
+  // depositado primero — un hecho que no ocurrió, mintiendo en el historial.
+  en_cartera: ['depositado', 'acreditado', 'endosado', 'devuelto'],
   // Un cheque depositado se acredita o rebota: no hay tercera opción.
   depositado: ['acreditado', 'rechazado'],
   // Rechazado se puede reintentar (el librador dice que ya hay fondos) o devolver.
@@ -39,8 +43,9 @@ export const TRANSICIONES: Record<Estado, readonly Estado[]> = {
   // Acreditado dejó de ser terminal el 27/11/2026, cuando pasó a generar el movimiento de
   // plata. Antes un clic equivocado solo ponía mal un estado; ahora mete dinero en la
   // caja, y una operación que mueve plata sin forma de deshacerse se arregla tocando la
-  // base. Volver a `depositado` borra el movimiento y deja el cheque donde estaba.
-  acreditado: ['depositado'],
+  // base. Deshacer borra el movimiento y devuelve el cheque DE DONDE VINO: a `depositado`
+  // si se cobró por banco, a `en_cartera` si fue por ventanilla. Por eso los dos destinos.
+  acreditado: ['depositado', 'en_cartera'],
   endosado: [],
   devuelto: [],
 }
@@ -65,6 +70,27 @@ export const muevePlata = (e: Estado): boolean => MUEVE_PLATA.includes(e)
  * solo en el servidor pasa por acá.
  */
 export const CLIENTE_SIN_BANCO = 'COBRO DE CHEQUES'
+
+/**
+ * De dónde venía el cheque antes de su estado actual, según el historial.
+ *
+ * Lo usa el deshacer: un cobro se revierte al estado del que vino, que no siempre es el
+ * mismo. Si se depositó y el banco acreditó, vuelve a `depositado`; si se cobró por
+ * ventanilla, vuelve a `en_cartera`. Mandarlo siempre a `depositado` inventaría un
+ * depósito que nunca ocurrió.
+ *
+ * `eventos` viene del más viejo al más nuevo, como lo arma la ficha. Devuelve `null` si
+ * no hay de dónde volver —un solo evento— o si ese estado ya no es un destino válido,
+ * y entonces quien llama decide; no se adivina.
+ */
+export function estadoAnterior(
+  eventos: readonly { estado: Estado }[],
+  desde: Estado,
+): Estado | null {
+  if (eventos.length < 2) return null
+  const previo = eventos[eventos.length - 2].estado
+  return puedeIr(desde, previo) ? previo : null
+}
 
 export const esTerminal = (e: Estado): boolean => TRANSICIONES[e].length === 0
 export const puedeIr = (desde: Estado, hasta: Estado): boolean =>

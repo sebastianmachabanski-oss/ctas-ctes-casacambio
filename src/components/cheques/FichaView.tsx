@@ -5,7 +5,8 @@ import SubirImagen from '@/components/cheques/SubirImagen'
 import { esPdf } from '@/lib/cheques-archivo'
 import { useRouter } from 'next/navigation'
 import {
-  ESTADO_LABEL, TRANSICIONES, esTerminal, muevePlata, textoVencimiento, vencidoSinDepositar,
+  ESTADO_LABEL, TRANSICIONES, esTerminal, muevePlata, estadoAnterior,
+  textoVencimiento, vencidoSinDepositar,
   pesos, pesosExacto, fechaLarga, CLIENTE_SIN_BANCO,
   type Cheque, type Estado, type Evento,
 } from '@/lib/cheques'
@@ -87,7 +88,15 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
 
   // Los botones SON la máquina de estados: no hay una lista de acciones escrita aparte
   // que pueda quedar desincronizada y ofrecer algo imposible.
-  const posibles = TRANSICIONES[cheque.estado]
+  //
+  // Única excepción: desde `acreditado` la máquina admite dos destinos —`depositado` y
+  // `en_cartera`— pero no son una elección. Son el mismo deshacer, y cuál corresponde lo
+  // dice el historial: se vuelve de donde se vino. Ofrecer los dos haría que el operador
+  // tuviera que recordar si ese cheque se depositó o se cobró por ventanilla.
+  const deshacerCobro = cheque.estado === 'acreditado'
+    ? (estadoAnterior(eventos, 'acreditado') ?? 'depositado')
+    : null
+  const posibles = deshacerCobro ? [deshacerCobro] : TRANSICIONES[cheque.estado]
 
   // A qué tasa se tomó este documento. Sale de la operación que lo trajo; devuelve null
   // si esa operación no está o no tiene de dónde sacar el costo, y entonces el bloque no
@@ -395,7 +404,10 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
                   onClick={() => (esTerminal(destino) || muevePlata(destino)
                     ? setConfirmando(destino)
                     : mover(destino))}>
-                  {enviando === destino ? 'Registrando…' : ACCION[destino]}
+                  {enviando === destino ? 'Registrando…'
+                    : deshacerCobro
+                      ? `Deshacer el cobro (vuelve a ${ESTADO_LABEL[destino].toLowerCase()})`
+                      : ACCION[destino]}
                 </button>
               ))}
             </>

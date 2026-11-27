@@ -127,9 +127,13 @@ export async function POST(request: Request) {
   // válida, y con un `every` los acreditados de esa tanda habrían perdido su cobro sin
   // que nadie lo borrara. La pantalla no deja armar esa selección, pero la API no se
   // apoya en el navegador para nada.
+  //
+  // Los dos destinos que deshacen: a `depositado` si el cobro fue por banco y a
+  // `en_cartera` si fue por ventanilla. Lo que importa no es a dónde va sino DE DÓNDE
+  // viene — si el cheque estaba acreditado, su cobro hay que borrarlo.
   const avisos: string[] = []
   const vuelvenDeAcreditado = filas.filter(f => f.estado === 'acreditado').map(f => f.id)
-  if (destino === 'depositado' && vuelvenDeAcreditado.length) {
+  if ((destino === 'depositado' || destino === 'en_cartera') && vuelvenDeAcreditado.length) {
     const { data: evs } = await (supabase as any)
       .from('cheques_eventos').select('cheque_id,movimiento_id')
       .in('cheque_id', vuelvenDeAcreditado).eq('estado', 'acreditado')

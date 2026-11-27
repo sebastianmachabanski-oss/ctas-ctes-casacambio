@@ -235,12 +235,33 @@ le saca el supuesto.
 - **Un movimiento por banco.** Acreditar de una tanda cheques de bancos distintos son
   cobros distintos; mezclarlos obligaría a inventar un cliente que no es ninguno.
 
+### Cobro por ventanilla
+
+No todo cheque pasa por el banco. Si se cobra en la ventanilla el día de pago, va de
+`en_cartera` directo a `acreditado`, **sin depositarse**.
+
+> Antes la máquina asumía que todo cheque se depositaba, y para registrar un cobro de
+> ventanilla había que marcarlo `depositado` primero: un hecho que no ocurrió, anotado en
+> un historial que después nadie puede desmentir.
+
+Es el **mismo estado** que la acreditación bancaria y el mismo movimiento de plata. La
+diferencia —si pasó o no por el banco— ya la dice el evento anterior; dos estados para el
+mismo hecho duplicarían las reglas sin agregar información.
+
 ### Deshacer
 
-`acreditado` **dejó de ser terminal**: vuelve a `depositado` y eso **borra el movimiento**
-de las dos tablas. Antes un clic equivocado solo ponía mal un estado; ahora mete dinero en
-la caja, y una operación que mueve plata sin forma de deshacerse se arregla tocando la
-base.
+`acreditado` **dejó de ser terminal** y deshacer **borra el movimiento** de las dos tablas.
+Antes un clic equivocado solo ponía mal un estado; ahora mete dinero en la caja, y una
+operación que mueve plata sin forma de deshacerse se arregla tocando la base.
+
+**Vuelve de donde vino**, no siempre al mismo lugar: a `depositado` si se cobró por banco,
+a `en_cartera` si fue por ventanilla. Lo resuelve `estadoAnterior()` leyendo el historial.
+Mandarlo siempre a `depositado` inventaría un depósito que nunca ocurrió — el mismo error
+que el cobro de ventanilla obligaba a cometer.
+
+Por eso la ficha ofrece **un solo botón** aunque la máquina admita dos destinos: no es una
+elección del operador, y pedirle que recuerde cómo se cobró ese cheque sería pedirle que
+haga el trabajo del historial.
 
 El movimiento se ubica por `cheques_eventos.movimiento_id` — la columna que la tabla tenía
 declarada y vacía desde el 22/11/2026, porque hasta ahora solo la escribía el alta. Si un
@@ -293,10 +314,10 @@ y el movimiento que lo usa como medio de pago queda referenciado en el evento.
 
 | Desde | Puede ir a |
 |---|---|
-| `en_cartera` | `depositado` · `endosado` · `devuelto` |
+| `en_cartera` | `depositado` · `acreditado` (ventanilla) · `endosado` · `devuelto` |
 | `depositado` | `acreditado` · `rechazado` |
 | `rechazado` | `devuelto` · vuelve a `depositado` (se reintenta) |
-| `acreditado` | vuelve a `depositado` (deshace el cobro y borra su movimiento) |
+| `acreditado` | vuelve a `depositado` o a `en_cartera`, según de dónde vino — deshace el cobro y borra su movimiento |
 | `endosado` | — (terminal) |
 | `devuelto` | — (terminal) |
 
