@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import AltaCheques from '@/components/cheques/AltaCheques'
 import { validarChequesDelAlta, sumaDeCheques, type ChequeNuevo } from '@/lib/cheques'
+import { plazoPromedio, mensualDesdeCotizacion, cotizacionDesdeMensual } from '@/lib/cheques-tasa'
 import { useRouter } from 'next/navigation'
 import SelectBuscable from '@/components/SelectBuscable'
 import { useAvisoSinGuardar } from '@/lib/useAvisoSinGuardar'
@@ -340,6 +341,43 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
   /** Una COMPRA de CHEQUES trae instrumentos; el resto de las operaciones, no. */
   const esAltaCheques = form.operacion === 'COMPRA' && form.propio === 'CHEQUES'
 
+  // ── LA TASA, SEGUNDA ENTRADA DE LA COTIZACIÓN (27/11/2026) ──────────────
+  //
+  // La app guarda COTIZACIÓN: pesos por peso de nominal. 0,88 son 88 por cada 100. Eso no
+  // cambia — es lo que viaja al servidor y lo que usa el motor.
+  //
+  // Pero nadie negocia así. El cliente dice "te lo tomo al tres y medio mensual" y el
+  // operador convierte de cabeza metiendo el plazo en el medio, que es donde se pierde
+  // plata. Entonces las dos casillas están atadas: se escribe una y se ve la otra.
+  //
+  // El plazo sale de las fechas de pago de los cheques, así que la casilla recién sirve
+  // con cheques cargados. Antes de eso queda apagada y lo dice.
+  const plazoCheques = esAltaCheques ? plazoPromedio(cheques, form.fecha) : null
+  const puedeConvertir = plazoCheques !== null && plazoCheques > 0
+
+  /** Lo que el operador tipeó en Tasa. Vacío = la tasa se deriva de la cotización. */
+  const [tasaTipeada, setTasaTipeada] = useState('')
+
+  // Si cambian los cheques después de tipear la tasa, la cotización tiene que seguirla:
+  // agregar un cheque que vence más lejos, a la misma tasa, hace pagar menos. Al revés
+  // sería peor que no tener el campo, porque la pantalla mostraría una tasa que no es la
+  // de la cotización que se va a guardar.
+  useEffect(() => {
+    if (!tasaTipeada || !puedeConvertir) return
+    const mensual = Number(tasaTipeada.replace(',', '.')) / 100
+    if (isNaN(mensual)) return
+    const cot = cotizacionDesdeMensual(mensual, plazoCheques!)
+    setForm(f => ({ ...f, cotizacion: cot === null ? '' : cot.toFixed(4) }))
+  }, [tasaTipeada, plazoCheques, puedeConvertir])
+
+  /** Lo que muestra la casilla de Tasa: lo tipeado, o lo que sale de la cotización. */
+  const tasaMostrada = (() => {
+    if (tasaTipeada) return tasaTipeada
+    if (!puedeConvertir || !form.cotizacion) return ''
+    const m = mensualDesdeCotizacion(Number(form.cotizacion), plazoCheques!)
+    return m === null ? '' : (m * 100).toFixed(2)
+  })()
+
   // El nominal NO se tipea cuando hay cheques: lo da la suma. Un importe escrito
   // aparte es el descuadre que `cheques_descuadrados()` existe para encontrar.
   useEffect(() => {
@@ -351,8 +389,12 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
 
   // Al dejar de ser una compra de cheques, la lista se vacía: si no, quedaría
   // colgada e iría en el envío de una operación que no los lleva.
+  // La tasa tipeada se va con ella: si queda, al volver a una compra de cheques
+  // recalcularía la cotización con un número de otra operación.
   useEffect(() => {
-    if (!esAltaCheques && cheques.length) setCheques([])
+    if (esAltaCheques) return
+    if (cheques.length) setCheques([])
+    setTasaTipeada('')
   }, [esAltaCheques, cheques.length])
 
   function set(field: string, value: string) {
@@ -515,6 +557,7 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
     setError(null)
     setForm(formPorDefecto())
     setCheques([])
+    setTasaTipeada('')
     // El buscador de cliente guarda su texto aparte: sin esto el campo seguía mostrando
     // el nombre anterior con la cuenta ya vacía.
     setClienteQuery('')
@@ -751,13 +794,46 @@ export default function NuevaTransaccionForm({ cuentas, clientes, umbralUsd, dol
             min="0"
             className="input"
             value={form.cotizacion}
-            onChange={e => set('cotizacion', e.target.value)}
+            onChange={e => { setTasaTipeada(''); set('cotizacion', e.target.value) }}
             disabled={!cotizacionHabilitada}
             title={cotizacionHabilitada ? undefined
               : 'Las transacciones de cuenta corriente no llevan cotización: no hay cambio de una moneda por otra.'}
             placeholder={cotizacionHabilitada ? '0.00' : 'No aplica en cuenta corriente'}
           />
+          {esAltaCheques && puedeConvertir && (
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+              {Math.round(plazoCheques!).toLocaleString('es-AR')} días de plazo promedio
+            </div>
+          )}
         </div>
+
+        {/* La tasa. Solo en una COMPRA de CHEQUES: en el resto de las operaciones la
+            cotización es un precio de mercado, no un descuento, y una tasa no significa
+            nada. No es obligatoria: la obligatoria sigue siendo la cotización. */}
+        {esAltaCheques && (
+          <div>
+            <label className="label" htmlFor="tasa-mensual">Tasa mensual</label>
+            <input
+              id="tasa-mensual"
+              type="number"
+              step="0.01"
+              min="0"
+              className="input"
+              value={tasaMostrada}
+              onChange={e => setTasaTipeada(e.target.value)}
+              disabled={!puedeConvertir}
+              title={puedeConvertir
+                ? 'Directa sobre el nominal. Escribí acá o en Cotización: se completan entre sí.'
+                : 'Necesita el plazo, que sale de las fechas de pago de los cheques de abajo.'}
+              placeholder={puedeConvertir ? '0.00' : 'Cargá los cheques primero'}
+            />
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+              {puedeConvertir
+                ? 'Directa sobre el nominal'
+                : 'Se habilita al cargar los cheques'}
+            </div>
+          </div>
+        )}
         <div>
           <label className="label">Costo %</label>
           <input

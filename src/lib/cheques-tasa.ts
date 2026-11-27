@@ -188,6 +188,66 @@ export function tasaDeCartera(
   return { ...tasa, nominal, cheques: contados, sinCosto }
 }
 
+// ── Cotización ⇄ tasa, para el formulario de alta ─────────────────────────
+//
+// En el alta se tipea una COTIZACIÓN: pesos por peso de nominal. 0,88 quiere decir que se
+// pagan 88 por cada 100 de cheque. Es lo que la app guarda y lo que el motor usa para
+// calcular la plata que sale, y eso NO cambia.
+//
+// El problema es que nadie negocia así. El cliente dice "te lo tomo al tres y medio
+// mensual" y el operador tiene que convertir a mano, metiendo el plazo en el medio. Esa
+// cuenta es donde se pierde plata.
+//
+// Entonces el formulario ofrece las dos entradas atadas: se escribe una y se ve la otra.
+// La que viaja al servidor sigue siendo la cotización.
+//
+//   cotización 0,88  ⇄  directa del período 12 %  ⇄  mensual 12 % × (30 / días)
+//
+// La tasa que se tipea es la DIRECTA MENSUAL —sobre el nominal, escalada lineal a 30
+// días— porque es como se cotiza en el mostrador (decisión del 27/11/2026).
+
+/**
+ * Plazo de una operación: días hasta el vencimiento, promedio ponderado por importe.
+ *
+ * Devuelve `null` si no hay cheques o si no suman nada. Puede dar NEGATIVO cuando se
+ * descuenta un cheque ya vencido, y se devuelve tal cual en vez de recortarlo a cero:
+ * acá el número es un dato de la operación, y quien lo use decide si puede anualizar.
+ * (Distinto de la cartera, donde el plazo es "cuánto falta" y nunca es negativo.)
+ */
+export function plazoPromedio(
+  cheques: readonly { importe: number; fecha_pago: string }[],
+  desde: string,
+): number | null {
+  let peso = 0, ponderado = 0
+  for (const c of cheques) {
+    const imp = Number(c.importe) || 0
+    if (!(imp > 0) || !c.fecha_pago) continue
+    peso += imp
+    ponderado += diasHasta(c.fecha_pago, desde) * imp
+  }
+  return peso > 0 ? ponderado / peso : null
+}
+
+/** De la cotización a la tasa directa mensual. `null` si el plazo no deja anualizar. */
+export function mensualDesdeCotizacion(cotizacion: number, dias: number): number | null {
+  if (!(dias > 0) || !(cotizacion > 0)) return null
+  return (1 - cotizacion) * (DIAS_MES / dias)
+}
+
+/**
+ * De la tasa directa mensual a la cotización.
+ *
+ * Devuelve `null` si la tasa es tan alta para ese plazo que la cotización daría cero o
+ * negativa —pagar nada, o cobrarle al cliente por llevarse el cheque—, que no es una
+ * operación sino un error de tipeo. Mejor que el campo no se complete a que se complete
+ * con un disparate.
+ */
+export function cotizacionDesdeMensual(mensual: number, dias: number): number | null {
+  if (!(dias > 0)) return null
+  const cotizacion = 1 - mensual * (dias / DIAS_MES)
+  return cotizacion > 0 ? cotizacion : null
+}
+
 /** "12,00 %" — una tasa como fracción, en formato argentino. */
 const nfTasa = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 export const tasaTexto = (v: number | null): string =>

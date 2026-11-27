@@ -19,6 +19,7 @@
 
 import {
   calcularTasa, costoDeCheque, tasaDeCartera, plazoTexto, tasaTexto,
+  plazoPromedio, mensualDesdeCotizacion, cotizacionDesdeMensual,
   DIAS_MES, DIAS_ANIO, type Origen,
 } from '../src/lib/cheques-tasa'
 import type { Cheque } from '../src/lib/cheques'
@@ -274,6 +275,65 @@ const origen = (id: string, fecha: string, nominal: number, pagado: number): Ori
   }
 
   assertIgual(rotas, 0, `500 operaciones al azar cierran (${conProrrateo} con prorrateo)`)
+}
+
+// ── 10. Cotización ⇄ tasa mensual, las dos entradas del alta ──────────────
+// Es la conversión que el operador hoy hace de cabeza. Si la ida y la vuelta no dan
+// exactamente lo mismo, el campo escribe un número distinto del que se tipeó.
+{
+  console.log('\n── Cotización ⇄ tasa mensual ──')
+
+  // 0,88 a 30 días: 12 % de descuento en un mes justo.
+  assertCasi(mensualDesdeCotizacion(0.88, 30), 0.12, '0,88 a 30 días es 12 % mensual')
+  assertCasi(cotizacionDesdeMensual(0.12, 30), 0.88, 'y 12 % mensual a 30 días vuelve a 0,88')
+
+  // El mismo 12 % de descuento al doble de plazo es la mitad de tasa mensual.
+  assertCasi(mensualDesdeCotizacion(0.88, 60), 0.06, '0,88 a 60 días es 6 % mensual')
+  assertCasi(cotizacionDesdeMensual(0.035, 75), 1 - 0.035 * 2.5, 'el ejemplo del mostrador: 3,5 % a 75 días')
+
+  assertIgual(mensualDesdeCotizacion(0.88, 0), null, 'sin plazo no hay tasa mensual')
+  assertIgual(mensualDesdeCotizacion(0.88, -5), null, 'con plazo vencido tampoco')
+  assertIgual(cotizacionDesdeMensual(0.035, 0), null, 'ni al revés')
+
+  // Una tasa imposible para el plazo: 40 % mensual a 90 días se comería todo el cheque.
+  assertIgual(cotizacionDesdeMensual(0.40, 90), null, 'una tasa que deja cotización en cero no se escribe')
+  assertIgual(cotizacionDesdeMensual(0.35, 90), null, 'ni la que la deja negativa')
+
+  // Ida y vuelta sobre 200 combinaciones: lo que se tipea es lo que queda.
+  let rotas = 0
+  for (let i = 0; i < 200; i++) {
+    const dias = 5 + i
+    const mensual = 0.005 + (i % 20) * 0.004   // de 0,5 % a 8,1 % mensual
+    const cot = cotizacionDesdeMensual(mensual, dias)
+    if (cot === null) continue
+    const vuelta = mensualDesdeCotizacion(cot, dias)
+    if (vuelta === null || Math.abs(vuelta - mensual) > 1e-12) {
+      rotas++
+      console.error(`   ${(mensual * 100).toFixed(2)} % a ${dias} días: volvió ${vuelta}`)
+    }
+  }
+  assertIgual(rotas, 0, 'la ida y la vuelta dan el mismo número en 200 combinaciones')
+}
+
+// ── 11. El plazo de la operación en el alta ───────────────────────────────
+{
+  console.log('\n── Plazo promedio de una operación ──')
+  const cs = [
+    { importe: 100_000, fecha_pago: '2026-12-01' },  // 30 días
+    { importe: 200_000, fecha_pago: '2026-12-31' },  // 60 días
+  ]
+  assertCasi(plazoPromedio(cs, '2026-11-01'), 50, 'se pondera por importe, no por cantidad')
+  assertCasi(plazoPromedio([cs[0]], '2026-11-01'), 30, 'con uno solo es su propio plazo')
+  assertIgual(plazoPromedio([], '2026-11-01'), null, 'sin cheques no hay plazo')
+  assertIgual(plazoPromedio([{ importe: 0, fecha_pago: '2026-12-01' }], '2026-11-01'), null,
+    'un cheque sin importe todavía no aporta plazo')
+  assertIgual(plazoPromedio([{ importe: 100, fecha_pago: '' }], '2026-11-01'), null,
+    'ni uno sin fecha de pago')
+
+  // Acá SÍ puede dar negativo: en el alta el plazo es un dato de la operación, y
+  // descontar un cheque ya vencido es algo que pasa.
+  assertCasi(plazoPromedio([{ importe: 100, fecha_pago: '2026-10-01' }], '2026-11-01'), -31,
+    'un cheque ya vencido da plazo negativo, y se informa tal cual')
 }
 
 console.log(`\n${ok} OK, ${fail} fallidas`)
