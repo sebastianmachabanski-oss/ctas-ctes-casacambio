@@ -17,6 +17,23 @@ Documentación clave: `docs/SINCRONIZACION.md` (sync Sheet→DB), `docs/MOTOR-CA
 - **Números**: formato argentino (punto de miles, coma decimal) en toda comunicación.
 - **Estimaciones**: en horas de esfuerzo activo, nunca en días. Los tiempos muertos
   (esperas entre respuestas) no cuentan.
+- **Formato de respuesta** (definido 27/11/2026, a pedido explícito): leer respuestas
+  largas le cuesta tiempo. Entonces:
+  - Contestar **solo lo que se preguntó**, en el mismo orden, sin abrir temas nuevos.
+    Si aparece algo importante al margen, se menciona en una línea al final o se anota
+    en el roadmap — no se desarrolla sin que lo pidan.
+  - **Títulos cortos en negrita** separando cada punto. Tablas cuando hay tres o más
+    datos comparables. Nada de párrafos largos seguidos.
+  - **El dato primero, la recomendación después**, y claramente separados: qué es así
+    hoy, y recién entonces qué conviene hacer.
+  - **Sin preámbulo ni resumen de lo ya conversado.** Arrancar por la respuesta.
+  - **Cerrar con la única decisión que hace falta**, si hace falta alguna. Una, no
+    cuatro.
+  - Ampliar solo si lo piden. La premisa es "lo básico y conciso y yo te pido ampliar".
+- **Una cosa por vez** (mismo pedido): definir bien un tema antes de pasar al
+  siguiente, y no empezar a programar sobre algo que todavía no está definido.
+  Encontrar un problema nuevo mientras se construye es señal de que faltaba definición,
+  no una invitación a seguir avanzando.
 
 ## Reglas del dominio (no romper)
 
