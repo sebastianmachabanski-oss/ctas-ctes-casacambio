@@ -130,13 +130,30 @@ export default function CarteraView({
 
   // Depositable es lo que la MÁQUINA DE ESTADOS permite, no una lista aparte: si mañana
   // cambia la tabla de transiciones, las casillas cambian solas.
+  // Se puede elegir lo que admita ALGUNA de las dos acciones de tanda. Antes solo las
+  // depositables, y por eso un cheque ya depositado no se podía ni marcar: acreditar de a
+  // uno desde la ficha era el único camino, con veinte cheques que el banco pagó el mismo
+  // día. (27/11/2026)
   const depositables = useMemo(
-    () => cheques.filter(c => puedeIr(c.estado, 'depositado')),
+    () => cheques.filter(c => puedeIr(c.estado, 'depositado') || puedeIr(c.estado, 'acreditado')),
     [cheques])
 
   const seleccionados = cheques.filter(c => elegidos.has(c.id))
   const sumaElegida = seleccionados.reduce((a, c) => a + c.importe, 0)
   const todosMarcados = depositables.length > 0 && depositables.every(c => elegidos.has(c.id))
+
+  // Cada acción se ofrece solo si TODOS los elegidos la admiten. Con una selección mixta
+  // —algunos en cartera y otros depositados— ninguna de las dos está bien para todos, y
+  // aplicar media tanda es peor que no aplicar ninguna.
+  const puedenDepositarse = seleccionados.length > 0
+    && seleccionados.every(c => puedeIr(c.estado, 'depositado'))
+  const puedenAcreditarse = seleccionados.length > 0
+    && seleccionados.every(c => puedeIr(c.estado, 'acreditado'))
+
+  /** Fecha en que el banco pagó. No es necesariamente hoy. */
+  const [fechaMov, setFechaMov] = useState(hoy)
+  /** La acreditación mueve plata, así que se confirma. */
+  const [confirmando, setConfirmando] = useState(false)
 
   function alternar(id: string) {
     setElegidos(prev => {
@@ -148,17 +165,21 @@ export default function CarteraView({
   const marcarTodos = () =>
     setElegidos(todosMarcados ? new Set() : new Set(depositables.map(c => c.id)))
 
-  async function depositar() {
+  async function mover(estado: 'depositado' | 'acreditado') {
     if (!seleccionados.length || enviando) return
-    setEnviando(true); setAviso(null)
+    setEnviando(true); setAviso(null); setConfirmando(false)
     try {
       const r = await fetch('/api/cheques/estado', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: seleccionados.map(c => c.id), estado: 'depositado' }),
+        body: JSON.stringify({ ids: seleccionados.map(c => c.id), estado, fecha: fechaMov }),
       })
       const j = await r.json().catch(() => ({}))
-      if (!r.ok) { setAviso(j.error || 'No se pudo registrar el depósito'); return }
+      if (!r.ok) {
+        setAviso(j.error || `No se pudo registrar ${estado === 'depositado' ? 'el depósito' : 'la acreditación'}`)
+        return
+      }
+      if (Array.isArray(j.avisos) && j.avisos.length) setAviso(j.avisos.join(' '))
       setElegidos(new Set())
       router.refresh()
     } catch {
@@ -228,12 +249,50 @@ export default function CarteraView({
                 : 'Ordenados por fecha de pago'}
             </div>
           </div>
-          <button className="btn-primary" style={{ marginLeft: 'auto' }}
-            disabled={!seleccionados.length || enviando} onClick={depositar}>
-            {enviando ? 'Registrando…'
-              : seleccionados.length ? `Depositar ${seleccionados.length} seleccionados`
-              : 'Depositar seleccionados'}
-          </button>
+          {/* ACREDITAR MUEVE PLATA, así que pide confirmación y fecha; depositar no, y
+              por eso sigue siendo un solo clic. La confirmación dice el importe y a
+              nombre de quién entra, que es lo que hay que leer antes de apretar. */}
+          {confirmando ? (
+            <div style={{
+              marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+            }}>
+              <span style={{ fontSize: 12.5, color: 'var(--ink-1)' }}>
+                Entran <b>{pesos(sumaElegida)}</b> a la caja, a nombre del banco de cada cheque.
+              </span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
+                Fecha
+                <input type="date" className="input" style={{ width: 150 }}
+                  max={hoy} value={fechaMov} onChange={e => setFechaMov(e.target.value)} />
+              </label>
+              <button className="btn-primary" disabled={enviando} onClick={() => mover('acreditado')}>
+                {enviando ? 'Registrando…' : 'Confirmar'}
+              </button>
+              <button className="chip" disabled={enviando} onClick={() => setConfirmando(false)}>
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {puedenAcreditarse && (
+                <button className="chip" disabled={enviando} onClick={() => setConfirmando(true)}>
+                  Acreditar {seleccionados.length} · {pesos(sumaElegida)}
+                </button>
+              )}
+              {/* Selección mixta: ninguna de las dos acciones vale para todos. Se dice
+                  por qué, en vez de dejar un botón apagado sin explicación. */}
+              {seleccionados.length > 0 && !puedenDepositarse && !puedenAcreditarse && (
+                <span style={{ fontSize: 12, color: 'var(--muted)', alignSelf: 'center' }}>
+                  Hay cheques en cartera y depositados juntos: elegí de a un estado por vez.
+                </span>
+              )}
+              <button className="btn-primary"
+                disabled={!puedenDepositarse || enviando} onClick={() => mover('depositado')}>
+                {enviando ? 'Registrando…'
+                  : puedenDepositarse ? `Depositar ${seleccionados.length} seleccionados`
+                  : 'Depositar seleccionados'}
+              </button>
+            </div>
+          )}
         </div>
 
         {aviso && <div className="banner banner-warn" style={{ margin: '0 16px 12px' }}>{aviso}</div>}

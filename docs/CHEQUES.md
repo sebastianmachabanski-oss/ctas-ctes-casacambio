@@ -183,9 +183,79 @@ Se eligen uno o varios cheques en cartera y se marcan como depositados, con la f
 
 ## Flujo 4 · Acreditación
 
-El banco acreditó. `estado` → `acreditado`, su fila de evento, y el cheque sale del
-calendario. Tampoco mueve plata: el dinero entró por el circuito bancario normal y se
-registra como cualquier otro ingreso.
+El banco pagó. `estado` → `acreditado`, su fila de evento, el cheque sale del calendario
+**y se registra el movimiento de plata**.
+
+> **Esto cambió el 27/11/2026.** Antes la acreditación no movía nada: se suponía cargada
+> aparte, a mano, como cualquier otro ingreso. Nadie lo enlazaba ni avisaba si no se
+> hacía, y la consecuencia era visible — la tarjeta CHEQUES de Inicio nunca se vaciaba.
+> No era la cartera: era el acumulado histórico de compras, cobrados incluidos.
+
+### El movimiento que genera
+
+| Campo | Valor |
+|---|---|
+| Operación | VENTA |
+| Moneda propia | CHEQUES |
+| Moneda externa | PESOS |
+| Monto | El nominal de los cheques acreditados |
+| Cotización | **1** — el banco paga el valor escrito, no hay quita |
+| Cliente | **El banco del cheque**, o `COBRO DE CHEQUES` si no está cargado |
+| Resultado | `cheques = −nominal` · `pesos = +nominal` |
+
+**El cliente es el banco, no quien trajo el cheque.** Poner al cliente original le
+duplicaría el volumen operado —te vendió el cheque y después te lo "compró"— y ensuciaría
+cualquier reporte por cliente.
+
+### Por qué no cambia Ganancias
+
+Un cheque de 100 comprado en 88:
+
+| | Antes | Ahora |
+|---|---|---|
+| Calce | 0 | 100 × (1,00 − 0,88) = 12 |
+| Valuación del stock a nominal | 12 | 0 |
+| **Ganancia** | **12** | **12** |
+
+Valuar la cartera a nominal **es** anticipar este cobro. Registrarlo no agrega ganancia:
+le saca el supuesto.
+
+### Las reglas que respeta
+
+- **`diario` Y `movimientos_caja`**, con el mismo `vinculo`. Regla del dominio del
+  1/9/2026.
+- **`origen = 'app'`**, y no se escribe a la planilla. Esta fila no existe allá: la genera
+  la app al marcar el cheque. Un sync la borraría igual que borraría las de USDT, y si la
+  oficina además carga el cobro en la planilla, se duplicaría.
+- **La fecha es la del hecho**, no la del día en que se marca. El diálogo la pide. Un
+  cobro cargado tres días tarde tiene que entrar con la fecha en que el banco pagó, o el
+  arqueo de ese día no cierra.
+- **La plata primero, el estado después.** Si fallara al revés, el cheque quedaría
+  acreditado sin su plata y nadie lo notaría hasta el arqueo.
+- **Un movimiento por banco.** Acreditar de una tanda cheques de bancos distintos son
+  cobros distintos; mezclarlos obligaría a inventar un cliente que no es ninguno.
+
+### Deshacer
+
+`acreditado` **dejó de ser terminal**: vuelve a `depositado` y eso **borra el movimiento**
+de las dos tablas. Antes un clic equivocado solo ponía mal un estado; ahora mete dinero en
+la caja, y una operación que mueve plata sin forma de deshacerse se arregla tocando la
+base.
+
+El movimiento se ubica por `cheques_eventos.movimiento_id` — la columna que la tabla tenía
+declarada y vacía desde el 22/11/2026, porque hasta ahora solo la escribía el alta. Si un
+cheque se acreditó antes de esa fecha no hay movimiento que borrar, y la pantalla lo dice
+en vez de quedarse callada.
+
+### Dónde se hace
+
+Desde la ficha de a uno, o **desde la cartera en tanda**: se eligen los depositados y se
+acreditan juntos. Es el caso normal —el banco paga veinte el mismo día— y antes obligaba a
+entrar cheque por cheque.
+
+La selección no puede mezclar estados: con unos en cartera y otros depositados ninguna de
+las dos acciones vale para todos, y la pantalla lo explica en vez de dejar un botón
+apagado sin motivo.
 
 ## Flujo 5 · Rechazo — el único que cuesta
 
@@ -226,7 +296,7 @@ y el movimiento que lo usa como medio de pago queda referenciado en el evento.
 | `en_cartera` | `depositado` · `endosado` · `devuelto` |
 | `depositado` | `acreditado` · `rechazado` |
 | `rechazado` | `devuelto` · vuelve a `depositado` (se reintenta) |
-| `acreditado` | — (terminal) |
+| `acreditado` | vuelve a `depositado` (deshace el cobro y borra su movimiento) |
 | `endosado` | — (terminal) |
 | `devuelto` | — (terminal) |
 

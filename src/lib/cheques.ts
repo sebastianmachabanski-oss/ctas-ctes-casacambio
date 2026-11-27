@@ -36,10 +36,35 @@ export const TRANSICIONES: Record<Estado, readonly Estado[]> = {
   depositado: ['acreditado', 'rechazado'],
   // Rechazado se puede reintentar (el librador dice que ya hay fondos) o devolver.
   rechazado: ['depositado', 'devuelto'],
-  acreditado: [],
+  // Acreditado dejó de ser terminal el 27/11/2026, cuando pasó a generar el movimiento de
+  // plata. Antes un clic equivocado solo ponía mal un estado; ahora mete dinero en la
+  // caja, y una operación que mueve plata sin forma de deshacerse se arregla tocando la
+  // base. Volver a `depositado` borra el movimiento y deja el cheque donde estaba.
+  acreditado: ['depositado'],
   endosado: [],
   devuelto: [],
 }
+
+/**
+ * Las transiciones que MUEVEN PLATA, y por eso se confirman.
+ *
+ * Hasta el 27/11/2026 se confirmaba lo que no se podía deshacer, que era un buen criterio
+ * cuando ninguna transición tocaba la caja. Ahora acreditar genera un movimiento: es
+ * reversible, pero confirmarlo importa más que antes, no menos.
+ */
+export const MUEVE_PLATA: readonly Estado[] = ['acreditado']
+export const muevePlata = (e: Estado): boolean => MUEVE_PLATA.includes(e)
+
+/**
+ * Con quién se liquida un cobro cuando el cheque no tiene banco cargado.
+ *
+ * Vive acá y no en `cheques-movimiento.ts` porque ESTE archivo es puro: no toca la base ni
+ * importa nada de Node. El otro usa `node:crypto` y, en cuanto una pantalla de cliente lo
+ * importaba aunque fuera por esta constante, el bundle del navegador se rompía
+ * (`UnhandledSchemeError`). La frontera entre lo que corre en los dos lados y lo que corre
+ * solo en el servidor pasa por acá.
+ */
+export const CLIENTE_SIN_BANCO = 'COBRO DE CHEQUES'
 
 export const esTerminal = (e: Estado): boolean => TRANSICIONES[e].length === 0
 export const puedeIr = (desde: Estado, hasta: Estado): boolean =>

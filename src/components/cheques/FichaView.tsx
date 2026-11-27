@@ -5,8 +5,8 @@ import SubirImagen from '@/components/cheques/SubirImagen'
 import { esPdf } from '@/lib/cheques-archivo'
 import { useRouter } from 'next/navigation'
 import {
-  ESTADO_LABEL, TRANSICIONES, esTerminal, textoVencimiento, vencidoSinDepositar,
-  pesos, pesosExacto, fechaLarga,
+  ESTADO_LABEL, TRANSICIONES, esTerminal, muevePlata, textoVencimiento, vencidoSinDepositar,
+  pesos, pesosExacto, fechaLarga, CLIENTE_SIN_BANCO,
   type Cheque, type Estado, type Evento,
 } from '@/lib/cheques'
 import { costoDeCheque, tasaTexto, plazoTexto } from '@/lib/cheques-tasa'
@@ -78,8 +78,10 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
   const router = useRouter()
   const [enviando, setEnviando] = useState<Estado | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
-  /** El destino que está esperando confirmación, cuando es un estado final. */
+  /** El destino que está esperando confirmación: estado final, o que mueve plata. */
   const [confirmando, setConfirmando] = useState<Estado | null>(null)
+  /** Fecha del hecho para las transiciones que generan un movimiento. */
+  const [fechaMov, setFechaMov] = useState(hoy)
   /** Qué pasó en el último cambio, para que la pantalla no quede muda. */
   const [hecho, setHecho] = useState<string | null>(null)
 
@@ -99,11 +101,16 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
       const r = await fetch('/api/cheques/estado', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [cheque.id], estado: destino }),
+        body: JSON.stringify({ ids: [cheque.id], estado: destino, fecha: fechaMov }),
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) { setAviso(j.error || 'No se pudo registrar el cambio'); return }
-      setHecho(`Ahora está ${ESTADO_LABEL[destino].toLowerCase()}. Quedó anotado en el curso del cheque.`)
+      if (Array.isArray(j.avisos) && j.avisos.length) setAviso(j.avisos.join(' '))
+      setHecho(
+        `Ahora está ${ESTADO_LABEL[destino].toLowerCase()}. `
+        + (j.movimientos
+          ? 'El cobro quedó registrado en la caja.'
+          : 'Quedó anotado en el curso del cheque.'))
       router.refresh()
     } catch {
       setAviso('No se pudo conectar. Probá de nuevo.')
@@ -354,9 +361,22 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
           ) : confirmando ? (
             <>
               <span style={{ fontSize: 12.5, color: 'var(--ink-1)' }}>
-                <b>{ACCION[confirmando]}.</b> Sale de la cartera y no se puede deshacer
-                desde la pantalla.
+                <b>{ACCION[confirmando]}.</b>{' '}
+                {muevePlata(confirmando)
+                  ? `Entran ${pesos(cheque.importe)} a la caja, a nombre de `
+                    + `${cheque.banco?.trim() || CLIENTE_SIN_BANCO}.`
+                  : 'Sale de la cartera y no se puede deshacer desde la pantalla.'}
               </span>
+              {/* LA FECHA DEL HECHO. Un cobro marcado tres días tarde tiene que entrar a
+                  la caja con la fecha en que el banco pagó, o el arqueo de ese día no
+                  cierra. Solo aparece donde hay plata: en las demás no cambia nada. */}
+              {muevePlata(confirmando) && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
+                  Fecha
+                  <input type="date" className="input" style={{ width: 150 }}
+                    max={hoy} value={fechaMov} onChange={e => setFechaMov(e.target.value)} />
+                </label>
+              )}
               <button className="btn-primary" disabled={!!enviando}
                 onClick={() => { const d = confirmando; setConfirmando(null); mover(d) }}>
                 {enviando ? 'Registrando…' : 'Confirmar'}
@@ -372,7 +392,9 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
               </span>
               {posibles.map(destino => (
                 <button key={destino} className="chip" disabled={!!enviando}
-                  onClick={() => (esTerminal(destino) ? setConfirmando(destino) : mover(destino))}>
+                  onClick={() => (esTerminal(destino) || muevePlata(destino)
+                    ? setConfirmando(destino)
+                    : mover(destino))}>
                   {enviando === destino ? 'Registrando…' : ACCION[destino]}
                 </button>
               ))}
