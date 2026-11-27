@@ -316,6 +316,29 @@ para negociar caso por caso.
 cuenta del cliente se debita por separado. Neto: el cheque sale, la caja de pesos no se
 mueve, el cliente queda debiendo.
 
+### Cómo se resuelve en pantalla
+
+Desde la ficha de un cheque rechazado, el botón **Resolver el rechazo** abre un panel con
+las tres salidas con plata, la fecha y el importe recuperado. Las otras dos —reintentar y
+dar por incobrable— siguen siendo botones de la máquina de estados, porque no hay nada que
+preguntar.
+
+El panel es una pantalla y no un botón más porque **cuánto se recupera y de dónde viene
+son decisiones del momento**: no están en ningún dato previo.
+
+- El importe **arranca en el nominal** y es editable. No puede superarlo: si hay
+  intereses, van como una operación aparte.
+- En el canje se muestra, mientras se carga, cuánto vale de más el cheque nuevo. Esa
+  diferencia es la ganancia del canje, y sale sola del spread entre las dos cotizaciones.
+- El cheque nuevo queda con el vínculo al que rebotó en sus notas.
+
+Las tres terminan en `devuelto` y **la plata se escribe antes que el estado**, igual que en
+la acreditación: si fallara al revés, el cheque quedaría resuelto sin su plata y nadie lo
+notaría hasta el arqueo. Si falla cualquier paso se deshace todo lo anterior.
+
+El endpoint es `/api/cheques/resolver-rechazo`, aparte de `/api/cheques/estado` porque
+este último solo cambia estados.
+
 ### El incobrable
 
 Estado propio, no `devuelto`: ahí el cliente resolvió y se llevó el papel; acá la casa se

@@ -7,6 +7,7 @@ import { esStaff } from '@/lib/roles'
 import { pareceCuentaCorriente, avisoCajaVsCtaCte } from '@/lib/caja-vs-ctacte'
 import { hayColumnaVinculo } from '@/lib/diario'
 import { validarChequesDelAlta, type ChequeNuevo } from '@/lib/cheques'
+import { insertarCheques } from '@/lib/cheques-movimiento'
 
 export const maxDuration = 30
 
@@ -264,50 +265,20 @@ export async function POST(request: Request) {
       }, { status: 500 })
     }
 
-    const movimientoId = (filaCaja as { id: string }).id
-    const limpio = (v: string | null | undefined) => {
-      const s = String(v ?? '').trim()
-      return s ? s : null
-    }
-
-    const { data: insertados, error: errorCheques } = await (supabase as any)
-      .from('cheques')
-      .insert(cheques.map(c => ({
-        movimiento_id: movimientoId,
-        numero: c.numero.trim(),
-        importe: Number(c.importe),
-        fecha_pago: c.fecha_pago,
-        fecha_emision: c.fecha_emision || null,
-        estado: 'en_cartera',
-        tipo: c.tipo,
-        librador: limpio(c.librador),
-        cuit_librador: limpio(c.cuit_librador),
-        banco: limpio(c.banco),
-        sucursal: limpio(c.sucursal),
-        cuenta: limpio(c.cuenta),
-        // La RUTA dentro del bucket privado, no una URL: una firmada vence.
-        archivo_url: limpio(c.archivo_url),
-        origen_datos: 'manual',
-        creado_por: user.id,
-      })))
-      .select('id')
-    if (errorCheques)
+    // Las filas de los cheques y su primer evento los escribe `insertarCheques`, que es
+    // el mismo helper que usa el canje de un cheque rechazado. Está compartido y no
+    // copiado porque son las filas de las que cuelga toda la cartera: dos versiones se
+    // desincronizan y la primera corrección entra en una sola, sin que nada falle.
+    const res = await insertarCheques(supabase, {
+      movimientoId: (filaCaja as { id: string }).id,
+      cheques,
+      fecha,
+      creadoPor: user.id,
+      nota: 'Recibido al descontar',
+    })
+    if ('error' in res)
       return NextResponse.json({
-        error: `La operación se guardó pero los cheques no: ${errorCheques.message}`,
-      }, { status: 500 })
-
-    // El primer evento del curso. Estado e historial se escriben siempre juntos: una
-    // ficha con estado y sin historia miente sin ninguna señal en pantalla.
-    const ids = ((insertados ?? []) as { id: string }[]).map(r => r.id)
-    const { error: errorEventos } = await (supabase as any).from('cheques_eventos').insert(
-      ids.map(id => ({
-        cheque_id: id, fecha, estado: 'en_cartera',
-        movimiento_id: movimientoId, notas: 'Recibido al descontar', creado_por: user.id,
-      })))
-    if (errorEventos)
-      return NextResponse.json({
-        error: 'Los cheques se guardaron pero sin su primer evento: '
-          + `${errorEventos.message}. La ficha va a mostrar la cartera sin historia.`,
+        error: `La operación se guardó pero los cheques no: ${res.error}`,
       }, { status: 500 })
   }
 

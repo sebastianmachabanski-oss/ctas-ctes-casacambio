@@ -37,7 +37,7 @@ import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 import { hayColumnaVinculo } from '@/lib/diario'
-import { CONCEPTO_INCOBRABLE } from '@/lib/cheques'
+import { CONCEPTO_INCOBRABLE, type ChequeNuevo } from '@/lib/cheques'
 
 export type SalidaDeCheques = {
   /** Fecha del hecho, no del día en que se carga. */
@@ -56,16 +56,35 @@ export type SalidaDeCheques = {
 
 export type ResultadoSalida = { id: string } | { error: string }
 
-export async function registrarSalidaDeCheques(
+export const registrarSalidaDeCheques = (
   supabase: SupabaseClient<any, any, any>,
   s: SalidaDeCheques,
+) => registrarMovimientoDeCheques(supabase, s, 'VENTA')
+
+/**
+ * La COMPRA del cheque que se recibe en un canje.
+ *
+ * Es el mismo movimiento que una salida con la pata de cheques al revés, así que comparte
+ * todo: el motor, las dos tablas, el vínculo y el manejo de errores. Lo que la hace un
+ * canje es que los pesos que salen son exactamente los que entraron por la salida del
+ * cheque rechazado, de modo que se cancelan y la casa no pone plata.
+ */
+export const registrarCompraDeCheques = (
+  supabase: SupabaseClient<any, any, any>,
+  s: SalidaDeCheques,
+) => registrarMovimientoDeCheques(supabase, s, 'COMPRA')
+
+async function registrarMovimientoDeCheques(
+  supabase: SupabaseClient<any, any, any>,
+  s: SalidaDeCheques,
+  operacion: 'VENTA' | 'COMPRA',
 ): Promise<ResultadoSalida> {
   if (!(s.nominal > 0)) return { error: 'El nominal tiene que ser mayor a cero' }
   if (!(s.cotizacion > 0)) return { error: 'La cotización tiene que ser mayor a cero' }
 
   const datos = {
     tipo: 'CAJA' as const,
-    operacion: 'VENTA',
+    operacion,
     propio: 'CHEQUES',
     externo: 'PESOS',
     monto: s.nominal,
@@ -155,6 +174,145 @@ export async function registrarSalidaDeCheques(
   }
 
   return { id: (fila as { id: string }).id }
+}
+
+/**
+ * Debita en la cuenta corriente de un cliente.
+ *
+ * Es la segunda pata de "se lo debito": el cheque sale de la caja con una VENTA y acá el
+ * cliente queda debiendo. Son DOS filas y no una porque el motor no tiene columna
+ * `CC CHEQUES` —corta con un error explícito— así que un `CTA CTE · VENTA · CHEQUES`
+ * no existe. No es un rodeo: es la única forma.
+ *
+ * `EGRESAN` y no `INGRESAN`: en la planilla un EGRESAN deja la cuenta en POSITIVO, que es
+ * el cliente debiéndole a la casa. El signo lo pone el motor, nunca se arma a mano.
+ */
+export async function registrarEgresoCuenta(
+  supabase: SupabaseClient<any, any, any>,
+  s: { fecha: string; cuenta: string; monto: number; referencia: string; autor: string },
+): Promise<{ ok: true } | { error: string }> {
+  if (!(s.monto > 0)) return { error: 'El importe tiene que ser mayor a cero' }
+  if (!s.cuenta.trim()) return { error: 'Falta la cuenta corriente a debitar' }
+
+  let impacto: { cuenta: string | null; valores: Record<string, number> }
+  try {
+    impacto = calcularMovimiento({
+      tipo: 'CTA CTE', operacion: 'EGRESAN', propio: 'PESOS', externo: '',
+      monto: s.monto, cotizacion: null, costoPorcentaje: null,
+    })
+  } catch (e: any) {
+    return { error: e?.message ?? 'No se pudo calcular el débito' }
+  }
+
+  const vinculo = (await hayColumnaVinculo(supabase)) ? randomUUID() : null
+  const conVinculo = vinculo ? { vinculo } : {}
+  const comunes = {
+    fecha: s.fecha,
+    tipo: 'CTA CTE',
+    operacion: 'EGRESAN',
+    monto: s.monto,
+    origen: 'app',
+    notas: s.referencia,
+    cc_pesos: Number(impacto.valores['CC PESOS'] ?? 0),
+    cc_dolares: 0, cc_euros: 0, cc_reales: 0, cc_usdt: 0, cc_libras: 0,
+  }
+
+  const { error: errorDiario } = await (supabase as any).from('diario').insert({
+    ...conVinculo, ...comunes,
+    evento: s.referencia,
+    cuenta_cte: s.cuenta.trim(),
+    concepto: 'PESOS',
+    detalle: 'C',
+    moneda: 'PESOS',
+    creado_por: s.autor,
+    anulado: false,
+  })
+  if (errorDiario) return { error: `No se pudo debitar la cuenta: ${errorDiario.message}` }
+
+  const { error: errorCaja } = await (supabase as any).from('movimientos_caja').insert({
+    ...conVinculo, ...comunes,
+    fila_sheet: null,
+    op: 'C',
+    cliente: s.cuenta.trim(),
+    propio: 'PESOS',
+    externo: null,
+    cot: null,
+    cot_efectiva: 1,
+    cuenta: impacto.cuenta,
+    creado_por: s.autor,
+    creado_at: new Date().toISOString(),
+    ...Object.fromEntries(
+      Object.entries(impacto.valores).map(([k, v]) => [k.toLowerCase().replace(/\s+/g, '_'), v]),
+    ),
+  })
+  if (errorCaja) {
+    if (vinculo) await (supabase as any).from('diario').delete().eq('vinculo', vinculo)
+    return { error: `No se pudo debitar la cuenta en caja: ${errorCaja.message}` }
+  }
+  return { ok: true }
+}
+
+/**
+ * Inserta los cheques de una operación y su primer evento.
+ *
+ * Lo usan el alta y el canje por otro cheque. Está acá y no copiado en los dos porque son
+ * las filas de las que después cuelga toda la cartera: dos versiones se desincronizan y la
+ * primera corrección entra en una sola, sin que nada falle.
+ *
+ * `vinculoCanje` ata el cheque nuevo al que rebotó. Sin eso, meses después nadie puede
+ * reconstruir que el cheque B existe porque el A no se pagó, que es el dato que dice qué
+ * clientes patean el problema para adelante.
+ */
+export async function insertarCheques(
+  supabase: SupabaseClient<any, any, any>,
+  p: {
+    movimientoId: string
+    cheques: readonly ChequeNuevo[]
+    fecha: string
+    creadoPor: string
+    nota: string
+    vinculoCanje?: string | null
+  },
+): Promise<{ ids: string[] } | { error: string }> {
+  const limpio = (v: string | null | undefined) => {
+    const s = String(v ?? '').trim()
+    return s ? s : null
+  }
+
+  const { data: insertados, error } = await (supabase as any)
+    .from('cheques')
+    .insert(p.cheques.map(c => ({
+      movimiento_id: p.movimientoId,
+      numero: c.numero.trim(),
+      importe: Number(c.importe),
+      fecha_pago: c.fecha_pago,
+      fecha_emision: c.fecha_emision || null,
+      estado: 'en_cartera',
+      tipo: c.tipo,
+      librador: limpio(c.librador),
+      cuit_librador: limpio(c.cuit_librador),
+      banco: limpio(c.banco),
+      sucursal: limpio(c.sucursal),
+      cuenta: limpio(c.cuenta),
+      // La RUTA dentro del bucket privado, no una URL: una firmada vence.
+      archivo_url: limpio(c.archivo_url),
+      origen_datos: 'manual',
+      creado_por: p.creadoPor,
+      notas: p.vinculoCanje ? `Reemplaza al cheque rechazado ${p.vinculoCanje}` : null,
+    })))
+    .select('id')
+  if (error) return { error: error.message }
+
+  const ids = ((insertados ?? []) as { id: string }[]).map(r => r.id)
+  const { error: errorEventos } = await (supabase as any).from('cheques_eventos').insert(
+    ids.map(id => ({
+      cheque_id: id, fecha: p.fecha, estado: 'en_cartera',
+      movimiento_id: p.movimientoId, notas: p.nota, creado_por: p.creadoPor,
+    })))
+  if (errorEventos)
+    return { error: `Los cheques se guardaron pero sin su primer evento: ${errorEventos.message}` }
+
+  return { ids }
 }
 
 /**

@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import SubirImagen from '@/components/cheques/SubirImagen'
+import ResolverRechazo from '@/components/cheques/ResolverRechazo'
 import { esPdf } from '@/lib/cheques-archivo'
 import { useRouter } from 'next/navigation'
 import {
@@ -73,8 +74,10 @@ function Dato({ rotulo, valor, ayuda, destacado }: {
   )
 }
 
-export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
+export default function FichaView({ cheque, eventos, origen, cuentas, hoy, imagen }: {
   cheque: Cheque; eventos: Evento[]; origen: Origen; hoy: string
+  /** Cuentas corrientes activas, para la salida "se lo debito al cliente". */
+  cuentas: string[]
   /** Enlace FIRMADO y de vida corta. El bucket es privado: no hay URL fija. */
   imagen: string | null
 }) {
@@ -85,6 +88,8 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
   const [confirmando, setConfirmando] = useState<Estado | null>(null)
   /** Fecha del hecho para las transiciones que generan un movimiento. */
   const [fechaMov, setFechaMov] = useState(hoy)
+  /** El panel de resolución del rechazo, que no es una transición más. */
+  const [resolviendo, setResolviendo] = useState(false)
   /** Qué pasó en el último cambio, para que la pantalla no quede muda. */
   const [hecho, setHecho] = useState<string | null>(null)
 
@@ -303,6 +308,13 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
         </div>
       )}
 
+      {/* RESOLVER EL RECHAZO. No es una transición más: cuánto se recupera y de dónde
+          viene son decisiones del momento, y un botón no las puede preguntar. */}
+      {resolviendo && (
+        <ResolverRechazo cheque={cheque} cuentas={cuentas} hoy={hoy}
+          onCancelar={() => setResolviendo(false)} />
+      )}
+
       {/* El curso del cheque */}
       <div className="card">
         <div className="card-h">
@@ -405,6 +417,14 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>
                 Desde {ESTADO_LABEL[cheque.estado].toLowerCase()}:
               </span>
+              {/* Va primero porque es lo que se hace en la mayoría de los rechazos: el
+                  reintento y la baja son los casos de borde. */}
+              {cheque.estado === 'rechazado' && !resolviendo && (
+                <button className="btn-primary" disabled={!!enviando}
+                  onClick={() => setResolviendo(true)}>
+                  Resolver el rechazo
+                </button>
+              )}
               {posibles.map(destino => (
                 <button key={destino} className="chip" disabled={!!enviando}
                   onClick={() => (esTerminal(destino) || muevePlata(destino)

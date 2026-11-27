@@ -54,6 +54,15 @@ export default async function ChequePage({ params }: { params: { id: string } })
     .eq('id', cheque.movimiento_id)
     .maybeSingle()
 
+  // Las cuentas corrientes activas: solo hacen falta para resolver un rechazo debitándolo
+  // al cliente, así que no se traen si el cheque no está rechazado.
+  let cuentas: string[] = []
+  if (cheque.estado === 'rechazado') {
+    const { data: ctas } = await supabase
+      .from('cuentas_corrientes').select('nombre').eq('activo', true).order('nombre')
+    cuentas = ((ctas ?? []) as { nombre: string }[]).map(c => c.nombre)
+  }
+
   // EL ENLACE A LA IMAGEN SE FIRMA ACÁ Y EN CADA VISITA.
   //
   // El bucket es privado porque un cheque muestra la firma de un tercero, así que no hay
@@ -72,6 +81,7 @@ export default async function ChequePage({ params }: { params: { id: string } })
       cheque={cheque}
       eventos={eventos}
       origen={(mov as any) ?? null}
+      cuentas={cuentas}
       hoy={hoyArgentina()}
       imagen={imagen}
     />
