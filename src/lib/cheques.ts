@@ -53,6 +53,19 @@ export const puedeIr = (desde: Estado, hasta: Estado): boolean =>
 export const ACTIVOS: readonly Estado[] = ['en_cartera', 'depositado']
 export const esActivo = (e: Estado): boolean => ACTIVOS.includes(e)
 
+/**
+ * Los estados en los que el cheque TODAVÍA ES UN RIESGO: la cartera más los rechazados.
+ *
+ * Un rechazado no es cartera —no se espera cobrarlo por el circuito normal— pero la plata
+ * sigue afuera y el librador sigue debiendo. Para medir exposición hay que contarlo, y es
+ * justamente el librador del que habría que desconfiar.
+ *
+ * Esto corrige un error del 27/11/2026: la pantalla le pasaba a `concentracionPorLibrador`
+ * los activos Y los rechazados, pero la función descartaba los rechazados por dentro. La
+ * intención del llamador era la correcta; la que estaba mal era la función.
+ */
+export const esRiesgo = (e: Estado): boolean => esActivo(e) || e === 'rechazado'
+
 export type Cheque = {
   id: string
   numero: string
@@ -166,7 +179,7 @@ export type Concentracion = {
 }
 
 /**
- * Agrupa la cartera ACTIVA por librador, de mayor a menor.
+ * Agrupa por librador lo que todavía es riesgo —cartera más rechazados—, de mayor a menor.
  *
  * Agrupa por CUIT cuando está, y por nombre normalizado cuando no: el nombre se tipea a
  * mano y "ACME SA" y "Acme S.A." son el mismo riesgo. Sin esto la concentración se
@@ -174,11 +187,11 @@ export type Concentracion = {
  * contrario de lo que se quiere.
  */
 export function concentracionPorLibrador(cheques: Cheque[]): Concentracion[] {
-  const activos = cheques.filter(c => esActivo(c.estado))
-  const total = activos.reduce((a, c) => a + c.importe, 0)
+  const enRiesgo = cheques.filter(c => esRiesgo(c.estado))
+  const total = enRiesgo.reduce((a, c) => a + c.importe, 0)
   const porClave = new Map<string, Concentracion>()
 
-  for (const c of activos) {
+  for (const c of enRiesgo) {
     const nombre = (c.librador ?? '').trim() || 'Sin librador'
     const cuit = (c.cuit_librador ?? '').trim() || null
     const clave = cuit ?? nombre.toUpperCase().replace(/[^A-Z0-9]/g, '')

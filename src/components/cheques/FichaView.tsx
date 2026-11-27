@@ -9,6 +9,7 @@ import {
   pesos, pesosExacto, fechaLarga,
   type Cheque, type Estado, type Evento,
 } from '@/lib/cheques'
+import { costoDeCheque, tasaTexto, plazoTexto } from '@/lib/cheques-tasa'
 
 type Origen = {
   id: string; fecha: string; cliente: string | null
@@ -46,6 +47,29 @@ function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode
   )
 }
 
+/** Una cifra del bloque de descuento: rótulo arriba, número grande, y por qué es ese. */
+function Dato({ rotulo, valor, ayuda, destacado }: {
+  rotulo: string; valor: string; ayuda?: string; destacado?: boolean
+}) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{
+        fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em',
+        textTransform: 'uppercase', color: 'var(--muted)',
+      }}>{rotulo}</div>
+      <div className="num" style={{
+        fontSize: destacado ? 18 : 15,
+        fontWeight: destacado ? 700 : 600,
+        marginTop: 2,
+        color: destacado ? 'var(--ink)' : undefined,
+      }}>{valor}</div>
+      {ayuda && (
+        <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 1 }}>{ayuda}</div>
+      )}
+    </div>
+  )
+}
+
 export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
   cheque: Cheque; eventos: Evento[]; origen: Origen; hoy: string
   /** Enlace FIRMADO y de vida corta. El bucket es privado: no hay URL fija. */
@@ -62,6 +86,11 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
   // Los botones SON la máquina de estados: no hay una lista de acciones escrita aparte
   // que pueda quedar desincronizada y ofrecer algo imposible.
   const posibles = TRANSICIONES[cheque.estado]
+
+  // A qué tasa se tomó este documento. Sale de la operación que lo trajo; devuelve null
+  // si esa operación no está o no tiene de dónde sacar el costo, y entonces el bloque no
+  // se dibuja en vez de mostrar ceros.
+  const costo = costoDeCheque(cheque, origen)
 
   async function mover(destino: Estado) {
     if (enviando) return
@@ -219,6 +248,42 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
         </div>
       </div>
 
+      {/* EL DESCUENTO. Es el número por el que se decide la operación, así que va arriba
+          del curso del cheque y no en una nota al pie. Las dos tasas se muestran juntas a
+          propósito: la directa es la que se habla con el cliente y la efectiva la que se
+          compara contra otra colocación. El detalle del cálculo, en `cheques-tasa.ts`. */}
+      {costo && (
+        <div className="card">
+          <div className="card-h">
+            <div className="card-t">El descuento</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{plazoTexto(costo.tasa.dias)}</div>
+          </div>
+          <div style={{
+            padding: '2px 14px 14px',
+            display: 'grid', gap: 14,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(116px, 1fr))',
+          }}>
+            <Dato rotulo="Nominal" valor={pesos(cheque.importe)} />
+            <Dato rotulo="Se pagó" valor={pesos(costo.tasa.pagado)} />
+            <Dato rotulo="Descuento" valor={pesos(costo.tasa.descuento)} />
+            <Dato rotulo="Tasa directa" valor={tasaTexto(costo.tasa.directa)}
+              ayuda="sobre el nominal" destacado />
+            <Dato rotulo="Mensual" valor={tasaTexto(costo.tasa.mensual)}
+              ayuda="directa a 30 días" destacado />
+            <Dato rotulo="TNA" valor={tasaTexto(costo.tasa.tna)} ayuda="efectiva a 365 días" />
+          </div>
+          {costo.prorrateado && (
+            <div style={{
+              padding: '0 14px 13px', fontSize: 12, color: 'var(--muted)', lineHeight: 1.5,
+            }}>
+              La operación trajo varios cheques y una sola cifra de lo pagado, así que el
+              costo de este se prorratea por importe. La tasa de la operación entera es
+              exacta; la de este cheque, aproximada.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* El curso del cheque */}
       <div className="card">
         <div className="card-h">
@@ -316,10 +381,13 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
         </div>
       </div>
 
-      {origen && (
+      {/* Solo cuando NO se pudo calcular el descuento: si se pudo, el bloque de arriba ya
+          lo dice mejor y repetirlo acá sería ruido. */}
+      {origen && !costo && (
         <div style={{ fontSize: 12, color: 'var(--muted)' }}>
           La operación que lo trajo movió {pesos(Math.abs(Number(origen.cheques) || 0))} en cheques
-          contra {pesos(Math.abs(Number(origen.pesos) || 0))} en pesos.
+          contra {pesos(Math.abs(Number(origen.pesos) || 0))} en pesos. No alcanza para
+          calcular la tasa.
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@ import {
   pesos, porcentaje, fechaCorta,
   type Cheque, type Concentracion, type Resumen,
 } from '@/lib/cheques'
+import { tasaTexto, type TasaCartera } from '@/lib/cheques-tasa'
 
 // Cartera de cheques. El cálculo vive en `src/lib/cheques.ts` para poder validarlo sin
 // navegador; acá solo se dibuja y se maneja la selección.
@@ -43,13 +44,80 @@ function Tarjeta({ rotulo, importe, cuenta, alerta }: {
   )
 }
 
+/**
+ * A qué tasa está colocada la cartera.
+ *
+ * Va aparte de las cinco tarjetas de importes porque no es un importe: es la respuesta a
+ * la pregunta con la que una oficina que descuenta documentos decide todo el día. Las dos
+ * tasas se muestran juntas —la directa es la que se habla con el cliente, la TNA la que se
+ * compara contra otra colocación— y el cálculo está en `cheques-tasa.ts`.
+ */
+function BandaTasa({ t }: { t: TasaCartera }) {
+  return (
+    <div className="card" style={{ padding: '13px 16px', display: 'grid', gap: 12,
+      gridTemplateColumns: 'repeat(auto-fit, minmax(132px, 1fr))', alignItems: 'end' }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{
+          fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em',
+          textTransform: 'uppercase', color: 'var(--muted)',
+        }}>Colocada al</div>
+        <div className="num" style={{ fontSize: 22, fontWeight: 700, marginTop: 1 }}>
+          {tasaTexto(t.mensual)}
+        </div>
+        <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>mensual, sobre el nominal</div>
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{
+          fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em',
+          textTransform: 'uppercase', color: 'var(--muted)',
+        }}>TNA</div>
+        <div className="num" style={{ fontSize: 17, fontWeight: 600, marginTop: 2 }}>
+          {tasaTexto(t.tna)}
+        </div>
+        <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>sobre la plata puesta</div>
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{
+          fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em',
+          textTransform: 'uppercase', color: 'var(--muted)',
+        }}>Plazo promedio</div>
+        <div className="num" style={{ fontSize: 17, fontWeight: 600, marginTop: 2 }}>
+          {Math.round(t.dias).toLocaleString('es-AR')} días
+        </div>
+        <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>ponderado por importe</div>
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{
+          fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em',
+          textTransform: 'uppercase', color: 'var(--muted)',
+        }}>Se pagó</div>
+        <div className="num" style={{ fontSize: 17, fontWeight: 600, marginTop: 2 }}>
+          {pesos(t.pagado)}
+        </div>
+        <div style={{ fontSize: 10.5, color: 'var(--muted)' }}>
+          por {pesos(t.nominal)} de nominal
+        </div>
+      </div>
+      {t.sinCosto > 0 && (
+        <div style={{ gridColumn: '1 / -1', fontSize: 11.5, color: 'var(--muted)' }}>
+          {t.sinCosto === 1
+            ? 'Un cheque quedó afuera del cálculo: no se encontró la operación que lo trajo.'
+            : `${t.sinCosto.toLocaleString('es-AR')} cheques quedaron afuera del cálculo: no se encontró la operación que los trajo.`}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function CarteraView({
-  cheques, total, resumen, concentracion, hoy, filtro, sinTabla, error,
+  cheques, total, resumen, concentracion, tasa, hoy, filtro, sinTabla, error,
 }: {
   cheques: Cheque[]
   total: number
   resumen: Resumen | null
   concentracion: Concentracion[]
+  /** A qué tasa está colocada la cartera activa. `null` si no hay de dónde sacarla. */
+  tasa: TasaCartera | null
   hoy: string
   filtro: string
   sinTabla?: boolean
@@ -147,6 +215,8 @@ export default function CarteraView({
             cuenta={resumen.rechazados.cheques} alerta={resumen.rechazados.cheques > 0} />
         </div>
       )}
+
+      {tasa && <BandaTasa t={tasa} />}
 
       <div className="card">
         <div className="card-h" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

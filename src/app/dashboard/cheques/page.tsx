@@ -6,6 +6,7 @@ import {
   resumenCartera, concentracionPorLibrador, esActivo,
   type Cheque, type Estado,
 } from '@/lib/cheques'
+import { tasaDeCartera, type Origen } from '@/lib/cheques-tasa'
 import CarteraView from '@/components/cheques/CarteraView'
 
 // Cartera de cheques (23/11/2026).
@@ -73,7 +74,7 @@ export default async function ChequesPage({ searchParams }: {
     // Sin la migración corrida la tabla no existe. Se avisa en pantalla en vez de
     // reventar: es exactamente lo que pasa en una instalación que todavía no la corrió.
     if (error) return <CarteraView sinTabla error={error.message} hoy={hoy} filtro={filtro}
-      cheques={[]} resumen={null} concentracion={[]} total={0} />
+      cheques={[]} resumen={null} concentracion={[]} tasa={null} total={0} />
     const filas = ((data ?? []) as unknown) as Cheque[]
     for (const c of filas) todos.push({ ...c, importe: Number(c.importe) || 0 })
     if (filas.length < PAGE) break
@@ -85,6 +86,27 @@ export default async function ChequesPage({ searchParams }: {
   const resumen = resumenCartera(activosYRechazados, hoy)
   const concentracion = concentracionPorLibrador(activosYRechazados)
 
+  // A QUÉ TASA ESTÁ COLOCADA LA CARTERA.
+  //
+  // Lo que se pagó por un cheque no está en el cheque: está en la operación que lo trajo
+  // (la columna PESOS de su movimiento), así que hay que ir a buscar esas operaciones. Se
+  // piden solo las de los cheques que importan y de a 500 ids, que es lo que admite un
+  // `in` sin que la URL se vuelva inmanejable.
+  //
+  // La tasa se calcula sobre la cartera ACTIVA, igual que la tarjeta "Total en cartera":
+  // un rechazado ya no es plata colocada esperando cobro, es un problema, y mezclarlo
+  // movería la tasa sin que nadie entienda por qué.
+  const enCartera = activosYRechazados.filter(c => esActivo(c.estado))
+  const idsOrigen = Array.from(new Set(enCartera.map(c => c.movimiento_id).filter(Boolean)))
+  const origenes = new Map<string, Origen>()
+  for (let i = 0; i < idsOrigen.length; i += 500) {
+    const { data: movs } = await supabase
+      .from('movimientos_caja').select('id,fecha,cheques,pesos')
+      .in('id', idsOrigen.slice(i, i + 500))
+    for (const m of ((movs ?? []) as unknown) as Origen[]) origenes.set(m.id, m)
+  }
+  const tasa = tasaDeCartera(enCartera, origenes, hoy)
+
   // El listado sí responde a la solapa.
   const permitidos = new Set(FILTROS[filtro])
   const lista = todos.filter(c => permitidos.has(c.estado))
@@ -95,6 +117,7 @@ export default async function ChequesPage({ searchParams }: {
       total={lista.length}
       resumen={resumen}
       concentracion={concentracion}
+      tasa={tasa}
       hoy={hoy}
       filtro={filtro}
     />
