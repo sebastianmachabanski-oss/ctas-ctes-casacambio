@@ -135,18 +135,32 @@ export function generarDia(c: ContextoDia): void {
   // ── Gastos ───────────────────────────────────────────────────────────────
   // Solo en PESOS (regla del dominio). Ver la nota de GASTO_FIJO_MENSUAL: el grueso cae
   // una vez por mes y lo demás son gastos chicos, para que el resultado mensual no salte.
+  /**
+   * LOS GASTOS SE INDEXAN, igual que en la realidad.
+   *
+   * Un alquiler y un sueldo siguen a la inflación. Dejarlos fijos en pesos a lo largo de
+   * catorce meses, mientras las cotizaciones suben 46 %, hace que en los primeros meses
+   * se coman casi toda la ganancia bruta: el neto queda chico y apalancado, y entonces
+   * un ±20 % en el bruto se convierte en un ±100 % en el resultado. La serie salta sin
+   * que haya pasado nada.
+   *
+   * El índice es la cotización del dólar del día contra su base, que es lo que de hecho
+   * usa cualquier casa de cambio para actualizar un contrato.
+   */
+  const indice_ = cotizacion('DOLARES', indice) / 1500
+
   const diaDelMes = Number(fecha.slice(8, 10))
   if (diaDelMes <= 5 && c.tomarGastoFijoDelMes(fecha.slice(0, 7))) {
     registrar({
       fecha, tipo: 'CAJA', cliente: 'ALQUILER Y SUELDOS', operacion: 'GASTOS',
       propio: 'PESOS', externo: '',
-      monto: redondo(GASTO_FIJO_MENSUAL * (0.97 + azar() * 0.06), 10_000),
+      monto: redondo(GASTO_FIJO_MENSUAL * indice_ * (0.97 + azar() * 0.06), 10_000),
     })
   }
   if (azar() < 0.18) {
     registrar({
       fecha, tipo: 'CAJA', cliente: uno(CONCEPTOS_GASTO), operacion: 'GASTOS',
-      propio: 'PESOS', externo: '', monto: redondo(entre(40_000, 260_000), 5_000),
+      propio: 'PESOS', externo: '', monto: redondo(entre(40_000, 260_000) * indice_, 5_000),
     })
   }
 }

@@ -70,7 +70,7 @@ export default function TableroView({ serie, comparacion, mesCursor, mesAnterior
   // adentro de la columna: el contenedor del gráfico lleva `overflow-x: auto` para que
   // en pantalla angosta se pueda arrastrar, y eso obliga al navegador a recortar también
   // en vertical. Dentro de la columna, el tooltip existía en el DOM y no se veía.
-  const [sobre, setSobre] = useState<{ i: number; x: number; y: number } | null>(null)
+  const [sobre, setSobre] = useState<{ i: number; x: number; y: number; abajo: number } | null>(null)
 
   const cmp = comparacion
   // El resultado grande es el del mes ENTERO que corre, no el del tramo recortado: lo que
@@ -215,7 +215,7 @@ export default function TableroView({ serie, comparacion, mesCursor, mesAnterior
                       key={m.mes}
                       onMouseEnter={e => {
                         const r = e.currentTarget.getBoundingClientRect()
-                        setSobre({ i, x: r.left + r.width / 2, y: r.top })
+                        setSobre({ i, x: r.left + r.width / 2, y: r.top, abajo: r.bottom })
                       }}
                       onMouseLeave={() => setSobre(s => (s?.i === i ? null : s))}
                       style={{
@@ -274,7 +274,7 @@ export default function TableroView({ serie, comparacion, mesCursor, mesAnterior
           </div>
         )}
 
-        {sobre && <Tooltip m={serie[sobre.i]} x={sobre.x} y={sobre.y} />}
+        {sobre && <Tooltip m={serie[sobre.i]} x={sobre.x} y={sobre.y} abajo={sobre.abajo} />}
 
         <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
           Los cuatro colores suman el resultado del mes: los gastos van hacia abajo porque
@@ -345,20 +345,34 @@ function TarjetaComparacion({ titulo, variacion, base, etiquetaBase, tramo }: {
  * El detalle del mes, al pasar por encima de su columna.
  *
  * `position: fixed` con las coordenadas de la columna: adentro del gráfico lo recortaría
- * el `overflow-x: auto`. Se mantiene a 190px del borde para no salirse en pantalla
- * angosta.
+ * el `overflow-x: auto`.
+ *
+ * DOS COSAS QUE SE VIERON RECIÉN EN LA DEMO, con datos reales:
+ *
+ *   El ancho es FIJO y el tope contra el borde es la mitad de ese ancho. Antes el tope
+ *   era 110px fijo mientras el contenido lo hacía crecer a casi 300: en el último mes
+ *   —que es el que todos miran— los importes quedaban cortados contra el borde derecho.
+ *
+ *   Y si no hay lugar arriba, baja. El gráfico empieza cerca del tope de la ventana, así
+ *   que sobre las primeras columnas el globo tapaba las tarjetas del resultado.
  */
-function Tooltip({ m, x, y }: { m: MesSerie; x: number; y: number }) {
+const ANCHO_TOOLTIP = 290
+const ALTO_TOOLTIP = 150
+
+function Tooltip({ m, x, y, abajo }: { m: MesSerie; x: number; y: number; abajo: number }) {
   const p = partesDe(m)
-  const izq = typeof window !== 'undefined'
-    ? Math.min(Math.max(x, 110), window.innerWidth - 110)
-    : x
+  const ancho = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const izq = Math.min(Math.max(x, ANCHO_TOOLTIP / 2 + 8), ancho - ANCHO_TOOLTIP / 2 - 8)
+  const vaAbajo = y < ALTO_TOOLTIP + 16
   return (
     <div role="tooltip" style={{
-      position: 'fixed', left: izq, top: y - 8, transform: 'translate(-50%, -100%)',
+      position: 'fixed', left: izq,
+      top: vaAbajo ? abajo + 8 : y - 8,
+      transform: `translate(-50%, ${vaAbajo ? '0' : '-100%'})`,
       pointerEvents: 'none',
       zIndex: 50, background: 'var(--card)', border: '1px solid var(--ring)',
-      borderRadius: 8, padding: '9px 11px', minWidth: 190, boxShadow: '0 6px 20px rgba(15,23,42,.13)',
+      borderRadius: 8, padding: '9px 11px', width: ANCHO_TOOLTIP,
+      boxSizing: 'border-box', boxShadow: '0 6px 20px rgba(15,23,42,.13)',
       fontSize: 12, lineHeight: 1.5, whiteSpace: 'nowrap',
     }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>{m.etiqueta}</div>

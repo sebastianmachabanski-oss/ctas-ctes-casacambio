@@ -254,6 +254,79 @@ Las consultas para reproducir todo esto están en `scripts/reales-de-donde-salen
 (la consulta 3 sirve para cualquier moneda cambiando el nombre de la columna) y en
 `scripts/comparar-valuacion-stock.sql`. Las dos solo leen.
 
+#### Definiciones del cliente — 25/11/2026
+
+Conversación con el cliente más dos consultas a producción. Lo que sigue está **cerrado**
+salvo donde dice lo contrario.
+
+**El universo es más chico de lo que se creía: no hay cuenta corriente.** Las 17.918
+compras y ventas de la base —10.486 y 7.432, del 2/12/2024 al 25/11/2026— son **todas de
+caja**. Cero filas con `tipo = 'CTA CTE'`. La cuenta corriente de este cliente es un libro
+de ingresos y egresos: nunca compró ni vendió moneda liquidando contra la cuenta de un
+cliente.
+
+Tres consecuencias:
+
+1. Moneda contra moneda es un problema **únicamente de caja**. Las patas `cc_*` no
+   participan y el desarrollo se simplifica.
+2. El interruptor de "cuenta corriente" en Configuración **hoy no hace nada** para este
+   cliente: prendido o apagado el resultado es idéntico, porque no hay nada que sumar.
+3. La rama `cc_*` del motor **nunca se ejecutó contra datos reales**. Está escrita y
+   cubierta por validadores, pero solo contra datos sintéticos. No es un error; es código
+   sin rodaje, y conviene saberlo si algún día el cliente empieza a operar así.
+
+Para qué usa entonces la cuenta corriente —y qué oportunidad abre eso— va aparte, en
+**4.8**: es un depósito de valor por el que no cobra nada.
+
+**Qué opera este cliente.** Compra y venta de euros y de reales, siempre contra pesos o
+contra dólares, nunca entre sí y nunca contra cheques. Confirmado por el cliente y por los
+datos. **También hay libras** (2.450 en caja al 25/11/2026): siguen el mismo camino que
+euros y reales.
+
+**Cómo se calcula.**
+
+- **Contra pesos** — ya está definido e implementado. No cambia.
+- **Contra dólares** — la ganancia sale de la cotización que se carga en la transacción,
+  tomada como valor de mercado, con el mismo criterio que una operación pesos/dólares.
+- **La ganancia nace en dólares y se pasa a pesos con la cotización de cierre del
+  período** para el panel general. El mismo dólar con el que se valúa la posición: usar
+  uno para valuar el stock y otro para convertir la ganancia hace que el panel se
+  contradiga consigo mismo.
+
+**Lo que falta definir — una sola pregunta.** El cliente dijo textual *"es ganancia por
+transacción... si el mercado dice que el euro vale 1,5 y yo vendo 1,8, eso va directo a
+ganancia"*, y también que la tasa de referencia la digita él y puede diferir de la del
+mercado. Eso **no es** el criterio de calce de período que usa el motor hoy, donde una
+compra no genera ganancia hasta que se vende.
+
+Los dos se reconcilian así, y es lo más probable que el cliente quiera sin nombrarlo: la
+parte **calzada** gana el spread real (dato duro, sin supuesto) y el **remanente** en
+stock se valúa contra el precio de referencia que él carga. Eso ya existe en el motor —es
+`resid: 'mtm'` con cotización de cierre—, solo que hoy el cierre está clavado en 1.500
+(ver 4.0.b y 4.7).
+
+Si esa lectura es correcta, la pregunta al cliente se achica a: **¿el precio de referencia
+es uno por período, o uno por operación?** De la respuesta sale si alcanza con el cierre
+que ya existe o si hace falta una columna nueva en el alta. El cliente no la pudo
+contestar; queda pendiente.
+
+**Dos reglas técnicas que hay que respetar al implementar.**
+
+- **La pata en dólares no entra al par dólar.** Si se compran euros pagando dólares, esos
+  dólares que salen no son una venta de dólares: no tienen spread propio. Meterlos en el
+  cálculo del dólar cuenta la ganancia dos veces. Hoy no pasa —`ganancias-datos.ts` saltea
+  la fila entera con `if (!vol || !ars) continue`, porque no hay pata en pesos—, pero al
+  hacerla visible hay que excluirla explícitamente.
+- **¿Esa pata mueve el stock de dólares?** Debería, porque si no la posición de dólares
+  queda mal; pero mover el stock cambia la valuación del remanente del dólar y por lo
+  tanto el resultado. Es una decisión a tomar, no un detalle de implementación.
+
+**Alcance adicional (punto 6 del cliente).** Lo que este cliente *no* hace —moneda contra
+moneda entre euros y reales, cheques contra divisa, compras y ventas por cuenta
+corriente— se documenta igual, con el criterio recomendado para cada caso, para poder
+explicárselo a un cliente futuro que sí lo necesite. Suma **2 a 3 h** de redacción sobre
+la estimación del módulo.
+
 ### 4.1. Rentabilidad por cliente y por moneda — **6 a 8 h**
 Hoy Ganancias es un total global. Este módulo abre el margen por cliente, por moneda y
 por tipo de operación, con ranking de los que más y menos aportan.
@@ -324,6 +397,21 @@ Son dos cosas, y la primera es más grave de lo que parece.
   Depende de tener una **cotización de cierre**: es la decisión de fuente de cotización
   que ya está pendiente del cliente.
 
+- **El margen fijo de 0,05 distorsiona, y ya tenemos con qué reemplazarlo — 4 a 6 h.**
+  Visto en la demo del 24/11/2026 con datos reales. El supuesto por defecto es
+  arbitrario: cinco centavos por unidad no sale de ningún lado, y es el que se usa en
+  todas las monedas por igual, valgan 290 pesos o 1.950.
+
+  La novedad es que **ya no hace falta inventarlo**. Desde el 19/11/2026 la tabla
+  `cotizaciones_mercado` guarda cotizaciones reales cada quince minutos, y monitorargy
+  tiene quince años de historia diaria para los meses hacia atrás. O sea que el valor de
+  cierre se puede calcular de verdad, en vez de suponerlo.
+
+  Dos caminos, y conviene el segundo:
+  1. Dejar el margen fijo pero que el valor se configure por moneda (parte de 4.7).
+  2. Valuar a la cotización de cierre real del período, tomada de `cotizaciones_mercado`.
+     Es lo correcto contablemente y además deja de ser un supuesto que haya que explicar.
+
 - **Devengar la ganancia del cheque hasta su vencimiento — 6 a 8 h.** Hoy se reconoce
   entera el día del descuento. Es interés: descontar a 90 días es prestar plata 90 días,
   y reconocer todo en el primer mes infla ese mes y deja los otros dos en cero. El dato
@@ -375,6 +463,73 @@ El trabajo:
 
 > **Gancho comercial:** convierte una objeción en una función. "¿Y si mi contador usa
 > otro criterio?" deja de ser un problema y pasa a ser una opción de configuración.
+
+### 4.8. Fondeo de clientes: cuánto vale la plata en custodia — **8 a 11 h**
+
+Surge del hallazgo del 25/11/2026 (ver 4.0.c): este cliente **no hace compras ni ventas
+por cuenta corriente**, pero tiene muchísimo movimiento de cuenta corriente. Averiguado
+con él el 27/11:
+
+1. La cuenta corriente es un **depósito de valor**. Los clientes dejan la plata ahí.
+2. **No cobra nada** por guardarla ni por moverla. Se usa además para mover dinero entre
+   clientes y proveedores: es un servicio recíproco, no un producto arancelado.
+3. Se podría registrar una **ganancia por tenencia** a modo de costo de oportunidad —a
+   validar con el cliente.
+
+#### El dato que lo justifica
+
+Saldos al 25/11/2026, tomados de la pantalla de Inicio. El saldo de cuenta corriente es
+negativo porque es **lo que la casa les debe a los clientes**:
+
+| | En caja | Debido a clientes | Capital propio |
+|---|---|---|---|
+| Pesos | 502.310.732 | 207.477.012 | ~294.833.720 |
+| Dólares | 454.961 | 472.797 | **−17.836** |
+| Euros | 43.855 | 14.230 | ~29.625 |
+
+No son saldos que se limpian: son posiciones grandes y persistentes. Y en dólares el
+número es contundente — **la casa debe más dólares de los que tiene en caja.** Dicho de
+otro modo, **el 100 % del efectivo en dólares de la casa es plata de clientes**: opera su
+negocio principal sin capital propio en esa moneda.
+
+> Los importes de arriba son los de un día y salen de una lectura de pantalla.
+> **Verificarlos contra `diario` antes de llevárselos al cliente**, y calcular el saldo
+> PROMEDIO del período, que es el que importa. El saldo de hoy no dice nada: lo relevante
+> es cuánto hubo en custodia a lo largo del año.
+
+#### Por qué NO va sumado a Ganancias
+
+El costo de oportunidad es un concepto de **análisis**, no de registro, y meterlo en el
+total operativo rompe tres cosas:
+
+- **No tiene contrapartida.** No es ganancia realizada ni realizable. Para sumarlo habría
+  que inventar un ingreso contra nada.
+- **Contamina la comparación entre meses.** Un mes mejoraría sin que la casa haya operado
+  mejor, solo porque un cliente dejó más plata depositada. Es exactamente el tipo de
+  salto que se corrigió en el tablero.
+- **La tasa es arbitraria y el resultado es hipersensible a ella.** Sobre 207 millones de
+  pesos, la diferencia entre 30 % y 60 % anual son decenas de millones. Un número que se
+  mueve así según un parámetro elegido a dedo no puede compartir total con el margen
+  medido.
+
+#### Qué construir en su lugar
+
+Un panel **aparte**, "Fondeo de clientes", al lado del resultado operativo y nunca dentro:
+
+- **Saldo promedio en custodia** por moneda en el período, calculado desde `diario`.
+- **Cuánto costaría conseguir ese capital en el mercado**, con la tasa visible y
+  configurable por moneda en `app_config` (no clavada en el código), y el supuesto
+  escrito en pantalla.
+- **Cobertura**: qué porcentaje de lo que se debe está efectivamente en caja. Es el otro
+  lado de la misma moneda — ese dinero es **exigible a la vista**, y hoy en dólares la
+  cobertura es del 96,2 %.
+
+Así se contesta la pregunta de negocio que el cliente tiene de verdad —"¿cuánto vale este
+servicio que doy gratis?"— sin ensuciar el margen, y de paso aparece la exposición de
+liquidez, que hoy no se mide en ningún lado.
+
+> **Pendiente de confirmar con el cliente:** si quiere verlo, con qué tasa, y si le
+> interesa el indicador de cobertura o prefiere no tenerlo en pantalla.
 
 ---
 

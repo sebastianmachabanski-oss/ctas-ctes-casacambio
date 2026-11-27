@@ -1,8 +1,7 @@
 /**
  * Continúa una base de DEMOSTRACIÓN ya sembrada, desde su último día hasta hoy.
  *
- *   SUPABASE_URL=https://xxx.supabase.co \
- *   SERVICE_ROLE_KEY=eyJ... \
+ *   npm run base demo                                    ← apuntar a la base de demo
  *   npx tsx scripts/continuar-demo.mts --confirmo-que-es-una-base-de-demo
  *
  * Y para que además tenga historia hacia atrás —el tablero mira trece meses—:
@@ -48,35 +47,30 @@ import { createClient } from '@supabase/supabase-js'
 import { calcularMovimiento } from '../src/lib/motor-calculo'
 import { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO } from './elenco-demo'
 import { controlGastoFijo, esHabil, generarDia } from './generador-demo'
-import { serieMensual } from '../src/lib/ganancias-series'
-import { ttVacio } from '../src/lib/ganancias-tt'
-import type { DiaAgg, ParAgg } from '../src/lib/ganancias-composicion'
+import { credenciales } from './env-local'
+import { cargarGanancias } from '../src/lib/ganancias-datos'
+import { agruparPorDia, informeDeSerie, serieDeDias } from './serie-demo'
 
-const parVacio = (): ParAgg => ({ vC: 0, aC: 0, vV: 0, aV: 0, vCcc: 0, aCcc: 0, vVcc: 0, aVcc: 0 })
-/** Cuántos meses hay entre dos fechas, ambas incluidas. */
-const mesesEntre = (a: string, b: string): number => {
-  const [a1, m1] = a.slice(0, 7).split('-').map(Number)
-  const [a2, m2] = b.slice(0, 7).split('-').map(Number)
-  return (a2 * 12 + m2) - (a1 * 12 + m1) + 1
-}
 
-/** Sin la barra del final: ver la nota en scripts/crear-primer-admin.mts. */
-const BASE_URL = (process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL)?.trim().replace(/\/+$/, '')
-const KEY = process.env.SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY
 const CONFIRMADO = process.argv.includes('--confirmo-que-es-una-base-de-demo')
 /** Lee la base y muestra qué se generaría, sin escribir una sola fila. */
 const VISTA_PREVIA = process.argv.includes('--vista-previa')
 
 function salir(msg: string): never { console.error(`❌ ${msg}`); process.exit(1) }
 
-if (!BASE_URL || !KEY) salir(
-  'Faltan SUPABASE_URL y SERVICE_ROLE_KEY en el entorno (Supabase → Project Settings → API).')
 if (!CONFIRMADO && !VISTA_PREVIA) salir(
   'Falta la bandera --confirmo-que-es-una-base-de-demo\n'
   + '   Este script carga operaciones FICTICIAS sobre una base que YA TIENE datos.\n'
   + '   Escribila entera, a propósito.')
 
-const db = createClient(BASE_URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } })
+/**
+ * Credenciales del `.env.local`, o del ambiente si están exportadas; ver
+ * scripts/env-local.ts. Acá SIEMPRE hacen falta, también en la vista previa: este script
+ * lee el estado de la base antes de generar nada.
+ */
+const cred = credenciales()
+if ('problema' in cred) salir(cred.problema)
+const db = createClient(cred.url, cred.key, { auth: { persistSession: false, autoRefreshToken: false } })
 
 const MONEDAS = ['PESOS', 'DOLARES', 'EUROS', 'REALES', 'USDT', 'LIBRAS'] as const
 type Moneda = typeof MONEDAS[number]
@@ -87,7 +81,7 @@ const COLUMNA: Record<Moneda, string> = {
 }
 
 // ── Lo que ya hay en la base ───────────────────────────────────────────────
-console.log(`→ Leyendo el estado de ${new URL(BASE_URL).host}…`)
+console.log(`→ Leyendo el estado del proyecto ${cred.proyecto}…`)
 
 const { count, error: errContar } = await db
   .from('movimientos_caja').select('*', { count: 'exact', head: true })
@@ -314,24 +308,49 @@ function registrar(m: {
 // ── La operatoria, día por día ─────────────────────────────────────────────
 // Mismas proporciones que `sembrar-demo.mts`: si fueran otras, el tramo nuevo se
 // distinguiría del viejo en cualquier gráfico.
-console.log(`→ Generando del ${fechas[0]} al ${fechas[fechas.length - 1]} (${fechas.length} días hábiles)…`)
+if (fechasAtras.length) console.log(
+  `→ Rellenando hacia atrás del ${fechasAtras[0]} al ${fechasAtras[fechasAtras.length - 1]}`
+  + ` (${fechasAtras.length} días hábiles)…`)
+if (fechas.length) console.log(
+  `→ Generando del ${fechas[0]} al ${fechas[fechas.length - 1]} (${fechas.length} días hábiles)…`)
 
 const tomarGastoFijoDelMes = controlGastoFijo()
 const elenco = { CUENTAS, EVENTUALES, REPARTIDORES, CONTRAPARTES_TT, CONCEPTOS_GASTO }
 
 /**
- * Primero el relleno hacia atrás, con una moneda que entra y sale por igual.
+ * Primero el relleno hacia atrás, con su propio controlador.
  *
- * Acá NO se usa `convieneQueEntre`: ese controlador empuja el stock hacia el objetivo, y
- * para días del pasado eso no significa nada. Lo que se busca es que el tramo viejo no
- * desbalancee la caja; lo que igual se desbalancee se compensa después, exacto, en el
- * SALDO INICIAL.
+ * NO se usa `convieneQueEntre`: ese empuja el stock hacia el objetivo de HOY, y para días
+ * del pasado eso no significa nada. Lo que se busca es que el tramo viejo termine con un
+ * neto cercano a cero, porque lo que se desbalancee hay que descontárselo al SALDO
+ * INICIAL y ese no puede quedar negativo.
+ *
+ * TAMPOCO SIRVE TIRAR UNA MONEDA 50/50, que fue el primer intento. Eso es una caminata
+ * aleatoria: sobre trescientos días hábiles el desvío acumulado del dólar ronda los
+ * 300.000 —del orden del saldo inicial entero— y la corrida aborta. El azar sin memoria
+ * no se compensa solo; hay que empujarlo.
+ *
+ * Acá la probabilidad sigue al neto ACUMULADO del propio relleno: si viene comprando de
+ * más, empieza a vender. Con eso el neto queda acotado a una fracción del stock en vez
+ * de crecer con la raíz del tiempo.
  */
+const stockAlEmpezarRelleno: Record<string, number> = { ...stock }
+/** Cuánto tolera desviarse antes de tirar fuerte: ~12 % del stock objetivo. */
+const ESCALA: Record<string, number> = Object.fromEntries(
+  Object.entries(OBJETIVO).map(([m, v]) => [m, Math.max(1, v * 0.12)]),
+)
+function convieneQueEntreEnElRelleno(moneda: string): boolean {
+  const neto = (stock[moneda] ?? 0) - (stockAlEmpezarRelleno[moneda] ?? 0)
+  const escala = ESCALA[moneda]
+  if (!escala) return azar() < 0.5
+  return azar() < Math.min(0.9, Math.max(0.1, 0.5 - neto / escala))
+}
+
 const desdeMovimiento = movimientos.length
 fechasAtras.forEach((fecha, dia) => {
   generarDia({
     fecha, indice: dia, azar, cotizacion: cotizacionAtras,
-    convieneQueEntre: () => azar() < 0.5,
+    convieneQueEntre: convieneQueEntreEnElRelleno,
     tomarGastoFijoDelMes, registrar, elenco,
   })
 })
@@ -389,50 +408,16 @@ const fmt = (n: number) => new Intl.NumberFormat('es-AR', { maximumFractionDigit
 const sinClasificar = movimientos.filter(m => !m.cuenta).length
 
 /**
- * El resultado mes a mes, calculado con el MISMO motor que la pantalla.
+ * El resultado mes a mes, con lo generado MÁS lo que ya está en la base.
  *
- * Es el control que de verdad importa antes de escribir: un generador puede producir
- * saldos correctos y, aun así, una serie que ningún negocio tendría —meses que varían
- * 500 %—, y eso se ve recién en el tablero, con los datos ya cargados. Acá se ve antes.
- *
- * Si la serie no convence, se vuelve a correr con `--semilla=` otro número.
+ * Sin lo que ya está, la serie muestra en cero los meses que este script no generó. Ver
+ * scripts/serie-demo.ts, que es el mismo bloque que usa `sembrar-demo.mts`.
  */
-const porMesDia = new Map<string, DiaAgg>()
-const diaSerie = (f: string): DiaAgg => {
-  let d = porMesDia.get(f)
-  if (!d) {
-    d = {
-      f, usd: parVacio(), eur: parVacio(), brl: parVacio(),
-      usdt: parVacio(), gbp: parVacio(), chq: parVacio(), g: 0, gcc: 0, tt: ttVacio(),
-    }
-    porMesDia.set(f, d)
-  }
-  return d
+const porDia = agruparPorDia(movimientos)
+for (const d of (await cargarGanancias(db, desde ?? primeraFecha, hoy)).dias) {
+  if (!porDia.has(d.f)) porDia.set(d.f, d)
 }
-const PAR_DE: Record<string, 'usd' | 'eur' | 'brl' | 'usdt' | 'gbp'> = {
-  dolares: 'usd', euros: 'eur', reales: 'brl', usdt: 'usdt', libras: 'gbp',
-}
-for (const m of movimientos) {
-  const d = diaSerie(m.fecha)
-  if (m.operacion === 'GASTOS') { d.g += Number(m.pesos) || 0; continue }
-  if (m.op === 'T') { d.tt.usd += Number(m.dolares) || 0; continue }
-  for (const [col, par] of Object.entries(PAR_DE)) {
-    const vol = Number(m[col]) || 0, ars = Number(m.pesos) || 0
-    const volcc = Number(m[`cc_${col}`]) || 0, arscc = Number(m.cc_pesos) || 0
-    const agg = d[par]
-    if (m.operacion === 'COMPRA' && vol > 0 && ars < 0) { agg.vC += vol; agg.aC += -ars }
-    if (m.operacion === 'VENTA' && vol < 0 && ars > 0) { agg.vV += -vol; agg.aV += ars }
-    if (volcc > 0 && arscc < 0) { agg.vCcc += volcc; agg.aCcc += -arscc }
-    if (volcc < 0 && arscc > 0) { agg.vVcc += -volcc; agg.aVcc += arscc }
-  }
-}
-const diasSerie = Array.from(porMesDia.values()).sort((a, b) => a.f.localeCompare(b.f))
-const serie = diasSerie.length
-  ? serieMensual(diasSerie, diasSerie[diasSerie.length - 1].f,
-      { cc: true, gastos: true, transferencias: true },
-      // Tantos meses como abarque lo generado.
-      mesesEntre(diasSerie[0].f, diasSerie[diasSerie.length - 1].f))
-  : []
+const serie = serieDeDias(porDia)
 
 /** Gastos por mes, que son los que antes hacían saltar el resultado. */
 const porMes = new Map<string, number>()
@@ -450,14 +435,8 @@ ${fechas.length ? `  Se agrega adelante      ${fechas[0]} → ${fechas[fechas.le
   De cuenta corriente     ${diario.length}
   Transferencias          ${movimientos.filter(m => m.op === 'T').length / 2} (dos patas cada una)
 ${desde ? `  SALDO INICIAL          se muda al ${desde} y se ajusta para que los saldos de hoy NO cambien\n` : ''}\
-RESULTADO POR MES — lo que va a mostrar el tablero
-${serie.map((m, i) => {
-  const prev = i > 0 ? serie[i - 1].neto : null
-  const v = prev && prev > 0 ? ((m.neto - prev) / prev * 100) : null
-  return `  ${m.mes}  ${fmt(m.neto).padStart(13)}   ${v === null ? '' : (v >= 0 ? '+' : '') + v.toFixed(1) + ' %'}`
-}).join('\n')}
-  Si la serie no convence —un negocio real no salta de un mes a otro—, volvé a correrlo
-  con --semilla=<otro numero>. Lo generado es repetible: la misma semilla da lo mismo.
+RESULTADO POR MES — lo que va a mostrar el tablero (lo nuevo MÁS lo que ya hay)
+${informeDeSerie(serie)}
 
 GASTOS POR MES (tienen que parecerse entre sí)
 ${Array.from(porMes.entries()).sort().map(([k, v]) => `  ${k}  ${fmt(v)}`).join('\n')}
@@ -480,7 +459,7 @@ if (VISTA_PREVIA) {
 
 // ── Escritura ──────────────────────────────────────────────────────────────
 {
-  console.log(`\n⚠️  Se va a ESCRIBIR en: ${new URL(BASE_URL).host}`)
+  console.log(`\n⚠️  Se va a ESCRIBIR en el proyecto: ${cred.proyecto}`)
   console.log('   Si no es la base de DEMOSTRACIÓN, cortá ahora con Ctrl+C.')
   if (!process.argv.includes('--sin-espera')) {
     for (let i = 5; i > 0; i--) {

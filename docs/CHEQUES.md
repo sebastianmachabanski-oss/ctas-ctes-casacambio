@@ -109,6 +109,50 @@ en cambio, se rechaza: ese identificador es único de verdad.
 **El caso simple.** Recibir un cheque al día como pago, sin descuento, usa el mismo
 circuito: el cheque cuelga del movimiento que sea. No hace falta un flujo aparte.
 
+### Los tres números del alta, y quién pone cada uno
+
+| | Quién lo pone |
+|---|---|
+| **Nominal** | La suma de los cheques de la lista. No se tipea. |
+| **Cotización** | El operador. Es obligatoria. |
+| **Pesos que salen** | El motor: nominal × cotización. No se tipea. |
+
+La cotización es **pesos por peso de nominal**: 0,88 quiere decir que se pagan 88 por
+cada 100 de cheque. Es lo que la app guarda y lo que el motor usa.
+
+### La tasa, segunda entrada de la cotización
+
+Agregada el 27/11/2026. **Nadie negocia en cotización.** El cliente dice *"te lo tomo al
+tres y medio mensual"* y el operador tiene que convertir de cabeza, con el plazo en el
+medio. Esa cuenta es donde se pierde plata.
+
+Entonces en una COMPRA de CHEQUES aparece una casilla **Tasa mensual** al lado de
+Cotización, y las dos están atadas: se escribe una y se completa la otra.
+
+```
+Cotización      0,9125        Tasa mensual     3,50
+75 días de plazo promedio     Directa sobre el nominal
+```
+
+Cuatro decisiones, todas en `src/lib/cheques-tasa.ts`:
+
+- **La tasa es DIRECTA y MENSUAL.** Directa es sobre el nominal, que es como se habla en
+  el mostrador; la efectiva —sobre la plata puesta— se muestra en la ficha del cheque
+  pero no se tipea. Mensual porque nadie cotiza "tasa del período".
+- **Escala lineal, no capitaliza.** 3,5 % a 60 días es 7 %, no 7,12 %. Es la convención
+  de la calle.
+- **El plazo sale de los cheques**, promedio ponderado por importe. Por eso la casilla
+  está apagada hasta que haya cheques cargados, y lo dice.
+- **Lo que se guarda sigue siendo la cotización.** La tasa no se persiste: es una ayuda
+  de carga, no un dato nuevo. Nada cambia en la base ni en el motor.
+
+Si se agrega un cheque después de tipear la tasa, el plazo cambia y **la cotización se
+recalcula sola** para respetar la tasa pactada. Al revés sería peor que no tener el
+campo: la pantalla mostraría una tasa que no es la de la cotización que se va a guardar.
+
+La aritmética la cubre `scripts/validar-tasa-cheques.mts`, incluida la ida y vuelta entre
+las dos casillas.
+
 ## Flujo 2 · La cartera: lo que se mira todos los días
 
 Pantalla nueva, **Cartera de cheques**. Es el producto de todo esto; lo demás es
