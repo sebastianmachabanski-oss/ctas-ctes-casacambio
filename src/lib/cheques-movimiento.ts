@@ -37,6 +37,7 @@ import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { calcularMovimiento, validarOperacion } from '@/lib/motor-calculo'
 import { hayColumnaVinculo } from '@/lib/diario'
+import { CONCEPTO_INCOBRABLE } from '@/lib/cheques'
 
 export type SalidaDeCheques = {
   /** Fecha del hecho, no del día en que se carga. */
@@ -154,6 +155,150 @@ export async function registrarSalidaDeCheques(
   }
 
   return { id: (fila as { id: string }).id }
+}
+
+/**
+ * La baja de un cheque incobrable: DOS movimientos, no uno.
+ *
+ * ── POR QUÉ DOS ────────────────────────────────────────────────────────────
+ * Lo natural sería una venta a cotización cero, pero el motor convierte el cero en uno
+ * (`cotBase = !cotizacion || cotizacion === 0 ? 1 : cotizacion`, réplica de la planilla) y
+ * registraría un cobro que nunca pasó. Y un `FALTANTE` deja la caja bien pero Ganancias
+ * peor: esa operación no entra al cálculo, así que el cheque seguiría contando como stock
+ * valuado a nominal y mostraría una ganancia por algo que nunca se cobró.
+ *
+ * La baja de un activo son dos asientos, y acá también:
+ *
+ *   1. VENTA de CHEQUES a nominal   → el cheque sale de la cartera
+ *   2. GASTOS en PESOS por el nominal → se da de baja contra pérdida
+ *
+ * Con un cheque de 100.000 comprado en 88.000:
+ *
+ *   caja      −88.000 (compra) +100.000 (salida) −100.000 (gasto) = −88.000
+ *   ganancias +12.000 (calce)                    −100.000 (gasto) = −88.000
+ *
+ * Las dos dan la plata que se sacó y no se recuperó. El gasto es por el NOMINAL y no por
+ * lo pagado porque los 12.000 de descuento ya se habían reconocido al comprar: dar de baja
+ * el documento entero borra la ganancia que no existió y el capital que sí se puso.
+ *
+ * ── EL CONCEPTO DEL GASTO ──────────────────────────────────────────────────
+ * Va en el campo CLIENTE, que es por donde la pantalla de Gastos busca. Así la pérdida por
+ * cheques se puede consultar aparte del alquiler y los sueldos.
+ */
+export async function registrarBajaIncobrable(
+  supabase: SupabaseClient<any, any, any>,
+  s: Omit<SalidaDeCheques, 'cotizacion'>,
+): Promise<{ idSalida: string } | { error: string }> {
+  // 1. El cheque sale a nominal.
+  const salida = await registrarSalidaDeCheques(supabase, { ...s, cotizacion: 1 })
+  if ('error' in salida) return salida
+
+  // 2. El gasto que lo da de baja. Lleva la MISMA referencia que la salida: es lo que
+  //    después permite encontrarlo para deshacer sin adivinar por importe y fecha.
+  const gasto = await registrarGastoIncobrable(supabase, s)
+  if ('error' in gasto) {
+    await borrarSalidaDeCheques(supabase, salida.id)
+    return { error: `${gasto.error}. La salida del cheque se deshizo; no quedó nada a medias.` }
+  }
+
+  return { idSalida: salida.id }
+}
+
+async function registrarGastoIncobrable(
+  supabase: SupabaseClient<any, any, any>,
+  s: Omit<SalidaDeCheques, 'cotizacion'>,
+): Promise<{ ok: true } | { error: string }> {
+  let impacto: { cuenta: string | null; valores: Record<string, number> }
+  try {
+    impacto = calcularMovimiento({
+      tipo: 'CAJA', operacion: 'GASTOS', propio: 'PESOS', externo: '',
+      monto: s.nominal, cotizacion: null, costoPorcentaje: null,
+    })
+  } catch (e: any) {
+    return { error: e?.message ?? 'No se pudo calcular el gasto' }
+  }
+
+  const vinculo = (await hayColumnaVinculo(supabase)) ? randomUUID() : null
+  const conVinculo = vinculo ? { vinculo } : {}
+  const comunes = {
+    fecha: s.fecha,
+    tipo: 'CAJA',
+    operacion: 'GASTOS',
+    monto: s.nominal,
+    origen: 'app',
+    notas: s.referencia,
+  }
+
+  const { error: errorDiario } = await (supabase as any).from('diario').insert({
+    ...conVinculo, ...comunes,
+    evento: s.referencia,
+    cuenta_cte: CONCEPTO_INCOBRABLE,
+    concepto: 'PESOS',
+    detalle: 'C',
+    moneda: 'PESOS',
+    creado_por: s.autor,
+    anulado: false,
+  })
+  if (errorDiario) return { error: `No se pudo registrar la pérdida: ${errorDiario.message}` }
+
+  const { error: errorCaja } = await (supabase as any).from('movimientos_caja').insert({
+    ...conVinculo, ...comunes,
+    fila_sheet: null,
+    op: 'C',
+    cliente: CONCEPTO_INCOBRABLE,
+    propio: 'PESOS',
+    externo: null,
+    cot: null,
+    cot_efectiva: 1,
+    cuenta: impacto.cuenta,
+    creado_por: s.autor,
+    creado_at: new Date().toISOString(),
+    ...Object.fromEntries(
+      Object.entries(impacto.valores).map(([k, v]) => [k.toLowerCase().replace(/\s+/g, '_'), v]),
+    ),
+  })
+  if (errorCaja) {
+    if (vinculo) await (supabase as any).from('diario').delete().eq('vinculo', vinculo)
+    return { error: `No se pudo registrar la pérdida en caja: ${errorCaja.message}` }
+  }
+  return { ok: true }
+}
+
+/**
+ * Deshace una baja: borra la salida del cheque y su gasto.
+ *
+ * El gasto se ubica por CONTENIDO —misma referencia, mismo concepto— porque el evento
+ * guarda un solo `movimiento_id` y ahí va el de la salida. Es el mismo criterio que usa
+ * `diario.ts` para la fila gemela: se borra solo si la coincidencia es ÚNICA, y con cero o
+ * varias se avisa en vez de adivinar. La referencia incluye el número de cheque, así que
+ * en la práctica siempre es una.
+ */
+export async function borrarBajaIncobrable(
+  supabase: SupabaseClient<any, any, any>,
+  movimientoSalida: string,
+  referencia: string,
+): Promise<{ ok: true; avisos: string[] } | { error: string }> {
+  const avisos: string[] = []
+
+  const { data: gastos } = await (supabase as any)
+    .from('movimientos_caja').select('id')
+    .eq('operacion', 'GASTOS').eq('cliente', CONCEPTO_INCOBRABLE).eq('notas', referencia)
+  const filas = ((gastos ?? []) as { id: string }[])
+
+  if (filas.length === 1) {
+    const res = await borrarSalidaDeCheques(supabase, filas[0].id)
+    if ('error' in res) return { error: `No se pudo borrar la pérdida: ${res.error}` }
+    if (res.avisoDiario) avisos.push(res.avisoDiario)
+  } else {
+    avisos.push(filas.length === 0
+      ? 'No se encontró el gasto de la baja: borralo a mano si existe.'
+      : `Hay ${filas.length} gastos con la misma referencia: no se borró ninguno. Revisalos a mano.`)
+  }
+
+  const res = await borrarSalidaDeCheques(supabase, movimientoSalida)
+  if ('error' in res) return { error: res.error }
+  if (res.avisoDiario) avisos.push(res.avisoDiario)
+  return { ok: true, avisos }
 }
 
 /**

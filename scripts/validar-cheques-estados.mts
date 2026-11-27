@@ -45,6 +45,8 @@ const ev = (...estados: Estado[]) => estados.map(estado => ({ estado }))
   assert(puedeIr('depositado', 'rechazado'), 'o el cheque rebota')
   assert(puedeIr('rechazado', 'depositado'), 'un rechazado se puede reintentar')
   assert(puedeIr('rechazado', 'devuelto'), 'o devolver al cliente')
+  assert(puedeIr('rechazado', 'incobrable'), 'o darlo por incobrable si nadie lo levanta')
+  assert(puedeIr('incobrable', 'rechazado'), 'y la baja se puede deshacer')
 }
 
 // ── 2. Los caminos que NO pueden existir ──────────────────────────────────
@@ -60,6 +62,12 @@ const ev = (...estados: Estado[]) => estados.map(estado => ({ estado }))
   assert(!puedeIr('endosado', 'depositado'), 'lo endosado tampoco')
   assert(!puedeIr('acreditado', 'rechazado'),
     'un cheque cobrado no puede rebotar después')
+  assert(!puedeIr('en_cartera', 'incobrable'),
+    'no se da por incobrable algo que nunca se presentó')
+  assert(!puedeIr('depositado', 'incobrable'),
+    'ni algo que todavía está en el banco: primero tiene que rebotar')
+  assert(!puedeIr('incobrable', 'depositado') && !puedeIr('incobrable', 'devuelto'),
+    'de la baja solo se vuelve al rechazo, que es de donde vino')
 
   // Nadie vuelve a su propio estado: sería un evento sin hecho detrás.
   for (const e of ESTADOS) assert(!puedeIr(e, e), `${e} no transiciona a sí mismo`)
@@ -81,8 +89,9 @@ const ev = (...estados: Estado[]) => estados.map(estado => ({ estado }))
     'lo que salió del circuito ya no es riesgo')
 
   assert(muevePlata('acreditado'), 'acreditar mueve plata')
+  assert(muevePlata('incobrable'), 'dar de baja un incobrable también')
   for (const e of ESTADOS) {
-    if (e === 'acreditado') continue
+    if (e === 'acreditado' || e === 'incobrable') continue
     assert(!muevePlata(e), `${e} todavía no mueve plata`)
   }
 

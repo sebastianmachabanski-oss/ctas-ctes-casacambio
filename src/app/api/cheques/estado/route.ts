@@ -1,8 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { esStaff } from '@/lib/roles'
-import { ESTADOS, ESTADO_LABEL, puedeIr, CLIENTE_SIN_BANCO, type Estado } from '@/lib/cheques'
-import { registrarSalidaDeCheques, borrarSalidaDeCheques } from '@/lib/cheques-movimiento'
+import {
+  ESTADOS, ESTADO_LABEL, puedeIr, CLIENTE_SIN_BANCO, CONCEPTO_INCOBRABLE, type Estado,
+} from '@/lib/cheques'
+import {
+  registrarSalidaDeCheques, borrarSalidaDeCheques,
+  registrarBajaIncobrable, borrarBajaIncobrable,
+} from '@/lib/cheques-movimiento'
+
+/**
+ * La referencia de una baja. Lleva el id del cheque porque es lo que hace la coincidencia
+ * ÚNICA cuando hay que encontrar el gasto para deshacerla: dos cheques del mismo número y
+ * el mismo importe existen, dos con el mismo id no.
+ */
+const referenciaBaja = (numero: string, chequeId: string) =>
+  `Baja por incobrable del cheque ${numero} · ${chequeId}`
 
 // Cambia el estado de uno o varios cheques (23/11/2026).
 //
@@ -118,7 +131,35 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── DESHACER UNA ACREDITACIÓN ───────────────────────────────────────────
+  // ── DAR DE BAJA UN INCOBRABLE ───────────────────────────────────────────
+  //
+  // Dos movimientos por cheque: la salida a nominal y el gasto que la da de baja. Van de
+  // a uno y no en tanda porque la referencia tiene que identificar al cheque — es lo que
+  // después permite encontrar el gasto para deshacer sin adivinar.
+  const bajas: { id: string; referencia: string }[] = []
+  if (destino === 'incobrable') {
+    for (const f of filas) {
+      const referencia = referenciaBaja(f.numero, f.id)
+      const res = await registrarBajaIncobrable(supabase, {
+        fecha,
+        cliente: CONCEPTO_INCOBRABLE,
+        nominal: Number(f.importe) || 0,
+        referencia,
+        autor: (profile as any)?.nombre ?? user.email ?? 'app',
+      })
+      if ('error' in res) {
+        for (const b of bajas) await borrarBajaIncobrable(supabase, b.id, b.referencia)
+        return NextResponse.json({
+          error: `No se pudo dar de baja el cheque ${f.numero}: ${res.error}. `
+            + 'No se marcó ninguno.',
+        }, { status: 500 })
+      }
+      bajas.push({ id: res.idSalida, referencia })
+      movimientosCreados.push({ id: res.idSalida, chequeIds: [f.id] })
+    }
+  }
+
+  // ── DESHACER UNA ACREDITACIÓN O UNA BAJA ────────────────────────────────
   // Volver a `depositado` desde `acreditado` borra el movimiento de cobro. Se busca por
   // el evento que lo dejó anotado, que es exactamente para lo que existe esa columna.
   //
@@ -132,6 +173,28 @@ export async function POST(request: Request) {
   // `en_cartera` si fue por ventanilla. Lo que importa no es a dónde va sino DE DÓNDE
   // viene — si el cheque estaba acreditado, su cobro hay que borrarlo.
   const avisos: string[] = []
+
+  // Deshacer una BAJA: borra la salida del cheque y el gasto que lo dio de baja. El gasto
+  // se encuentra por la referencia, que lleva el id del cheque — ver `referenciaBaja`.
+  if (destino === 'rechazado') {
+    for (const f of filas.filter(x => x.estado === 'incobrable')) {
+      const { data: ev } = await (supabase as any)
+        .from('cheques_eventos').select('movimiento_id')
+        .eq('cheque_id', f.id).eq('estado', 'incobrable').not('movimiento_id', 'is', null)
+        .order('creado_en', { ascending: false }).limit(1).maybeSingle()
+      const movId = (ev as { movimiento_id: string } | null)?.movimiento_id
+      if (!movId) {
+        avisos.push(`No se encontró la baja del cheque ${f.numero}: revisá la caja a mano.`)
+        continue
+      }
+      const res = await borrarBajaIncobrable(supabase, movId, referenciaBaja(f.numero, f.id))
+      if ('error' in res) return NextResponse.json({
+        error: `No se pudo deshacer la baja: ${res.error}. No se movió ningún cheque.`,
+      }, { status: 500 })
+      avisos.push(...res.avisos)
+    }
+  }
+
   const vuelvenDeAcreditado = filas.filter(f => f.estado === 'acreditado').map(f => f.id)
   if ((destino === 'depositado' || destino === 'en_cartera') && vuelvenDeAcreditado.length) {
     const { data: evs } = await (supabase as any)
@@ -156,7 +219,13 @@ export async function POST(request: Request) {
   const { error: errorUpdate } = await (supabase as any)
     .from('cheques').update({ estado: destino }).in('id', ids)
   if (errorUpdate) {
-    for (const m of movimientosCreados) await borrarSalidaDeCheques(supabase, m.id)
+    // Cada tipo de movimiento se deshace con su propio borrador: una baja son DOS filas y
+    // `borrarSalidaDeCheques` solo sacaría la primera, dejando el gasto huérfano.
+    if (bajas.length) {
+      for (const b of bajas) await borrarBajaIncobrable(supabase, b.id, b.referencia)
+    } else {
+      for (const m of movimientosCreados) await borrarSalidaDeCheques(supabase, m.id)
+    }
     return NextResponse.json({
       error: errorUpdate.message
         + (movimientosCreados.length ? ' — el movimiento de cobro se deshizo.' : ''),

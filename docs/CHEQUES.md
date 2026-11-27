@@ -291,6 +291,64 @@ estado → rechazado
    └─ se asume la pérdida                              → movimiento
 ```
 
+### Las salidas, una por una (27/11/2026)
+
+Cheque de **100.000** comprado en **88.000** (cotización 0,88).
+
+**Marcar `rechazado` no mueve plata.** El cheque todavía puede reintentarse: no pasó nada
+definitivo. La plata se mueve al **resolver** el rechazo, que es un segundo momento.
+
+| Salida | Estado | Movimientos |
+|---|---|---|
+| Reintentar el depósito | `depositado` | ninguno |
+| Repone en efectivo | `devuelto` | VENTA · CHEQUES → PESOS · 100.000 · cot 1 |
+| Se lo debito en cuenta | `devuelto` | esa VENTA **+** CTA CTE · EGRESAN · PESOS · 100.000 |
+| Canje por otro cheque | `devuelto` | esa VENTA **+** COMPRA del cheque nuevo |
+| Nadie lo levanta | `incobrable` | esa VENTA **+** GASTOS · PESOS · 100.000 |
+
+**Se le cobra el NOMINAL, no lo adelantado.** El cliente endosó un documento de 100.000 y
+garantizó que se pagaba: debe 100.000. Devolver solo los 88.000 dejaría a la casa
+trabajando gratis, habiendo puesto la plata y corrido el riesgo. El campo queda editable
+para negociar caso por caso.
+
+**La cuenta corriente necesita dos filas, no una.** El motor no tiene columna
+`CC CHEQUES` y corta con un error explícito, así que el cheque sale contra caja y la
+cuenta del cliente se debita por separado. Neto: el cheque sale, la caja de pesos no se
+mueve, el cliente queda debiendo.
+
+### El incobrable
+
+Estado propio, no `devuelto`: ahí el cliente resolvió y se llevó el papel; acá la casa se
+quedó con un documento que no vale. Mezclarlos haría que la pérdida por incobrables deje
+de poder consultarse.
+
+**Son dos movimientos, y el porqué importa.** Lo natural sería una venta a cotización
+cero, pero el motor convierte el cero en uno y registraría un cobro que nunca pasó. Y un
+`FALTANTE` deja la caja bien pero **Ganancias peor**: esa operación no entra al cálculo,
+así que el cheque seguiría contando como stock valuado a nominal y mostraría ganancia por
+algo que nunca se cobró.
+
+| | Caja | Ganancias |
+|---|---|---|
+| Compra | −88.000 | — |
+| Salida del cheque a nominal | +100.000 | +12.000 (calce) |
+| Gasto | −100.000 | −100.000 |
+| **Neto** | **−88.000** | **−88.000** |
+
+**El gasto es por el nominal y no por lo pagado** porque los 12.000 de descuento ya se
+habían reconocido al comprar. Dar de baja el documento entero borra la ganancia que no
+existió y el capital que sí se puso. Si el gasto fuera 88.000, la pérdida informada sería
+76.000.
+
+El gasto lleva el concepto fijo `CHEQUE INCOBRABLE` en el campo CLIENTE, que es por donde
+la pantalla de Gastos busca: así la pérdida por cheques se consulta aparte del alquiler y
+los sueldos.
+
+**Se puede deshacer:** vuelve a `rechazado` y se borran las dos filas. El gasto se ubica
+por la referencia, que lleva el id del cheque para que la coincidencia sea única.
+
+---
+
 En los tres casos hay un movimiento, y **su id va guardado en el evento**
 (`cheques_eventos.movimiento_id`). Para eso existe esa columna: para poder
 reconstruir, meses después, qué se hizo con cada rechazo y cuánto costó.

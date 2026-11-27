@@ -11,6 +11,7 @@
 
 export const ESTADOS = [
   'en_cartera', 'depositado', 'acreditado', 'rechazado', 'endosado', 'devuelto',
+  'incobrable',
 ] as const
 export type Estado = typeof ESTADOS[number]
 
@@ -21,6 +22,7 @@ export const ESTADO_LABEL: Record<Estado, string> = {
   rechazado: 'Rechazado',
   endosado: 'Endosado',
   devuelto: 'Devuelto',
+  incobrable: 'Incobrable',
 }
 
 /**
@@ -38,8 +40,15 @@ export const TRANSICIONES: Record<Estado, readonly Estado[]> = {
   en_cartera: ['depositado', 'acreditado', 'endosado', 'devuelto'],
   // Un cheque depositado se acredita o rebota: no hay tercera opción.
   depositado: ['acreditado', 'rechazado'],
-  // Rechazado se puede reintentar (el librador dice que ya hay fondos) o devolver.
-  rechazado: ['depositado', 'devuelto'],
+  // Las salidas del rechazo (27/11/2026). El rechazo en sí NO mueve plata: el cheque
+  // todavía puede reintentarse, no pasó nada definitivo. La plata se mueve al RESOLVERLO,
+  // que es un segundo momento:
+  //   · reintentar        → `depositado`, sin plata
+  //   · repone en efectivo → `devuelto`, el cheque sale contra caja
+  //   · se lo debito       → `devuelto`, el cheque sale y la cuenta del cliente se debita
+  //   · canje por otro     → `devuelto`, sale el viejo y entra el nuevo
+  //   · nadie lo levanta   → `incobrable`, el cheque se da de baja contra pérdida
+  rechazado: ['depositado', 'devuelto', 'incobrable'],
   // Acreditado dejó de ser terminal el 27/11/2026, cuando pasó a generar el movimiento de
   // plata. Antes un clic equivocado solo ponía mal un estado; ahora mete dinero en la
   // caja, y una operación que mueve plata sin forma de deshacerse se arregla tocando la
@@ -48,6 +57,9 @@ export const TRANSICIONES: Record<Estado, readonly Estado[]> = {
   acreditado: ['depositado', 'en_cartera'],
   endosado: [],
   devuelto: [],
+  // Dar de baja un cheque mueve plata, así que tiene que poder deshacerse: vuelve al
+  // rechazo del que vino y se borran las dos filas de la baja.
+  incobrable: ['rechazado'],
 }
 
 /**
@@ -57,8 +69,18 @@ export const TRANSICIONES: Record<Estado, readonly Estado[]> = {
  * cuando ninguna transición tocaba la caja. Ahora acreditar genera un movimiento: es
  * reversible, pero confirmarlo importa más que antes, no menos.
  */
-export const MUEVE_PLATA: readonly Estado[] = ['acreditado']
+export const MUEVE_PLATA: readonly Estado[] = ['acreditado', 'incobrable']
 export const muevePlata = (e: Estado): boolean => MUEVE_PLATA.includes(e)
+
+/**
+ * El concepto con el que se registra la baja de un incobrable.
+ *
+ * Va en el campo CLIENTE del gasto, que es por donde la pantalla de Gastos busca y
+ * agrupa. Sin un concepto fijo, la pérdida por cheques quedaría mezclada con el alquiler
+ * y los sueldos, y dejaría de poder consultarse — que es justo el número que justifica
+ * medir la concentración por librador.
+ */
+export const CONCEPTO_INCOBRABLE = 'CHEQUE INCOBRABLE'
 
 /**
  * Con quién se liquida un cobro cuando el cheque no tiene banco cargado.

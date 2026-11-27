@@ -23,6 +23,7 @@ const SOLAPAS: [string, string][] = [
 function Estado({ c, hoy }: { c: Cheque; hoy: string }) {
   if (vencidoSinDepositar(c, hoy)) return <span className="tag tag-red">Vencido</span>
   if (c.estado === 'rechazado') return <span className="tag tag-red">Rechazado</span>
+  if (c.estado === 'incobrable') return <span className="tag tag-red">Incobrable</span>
   if (c.estado === 'depositado') return <span className="tag tag-blue">Depositado</span>
   if (c.estado === 'acreditado') return <span className="tag tag-green">Acreditado</span>
   return <span className="tag tag-gray">{ESTADO_LABEL[c.estado]}</span>

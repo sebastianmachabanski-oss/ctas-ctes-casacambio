@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { esStaff } from '@/lib/roles'
 import { hoyArgentina } from '@/lib/periodos'
 import {
-  resumenCartera, concentracionPorLibrador, esActivo,
+  resumenCartera, concentracionPorLibrador, esActivo, ESTADOS,
   type Cheque, type Estado,
 } from '@/lib/cheques'
 import { tasaDeCartera, type Origen } from '@/lib/cheques-tasa'
@@ -37,7 +37,10 @@ const FILTROS: Record<string, readonly Estado[]> = {
   cartera: ['en_cartera', 'depositado'],
   depositados: ['depositado'],
   rechazados: ['rechazado'],
-  todos: ['en_cartera', 'depositado', 'acreditado', 'rechazado', 'endosado', 'devuelto'],
+  // "Todos" sale de ESTADOS y no de una lista escrita a mano: al agregar `incobrable` el
+  // 27/11/2026 una lista aparte lo habría dejado invisible en la única solapa que promete
+  // mostrarlo todo, sin que nada fallara.
+  todos: ESTADOS,
 }
 
 export default async function ChequesPage({ searchParams }: {

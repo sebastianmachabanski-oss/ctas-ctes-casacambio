@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import {
   ESTADO_LABEL, TRANSICIONES, esTerminal, muevePlata, estadoAnterior,
   textoVencimiento, vencidoSinDepositar,
-  pesos, pesosExacto, fechaLarga, CLIENTE_SIN_BANCO,
+  pesos, pesosExacto, fechaLarga, CLIENTE_SIN_BANCO, CONCEPTO_INCOBRABLE,
   type Cheque, type Estado, type Evento,
 } from '@/lib/cheques'
 import { costoDeCheque, tasaTexto, plazoTexto } from '@/lib/cheques-tasa'
@@ -25,6 +25,7 @@ const ACCION: Record<Estado, string> = {
   endosado: 'Endosar a un tercero',
   devuelto: 'Devolver al cliente',
   en_cartera: 'Volver a cartera',
+  incobrable: 'Darlo por incobrable',
 }
 
 const COLOR_EVENTO: Record<Estado, string> = {
@@ -34,6 +35,7 @@ const COLOR_EVENTO: Record<Estado, string> = {
   rechazado: '#d03b3b',
   endosado: '#7c3aed',
   devuelto: '#8a94a6',
+  incobrable: '#7f1d1d',
 }
 
 function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
@@ -96,6 +98,7 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
   const deshacerCobro = cheque.estado === 'acreditado'
     ? (estadoAnterior(eventos, 'acreditado') ?? 'depositado')
     : null
+  const deshacerBaja = cheque.estado === 'incobrable'
   const posibles = deshacerCobro ? [deshacerCobro] : TRANSICIONES[cheque.estado]
 
   // A qué tasa se tomó este documento. Sale de la operación que lo trajo; devuelve null
@@ -371,10 +374,13 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
             <>
               <span style={{ fontSize: 12.5, color: 'var(--ink-1)' }}>
                 <b>{ACCION[confirmando]}.</b>{' '}
-                {muevePlata(confirmando)
+                {confirmando === 'acreditado'
                   ? `Entran ${pesos(cheque.importe)} a la caja, a nombre de `
                     + `${cheque.banco?.trim() || CLIENTE_SIN_BANCO}.`
-                  : 'Sale de la cartera y no se puede deshacer desde la pantalla.'}
+                  : confirmando === 'incobrable'
+                    ? `El cheque se da de baja y la pérdida va a Gastos como `
+                      + `"${CONCEPTO_INCOBRABLE}". Se puede deshacer.`
+                    : 'Sale de la cartera y no se puede deshacer desde la pantalla.'}
               </span>
               {/* LA FECHA DEL HECHO. Un cobro marcado tres días tarde tiene que entrar a
                   la caja con la fecha en que el banco pagó, o el arqueo de ese día no
@@ -407,7 +413,9 @@ export default function FichaView({ cheque, eventos, origen, hoy, imagen }: {
                   {enviando === destino ? 'Registrando…'
                     : deshacerCobro
                       ? `Deshacer el cobro (vuelve a ${ESTADO_LABEL[destino].toLowerCase()})`
-                      : ACCION[destino]}
+                      : deshacerBaja
+                        ? 'Deshacer la baja (vuelve a rechazado)'
+                        : ACCION[destino]}
                 </button>
               ))}
             </>
